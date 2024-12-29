@@ -1,10 +1,10 @@
 import { createReadStream } from "fs";
 import readline from "readline";
-import js from './syntax';
-import type { Declarators, Keywords, Statements, Utils } from "./syntax";
+import js from './syntaxContexts';
+import type { Declarators, Keywords, Statements, Utils } from "./syntaxContexts";
 import { log } from "@/utils";
-import { once } from "./utils";
-import { parse_body, parse_function, parse_object, parse_expression, parse_params, parse_string } from "./parse";
+import * as parse_function from "./parse";
+import ContextData from "./ContextData";
 
 
 class RL {
@@ -30,7 +30,14 @@ class RL {
 
 }
 
-type ContextTypes = 'body' | 'expression' | 'string' | 'function' | 'params' | 'object';
+type ContextTypes =
+  | 'body'
+  | 'expression'
+  | 'string'
+  | 'function'
+  | 'params'
+  | 'object'
+  | 'pattern'
 
 type Context = {
   global: { [key: string]: unknown },
@@ -47,7 +54,7 @@ type ParseParams<T extends Object> = {
   sequence: string;
   context_data: ContextData<T>;
   // WIP
-  start_node(type: string, props: { [key: string]: any }): any;
+  start_node(type: string, props?: { [key: string]: any }): any;
   end_node(): any;
   // WIP
   update_context(new_context: ContextTypes, data?: { [key: string]: unknown; }): void;
@@ -55,25 +62,6 @@ type ParseParams<T extends Object> = {
 } & Utils
 
 export type Parse<T extends Object = {}> = (api: ParseParams<T>) => any;
-
-class ContextData<T extends Object = {}> {
-
-  private data: any = {};
-
-  constructor(init: T = {} as T) {
-    Object.assign(this, init);
-  }
-
-  set = (obj: { [key: string]: (context: T) => any }) => {
-
-    const [key, fn] = Object.entries(obj)[0] as [string, any];
-    if (!this.data[key]) {
-      this.data[key] = fn(this);
-    }
-    return this.data[key]
-
-  }
-}
 
 class Parser {
 
@@ -94,7 +82,7 @@ class Parser {
 
   private context: Context = {
     global: {},
-    data: [new ContextData()],
+    data: [new ContextData({}, "body")],
     buffer: ["body"]
   }
 
@@ -131,16 +119,20 @@ class Parser {
   }
 
   private update_context = (new_context: ContextTypes, data: { [key: string]: unknown } = {}) => {
+
     this.context.buffer.push(new_context);
-    this.context.data.push(new ContextData(data));
     this.current_context = `parse_${new_context}`;
-    this.api.context_data = this.context.data.at(-1) as ContextData<{}>;
+
+    const context_data = new ContextData(data, new_context);
+    this.context.data.push(context_data);
+    this.api.context_data = context_data;
+
   }
 
 
   private start_node = (type: string, props = {}) => {
 
-    console.log('called start node', props)
+    // console.log('called start node', props)
 
     const node: any = {
       ...props,
@@ -236,6 +228,7 @@ class Parser {
 
       this.api.char = this.char;
       this.api.sequence = this.sequence;
+      // this.api.context_data = this.context.data.at(-1) as any;
 
       this.parse[this.current_context](this.api);
 
@@ -257,14 +250,7 @@ class Parser {
     console.log(this.ast.body)
   }
 
-  private parse: { [key in `parse_${ContextTypes}`]: Parse<{}> } = {
-    parse_body,
-    parse_string,
-    parse_params,
-    parse_object,
-    parse_function,
-    parse_expression,
-  }
+  private parse: { [key in `parse_${ContextTypes}`]: Parse<{}> } = parse_function;
 
 
 

@@ -4,6 +4,7 @@ export const parse_body: Parse = ({
   char,
   sequence,
   isKeyword,
+  isDeclarator,
   avoid_multiple_whitespace
 }) => {
 
@@ -15,6 +16,8 @@ export const parse_body: Parse = ({
     switch (true) {
       case isKeyword(sequence, true):
         break;
+      case isDeclarator(sequence, true):
+        break;
     }
 
   }
@@ -22,8 +25,16 @@ export const parse_body: Parse = ({
   // if (/\s/.test(this.char))
 }
 
+export const parse_pattern: Parse = ({
+  char,
+  context_data
+}) => {
+
+}
+
 export const parse_object: Parse<{ destructure?: boolean }> = ({
-  char
+  char,
+  context_data,
 }) => {
 
   // if (!this.state.object_node) {
@@ -81,7 +92,8 @@ export const parse_function: Parse<{ async?: boolean }> = ({
 
   // context_data.set("fn_node", start_node)
 
-  const fn_node = context_data.set({ fn_node: ({ async }) => start_node('Function', { async }) })
+  // const fn_node = context_data.set(({ async }) => start_node('Function', { async }))
+  const obj = context_data.set({ foo: 'bar' })
 
 
   if (/[(]/.test(char.curr)) {
@@ -94,7 +106,7 @@ export const parse_function: Parse<{ async?: boolean }> = ({
       case "function":
         break;
       default: {
-        fn_node.name = sequence;
+        // fn_node.name = sequence;
       }
     }
   }
