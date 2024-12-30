@@ -8,12 +8,31 @@ type L = typeof lexical;
 const JS: Define<C, L> = {
   context,
   lexical,
-  parser: ({ isDeclarator }) => {
+  parser: ({ avoidMultipleWhitespace, isDeclarator, isKeyword }) => {
 
     return {
-      parseBody() { },
+      parseBody({ char, sequence }) {
+
+        if (avoidMultipleWhitespace()) {
+          return;
+        }
+
+        if (/[\s(]/.test(char.curr)) {
+          console.log(sequence)
+          switch (true) {
+            case isKeyword(sequence, true):
+              break;
+            case isDeclarator(sequence, true):
+              break;
+          }
+
+        }
+
+      },
       parseVariable() { },
-      parseFunction() { },
+      parseFunction() {
+        console.log('parse function')
+      },
       parseParams() { },
       parseClass() { },
       parseModule() { },

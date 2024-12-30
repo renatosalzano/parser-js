@@ -68,12 +68,12 @@ class Parser {
     endNode: this.end_node
   } as any;
 
-  private parser = {}
+  private parser: any = {}
 
   private constructor() {
     this.nodes.push(this.ast as any);
     this.current_context = {
-      type: 'parse_body',
+      type: 'parseBody',
       data: this.context.buffer[0][1]
     }
 
@@ -96,13 +96,13 @@ class Parser {
         this.sequence += this.char.curr;
       }
 
-      this.api.char = this.char;
-      this.api.sequence = this.sequence;
-
-      // this.parser[this.current_context.type].call(
-      //   this.current_context.data,
-      //   this.api
-      // );
+      this.parser[this.current_context.type].call(
+        this.current_context.data,
+        {
+          char: this.char,
+          sequence: this.sequence
+        }
+      );
 
       if (this.sequence_reg.test(this.char.curr)) {
         this.sequence = '';
@@ -127,10 +127,13 @@ class Parser {
     console.log('called extend')
 
     for (const key in lexical) {
-      instance.api[key] = lexical[key];
-    }
+      if (key.startsWith('is')) {
+        instance.api[key] = () => (lexical[key] as any).call(instance);
+      } else {
+        instance.api[key] = lexical[key];
+      }
 
-    console.log(instance.api)
+    }
 
     instance.parser = {
       ...instance.parser,
@@ -143,7 +146,7 @@ class Parser {
   static transform = <T = typeof JS.context>(path: string, visitors: { [K in keyof T]: any }) => {
     instance ??= new this();
     instance.Reader = new Reader(path);
-    // instance.Reader.read(instance.readline);
+    instance.Reader.read(instance.readline);
     instance = null;
   }
 }

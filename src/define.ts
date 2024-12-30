@@ -4,7 +4,16 @@ type JS = typeof javascript;
 
 type obj = { [key: string]: any }
 
-type ParseCtx<T extends unknown = {}> = (this: T) => any;
+type ParseParams = {
+  char: {
+    curr: string;
+    prev: string;
+    next: string;
+  },
+  sequence: string;
+
+}
+type ParseCtx<T extends unknown = {}> = (this: T, parser: ParseParams) => any;
 type Ctx<C> = (name: keyof C, data?: obj) => (parser: any) => void;
 
 type Lexical<T extends obj = obj> = {
@@ -43,7 +52,7 @@ function defineLexical<T>(defineLexical: (ctx: Ctx<any>) => T) {
     lexical[Key] = function (this: any, sequence: string, updateContext?: boolean) {
       const ret = lexical.hasOwnProperty(sequence);
       if (updateContext) {
-        (ret as any)[sequence](this)
+        lexical[sequence](this)
       }
       return ret;
     }
@@ -51,7 +60,7 @@ function defineLexical<T>(defineLexical: (ctx: Ctx<any>) => T) {
 
   return lexical as { [K in keyof T]: T[K] } & {
     // @ts-ignore
-    [K in keyof T as `is${Capitalize<K>}`]: (this: any, sequence: string, updateContext?: boolean) => void;
+    [K in keyof T as `is${Capitalize<K>}`]: (this: any, sequence: string, updateContext?: boolean) => boolean;
   }
 }
 
