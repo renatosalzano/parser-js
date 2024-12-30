@@ -7,13 +7,13 @@
     "allowJs": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "baseUrl": "./src",
-    "outDir": "./dist",
+    "baseUrl": "src",
+    "outDir": "dist",
     "declaration": true,
     "noEmit": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@/*": [ "*" ],
+      "utils/*": [ "src/utils/*" ],
     }
   },
   "include": [ "src/**/*" ],

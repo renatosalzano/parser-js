@@ -1,15 +1,3 @@
-
-if (!Set.prototype.difference) {
-  Set.prototype.difference = function (otherSet) {
-    const result = new Set();
-    for (const value of this) {
-      if (!otherSet.has(value)) {
-        result.add(value);
-      }
-    } return result;
-  };
-};
-
 const colors = {
   // fg
   0: 30,

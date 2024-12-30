@@ -46,18 +46,14 @@ async function main() {
     outfile: 'dist/index.js',
     // external: ['vscode'],
     logLevel: 'silent',
-    // tsconfig: 'tsconfig.json',
+    tsconfig: 'tsconfig.json',
     plugins: [
       aliasPath({
         alias: {
-          '@': './src'
+          'utils': './src/utils'
         }
       })
     ]
-    // plugins: [
-    // 	/* add to the end of plugins array */
-    // 	esbuildProblemMatcherPlugin,
-    // ],
   });
 
   if (watch) {

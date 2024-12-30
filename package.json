@@ -1,5 +1,5 @@
 {
-  "name": "esparser",
+  "name": "parser",
   "type": "module",
   "scripts": {
     "dev": "npm-run-all -p dev:*",
