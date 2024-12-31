@@ -1,15 +1,6 @@
 import contextMap from './context';
 import { defineLexical } from '../define';
 
-const brackets = {
-  "(": { type: "BracketR" },
-  ")": { type: "BracketL" },
-  "[": { type: "SquareBracketR" },
-  "]": { type: "SquareBracketL" },
-  "{": { type: "CurlyBracketR" },
-  "}": { type: "CurlyBracketL" }
-};
-
 type ContextJS = typeof contextMap;
 
 type Ctx<C> = (name: keyof C, data?: any) => (parser: any) => void;

@@ -6,6 +6,15 @@ import { resolve } from "path";
 import Reader from "Reader";
 import { log } from "utils";
 
+const brackets = {
+  "(": { type: "bracketL" },
+  ")": { type: "bracketR" },
+  "[": { type: "squareL" },
+  "]": { type: "squareR" },
+  "{": { type: "curlyL" },
+  "}": { type: "curlyR" }
+};
+
 function regEq(reg1?: RegExp, reg2?: RegExp) {
   if (reg1 && reg2) {
     return reg1.source === reg2.source && reg1.flags === reg2.flags;
@@ -61,7 +70,7 @@ class Parser {
 
   private context = {
     global: {},
-    buffer: [["Body", ContextData()]]
+    buffer: [["Body", ContextData(), 0]]
   }
 
   private curr_context: {
@@ -96,10 +105,10 @@ class Parser {
     this.set_sequence_rule(rules.sequenceRule);
   }
 
-  private update_context = (Context: string, data = {}, sequence_length = 0) => {
+  private update_context = (Context: string, data = {}, start_offset = 0) => {
 
     const curr_context = this.curr_context.name;
-    const context_start = this.index - sequence_length;
+    const context_start = this.index - start_offset;
 
     this.load_rules(Context);
 
@@ -221,7 +230,38 @@ class Parser {
     return this.curr_node;
   }
 
+  private eat = (char: string) => {
+
+  }
+
+  private brackets: { [key: string]: string } = {
+    "(": 'bracketL',
+    ")": 'bracketR',
+    "[": 'squareL',
+    "]": 'squareR',
+    "{": 'curlyL',
+    "}": 'curlyR',
+  }
+
+  /**
+   * Checks if the current or next character is a bracket.
+   * This allows you to anticipate actions, such as changing context,
+   * where the context will start exactly where the bracket begins.
+   * 
+   * @param {boolean} [next_char=true] - If true, checks the next character; otherwise, checks the current character.
+   * @returns {string} - Returns the type of bracket if found, otherwise an empty string.
+   */
+  private check_brackets = (next_char: boolean = true): string => {
+    const char = this.char[(next_char ? 'next' : 'curr')];
+    if (this.brackets[char]) {
+      return this.brackets[char];
+    }
+    return '';
+  }
+
+
   private api = {
+    eat: this.eat,
     getNode: this.get_node,
     updateContext: this.update_context,
     endContext: this.end_context,
@@ -229,6 +269,12 @@ class Parser {
     startNode: this.start_node,
     endNode: this.end_node,
     appendNode: this.append_node,
+    bracketL: (n: boolean) => this.check_brackets(n) === 'bracketL',
+    bracketR: (n: boolean) => this.check_brackets(n) === 'bracketR',
+    squareL: (n: boolean) => this.check_brackets(n) === 'squareL',
+    squareR: (n: boolean) => this.check_brackets(n) === 'squareR',
+    curlyL: (n: boolean) => this.check_brackets(n) === 'curlyL',
+    curlyR: (n: boolean) => this.check_brackets(n) === 'curlyR',
   } as any;
 
   private line: string = ''

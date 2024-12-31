@@ -48,13 +48,19 @@ type Node<T> = {
 
 type ParserApi<C, L> = {
   avoidWhitespace(onlyMultiple?: boolean): boolean;
-  setSequenceRule(captureReg?: RegExp, replaceReg?: RegExp): void;
-  updateContext<T>(newContext: keyof JS['context'] | keyof C, data?: T): void;
+  setSequenceRule(breakReg?: RegExp, replaceReg?: RegExp): void;
+  updateContext<T>(newContext: keyof JS['context'] | keyof C, data?: T, startOffset?: number): void;
   endContext(): void;
   startNode<T>(name: keyof JS['context'] | keyof C, data?: T): Node<T>;
-  endNode(appendTo?: boolean): void;
+  endNode<T>(node: T): T;
   getNode<T>(index?: number): Node<T>;
   appendNode<T>(node: T): void;
+  bracketL(nextChar?: boolean): boolean;
+  bracketR(nextChar?: boolean): boolean;
+  squareL(nextChar?: boolean): boolean;
+  squareR(nextChar?: boolean): boolean;
+  curlyL(nextChar?: boolean): boolean;
+  curlyR(nextChar?: boolean): boolean;
 }
   & JS["lexical"] & L
 

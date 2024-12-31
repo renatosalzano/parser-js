@@ -46,7 +46,11 @@ const JS: Define<C, L> = {
     startNode,
     endNode,
     isDeclarator,
-    isKeyword
+    isKeyword,
+    bracketL,
+    bracketR,
+    curlyL,
+    curlyR
   }) => ({
 
     parseBody({ char, sequence }) {
@@ -80,7 +84,7 @@ const JS: Define<C, L> = {
         returnType: 'void'
       })
 
-      if (/[(]/.test(char.curr)) {
+      if (bracketL()) {
         this.parsed_params = true;
         updateContext('Params', { params: this.params });
         return
@@ -117,12 +121,12 @@ const JS: Define<C, L> = {
     parseParams({ char }) {
 
       if (/{/.test(char.curr)) {
-        updateContext('Pattern', { type: 'object', params: this.params });
+        updateContext('Pattern', { type: 'object', params: this.params }, -1);
         return;
       }
 
       if (/\[/.test(char.curr)) {
-        updateContext('Pattern', { type: 'array', params: this.params });
+        updateContext('Pattern', { type: 'array', params: this.params }, -1);
         return;
       }
 
@@ -142,7 +146,7 @@ const JS: Define<C, L> = {
     parsePattern({ char, sequence }) {
 
       if (/[{]/.test(char.curr)) {
-        updateContext('Pattern', { type: "object" })
+        updateContext('Pattern', { type: "object" },)
         return;
       }
 
@@ -175,8 +179,10 @@ const JS: Define<C, L> = {
           this.node.properties.push({ key, type: 'rest' })
         }
 
+        endNode(this.node)
+
         if (this.params) {
-          this.params.push(endNode(this.node))
+          this.params.push(this.node)
         }
 
         endContext()
