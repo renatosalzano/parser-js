@@ -1,5 +1,5 @@
 import ContextData from "ContextData";
-import type { Extend } from "define";
+import type { Extend, ContextRules } from "define";
 import JS from "javascript";
 import Reader from "Reader";
 import { log } from "utils";
@@ -11,6 +11,8 @@ function regEq(reg1?: RegExp, reg2?: RegExp) {
   return false;
 }
 
+
+type Quotes = '\'' | '"' | '`';
 
 function isQuote(char: string) {
   return /['|"|`]/.test(char);
@@ -32,7 +34,6 @@ interface Node {
 class Parser {
 
   private Reader?: Reader;
-  private contexts = new Set<string>();
   private output = '';
 
   private ast = {
@@ -52,8 +53,8 @@ class Parser {
   private sequence = '';
   private sequence_reg = /[\s()\[\]{},:;]/;
   private sequence_replace_reg?: RegExp;
-  private skip = false;
-  private skip_whitespace = false;
+
+  private context_map: { [key: string]: { data: any, rules?: ContextRules } } = {};
 
   private context = {
     global: {},
@@ -61,78 +62,101 @@ class Parser {
   }
 
   private curr_context: {
-    type: `parse${string}`,
-    data: any
+    name: string;
+    type: `parse${string}`;
+    data: any;
   }
 
   private parser: any = {}
-  private start_string = false;
+  private start_string: Quotes | '' = '';
   private cache = new Set<any>();
+  private rules: ContextRules = {}
 
   private constructor() {
     this.nodes.push(this.ast as any);
     this.curr_node = this.nodes[0];
 
     this.curr_context = {
+      name: 'Body',
       type: 'parseBody',
       data: this.context.buffer[0][1]
     }
 
   }
 
+  private load_rules(context: string) {
+
+    const rules = this.context_map[context]?.rules || {};
+    this.rules = rules;
+    this.set_sequence_rule(rules.sequenceRule);
+  }
+
   private update_context = (Context: string, data = {}) => {
+
+    const curr_context = this.curr_context.name;
+
+    this.load_rules(Context);
 
     this.context.buffer.push([Context, ContextData(data)]);
 
     this.curr_context = {
+      name: Context,
       type: `parse${Context}`,
       data: this.context.buffer.at(-1)![1]
     }
 
-    this.set_sequence_rule()
-    log('context:', `${Context};y`)
+    log('context:', `${curr_context} --> ${Context};y`)
 
   }
 
   private end_context = () => {
+
     this.context.buffer.pop();
     const [Context, Data] = this.context.buffer.at(-1) as any;
+
+    this.load_rules(Context);
+
     this.curr_context = {
+      name: Context,
       type: `parse${Context}`,
       data: Data
     }
   }
 
-  private set_sequence_rule = (reg?: RegExp, replace_reg?: RegExp) => {
+  private set_sequence_rule = (rule: ContextRules['sequenceRule']) => {
 
-    if (replace_reg) {
-      this.sequence_replace_reg = replace_reg;
-    } else[
-      this.sequence_replace_reg = undefined
-    ]
+    if (rule) {
+      const { breakReg, replaceReg } = rule;
 
-    if (reg) {
-      if (!regEq(reg, this.sequence_reg)) {
-        log('sequence reg;m', reg, 'was;m', this.sequence_reg);
-        this.sequence_reg = reg;
+      if (!regEq(breakReg, this.sequence_reg)) {
+
+        log('sequence reg:', this.sequence_reg, '-->;y', breakReg)
+
+        this.sequence_reg = breakReg;
       }
+
     } else {
+      // set to default
       this.sequence_reg = /[\s()\[\]{},:;]/;
     }
   }
 
-  private avoid_whitespace = (only_multiple = false) => {
-    const check_prev = only_multiple
-      ? this.char.curr === this.char.prev
-      : true
+  private avoid_whitespace = () => {
+    // dont eat whitespace during parse string
+    if (this.start_string) return false;
 
-    if (/\s/.test(this.char.curr) && check_prev) {
-      ++this.index;
-      this.skip = true;
-      this.skip_whitespace = true;
-      return true;
-    } else {
-      this.skip_whitespace = false;
+    const rule = this.rules?.avoidWhitespace;
+
+    if (rule) {
+      const check_prev = rule === 'multiple'
+        ? this.char.curr === this.char.prev
+        : true
+
+      if (/\s/.test(this.char.curr) && check_prev) {
+        ++this.index;
+        return true;
+      }
+
     }
   }
 
@@ -152,6 +176,7 @@ class Parser {
     this.curr_node = this.nodes.at(-1) as Node;
     return this.curr_node;
   }
+
   private end_node(append_to?: string) {
 
     if (append_to) {
@@ -177,14 +202,13 @@ class Parser {
     updateContext: this.update_context,
     endContext: this.end_context,
     setSequenceRule: this.set_sequence_rule,
-    avoidWhitespace: this.avoid_whitespace,
     startNode: this.start_node,
     endNode: this.end_node
   } as any;
 
 
   private readline = (line: string, next: Function, ln: number) => {
-    console.log('read line', ln)
+    console.log('read line ', ln)
 
     while (this.index <= line.length && ln < 4) {
 
@@ -192,13 +216,19 @@ class Parser {
       this.char.prev = line[this.index - 1];
       this.char.next = line[this.index + 1];
 
-      // if (/['|"|`]/.test(this.char.curr))
       if (isQuote(this.char.curr)) {
-
+        if (this.start_string) {
+          if (`${this.char.prev}${this.char.curr}` !== `\\${this.start_string}`) {
+            // end parsing string
+            this.start_string = '';
+          }
+        } else {
+          // start parsing string
+          this.start_string = this.char.curr as any;
+        }
       }
 
-      if (this.skip_whitespace) {
-        ++this.index;
+      if (this.avoid_whitespace()) {
         continue;
       }
 
@@ -218,11 +248,6 @@ class Parser {
         this.sequence = '';
       }
 
-      if (this.skip) {
-        this.skip = false;
-        continue;
-      }
-
       this.output += this.char.curr;
 
       ++this.index;
@@ -233,8 +258,13 @@ class Parser {
   }
 
   static extend: Extend = ({ context, lexical, parser }) => {
-    instance ??= new this();
-    console.log('called extend')
+    instance ??= new this()
+    log('Extend parser;y')
+
+    instance.context_map = {
+      ...instance.context_map,
+      ...context,
+    }
 
     for (const key in lexical) {
       instance.api[key] = lexical[key];

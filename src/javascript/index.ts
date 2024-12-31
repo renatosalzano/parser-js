@@ -38,7 +38,6 @@ const JS: Define<C, L> = {
   context,
   lexical,
   parser: ({
-    avoidWhitespace,
     updateContext,
     endContext,
     setSequenceRule,
@@ -50,10 +49,6 @@ const JS: Define<C, L> = {
   }) => ({
 
     parseBody({ char, sequence }) {
-
-      if (avoidWhitespace(true)) {
-        return;
-      }
 
       if (/[\s(]/.test(char.curr)) {
         switch (true) {
@@ -69,10 +64,6 @@ const JS: Define<C, L> = {
     parseVariable() { },
 
     parseFunction({ char, sequence }) {
-
-      if (avoidWhitespace(true)) {
-        return;
-      }
 
       this.node = startNode("Function", {
         name: '',
@@ -102,17 +93,14 @@ const JS: Define<C, L> = {
 
     parseParams({ char }) {
 
-      if (avoidWhitespace()) {
-        return
+      if (/{/.test(char.curr)) {
+        updateContext('Pattern', { type: 'object' });
+        return;
       }
 
-      if (/[\s{[]/.test(char.curr)) {
-        switch (char.curr) {
-          case '{': {
-            updateContext('Pattern', { type: 'object' })
-            break;
-          }
-        }
+      if (/\[/.test(char.curr)) {
+        updateContext('Pattern', { type: 'array' });
+        return;
       }
 
     },
@@ -124,12 +112,6 @@ const JS: Define<C, L> = {
     parseArray() { },
 
     parsePattern({ char, sequence }) {
-
-      if (avoidWhitespace()) {
-        return;
-      }
-
-      setSequenceRule(/[,{}\[\]]/)
 
       if (/[{]/.test(char.curr)) {
         updateContext('Pattern', { type: "object" })
@@ -148,6 +130,7 @@ const JS: Define<C, L> = {
         })
 
         if (/[,]/.test(char.curr)) {
+          console.log(sequence)
           let [key, value] = sequence.split('=');
           key = key.trim();
           value = parseValue(value);

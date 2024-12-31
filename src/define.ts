@@ -81,6 +81,18 @@ function ctx<T>(
 }
 
 
+type ContextRules = {
+  avoidWhitespace?: boolean | "multiple",
+  sequenceRule?: {
+    breakReg: RegExp, replaceReg?: RegExp
+  }
+}
+
+
+function defineContext<T>(data: T, rules: ContextRules = {}) {
+  return { data, rules } as T
+}
+
 function defineLexical<T>(define: (ctx: Ctx<any>) => T) {
 
   const lexical = define(ctx as any) as any;
@@ -110,6 +122,8 @@ function defineLexical<T>(define: (ctx: Ctx<any>) => T) {
 export {
   Extend,
   Define,
+  ContextRules,
+  defineContext,
   defineLexical
 }
 
