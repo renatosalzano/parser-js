@@ -89,7 +89,16 @@ const lexical = defineLexical((ctx: Ctx<ContextJS>) => {
       // '&=': ctx('assignment'),
       // '|=': ctx('assignment'),
       // '^=': ctx('assignment')
-    }
+    },
+
+    // bracket: {
+    //   "(": { type: "BracketR" },
+    //   ")": { type: "BracketL" },
+    //   "[": { type: "SquareBracketR" },
+    //   "]": { type: "SquareBracketL" },
+    //   "{": { type: "CurlyBracketR" },
+    //   "}": { type: "CurlyBracketL" }
+    // }
   }
 })
 

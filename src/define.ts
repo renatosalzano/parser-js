@@ -11,9 +11,16 @@ type ParseParams = {
     next: string;
   },
   sequence: string;
-
 }
-type ParseCtx<T extends unknown = {}> = (this: T, parser: ParseParams) => any;
+
+type ContextData<T> = {
+  [K in keyof T]: T[K]
+} & {
+  [key: string]: any;
+}
+
+
+type ParseCtx<T extends unknown = {}> = (this: ContextData<T>, parser: ParseParams) => any;
 type Ctx<C> = (name: keyof C, data?: obj) => (parser: any) => void;
 
 type Lexical<T extends obj = obj> = {
@@ -31,44 +38,22 @@ type IsString<T> = keyof T extends string ? T : never
 // }
 
 type IsValidLexical<T> = { [K in keyof T]: T[K] extends { [key: string]: (parser: any) => void; } ? T[K] : never; };
-
-export function ctx<T>(
-  context: keyof T,
-  context_data = {}
-) {
-  return (parser: any) => {
-    parser.update_context(context, context_data);
-  }
-}
-
-
-function defineLexical<T>(defineLexical: (ctx: Ctx<any>) => T) {
-
-  const lexical = defineLexical(ctx as any) as any;
-
-  for (const key in lexical) {
-
-    const Key = `is${key[0].toUpperCase() + key.slice(1)}`;
-    lexical[Key] = function (this: any, sequence: string, updateContext?: boolean) {
-      const ret = lexical.hasOwnProperty(sequence);
-      if (updateContext) {
-        lexical[sequence](this)
-      }
-      return ret;
-    }
-  }
-
-  return lexical as { [K in keyof T]: T[K] } & {
-    // @ts-ignore
-    [K in keyof T as `is${Capitalize<K>}`]: (this: any, sequence: string, updateContext?: boolean) => boolean;
-  }
+type Node<T> = {
+  type: string;
+  start: number;
+  end: number;
+} & {
+  [K in keyof T]: T[K]
 }
 
 type ParserApi<C, L> = {
-  avoidMultipleWhitespace(): boolean;
-  updateContext(newContext: keyof JS['context'] | keyof C): void;
-  startNode(...args: any[]): any;
-  endNode(): void;
+  avoidWhitespace(onlyMultiple?: boolean): boolean;
+  setSequenceRule(captureReg?: RegExp, replaceReg?: RegExp): void;
+  updateContext<T>(newContext: keyof JS['context'] | keyof C, data?: T): void;
+  endContext(): void;
+  startNode<T>(name: keyof JS['context'] | keyof C, data?: T): Node<T>;
+  endNode(appendTo?: boolean): void;
+  getNode<T>(index?: number): Node<T>
 }
   & JS["lexical"] & L
 
@@ -85,6 +70,42 @@ type Define<
 
 
 type Extend = <C, L>(define: Define<C, L>) => void;
+
+function ctx<T>(
+  context: keyof T,
+  context_data = {}
+) {
+  return (parser: any) => {
+    parser.update_context(context, context_data);
+  }
+}
+
+
+function defineLexical<T>(define: (ctx: Ctx<any>) => T) {
+
+  const lexical = define(ctx as any) as any;
+
+  for (const group in lexical) {
+
+    const Key = `is${group[0].toUpperCase() + group.slice(1)}`;
+    const lexicalGroup = lexical[group];
+
+    lexical[Key] = (parser: any, sequence: string, updateContext?: boolean) => {
+      const hasProp = lexicalGroup.hasOwnProperty(sequence);
+      if (hasProp && updateContext) {
+        lexicalGroup[sequence](parser)
+      }
+      return hasProp;
+    }
+
+  }
+
+  return lexical as { [K in keyof T]: T[K] } & {
+    // @ts-ignore
+    [K in keyof T as `is${Capitalize<K>}`]: (sequence: string, updateContext?: boolean) => boolean;
+  }
+}
+
 
 export {
   Extend,
