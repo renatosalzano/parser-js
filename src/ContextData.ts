@@ -1,3 +1,5 @@
+import { log } from "utils";
+
 function ContextData<T extends object = {}>(init: T = {} as T): T {
 
   return new Proxy(init, {
@@ -10,6 +12,7 @@ function ContextData<T extends object = {}>(init: T = {} as T): T {
       }
       return true;
     },
+
   });
 }
 

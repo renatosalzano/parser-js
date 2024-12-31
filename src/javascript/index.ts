@@ -42,6 +42,7 @@ const JS: Define<C, L> = {
     endContext,
     setSequenceRule,
     getNode,
+    appendNode,
     startNode,
     endNode,
     isDeclarator,
@@ -60,21 +61,33 @@ const JS: Define<C, L> = {
 
       }
 
+      if (/}/.test(char.curr)) {
+        endContext();
+      }
+
     },
     parseVariable() { },
 
     parseFunction({ char, sequence }) {
 
-      this.node = startNode("Function", {
+      this.params = () => []
+      this.body = () => []
+      this.node = () => startNode("Function", {
         name: '',
         async: this.async || false,
         params: [],
         body: null,
-        returnType: ''
+        returnType: 'void'
       })
 
       if (/[(]/.test(char.curr)) {
-        updateContext('Params', { functionNode: this.node });
+        this.parsed_params = true;
+        updateContext('Params', { params: this.params });
+        return
+      }
+
+      if (/[{]/.test(char.curr)) {
+        updateContext('Body', { body: this.body });
         return
       }
 
@@ -83,23 +96,38 @@ const JS: Define<C, L> = {
           case "function":
             break;
           default: {
-            console.log(sequence)
-            this.node.name = sequence;
+            if (!this.parsed_params) {
+              this.node.name = sequence;
+            }
             // fn_node.name = sequence;
           }
         }
+      }
+
+      if (/}/.test(char.prev)) {
+        endNode(this.node);
+        this.node.params = this.params;
+        appendNode(this.node);
+
+        // console.log('get node', getNode())
+        endContext();
       }
     },
 
     parseParams({ char }) {
 
       if (/{/.test(char.curr)) {
-        updateContext('Pattern', { type: 'object' });
+        updateContext('Pattern', { type: 'object', params: this.params });
         return;
       }
 
       if (/\[/.test(char.curr)) {
-        updateContext('Pattern', { type: 'array' });
+        updateContext('Pattern', { type: 'array', params: this.params });
+        return;
+      }
+
+      if (/[)]/.test(char.curr)) {
+        endContext();
         return;
       }
 
@@ -125,16 +153,14 @@ const JS: Define<C, L> = {
 
       if (this.type === 'object') {
 
-        this.node = startNode("Object", {
+        this.node = () => startNode("Object", {
           properties: []
         })
 
         if (/[,]/.test(char.curr)) {
-          console.log(sequence)
           let [key, value] = sequence.split('=');
           key = key.trim();
           value = parseValue(value);
-
           this.node.properties.push({ key, value })
         }
 
@@ -143,10 +169,16 @@ const JS: Define<C, L> = {
       }
 
       if (/[}\]]/.test(char.curr)) {
-        console.log(sequence)
+        // end pattern
         if (isSpread(sequence)) {
-          console.log(sequence)
+          const key = sequence.slice(3)
+          this.node.properties.push({ key, type: 'rest' })
         }
+
+        if (this.params) {
+          this.params.push(endNode(this.node))
+        }
+
         endContext()
       }
 

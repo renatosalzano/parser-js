@@ -53,7 +53,8 @@ type ParserApi<C, L> = {
   endContext(): void;
   startNode<T>(name: keyof JS['context'] | keyof C, data?: T): Node<T>;
   endNode(appendTo?: boolean): void;
-  getNode<T>(index?: number): Node<T>
+  getNode<T>(index?: number): Node<T>;
+  appendNode<T>(node: T): void;
 }
   & JS["lexical"] & L
 
@@ -75,8 +76,8 @@ function ctx<T>(
   context: keyof T,
   context_data = {}
 ) {
-  return (parser: any) => {
-    parser.update_context(context, context_data);
+  return (parser: any, sequence_length: number) => {
+    parser.update_context(context, context_data, sequence_length);
   }
 }
 
@@ -105,7 +106,7 @@ function defineLexical<T>(define: (ctx: Ctx<any>) => T) {
     lexical[Key] = (parser: any, sequence: string, updateContext?: boolean) => {
       const hasProp = lexicalGroup.hasOwnProperty(sequence);
       if (hasProp && updateContext) {
-        lexicalGroup[sequence](parser)
+        lexicalGroup[sequence](parser, sequence.length)
       }
       return hasProp;
     }
