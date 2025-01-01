@@ -1,5 +1,5 @@
 import { log } from 'utils';
-import Parser from './Parser';
+import Program from './Parser';
 import { resolve } from 'path';
 
 
@@ -11,9 +11,7 @@ async function main() {
 
   try {
 
-    Parser.transform(resolve(process.cwd(), './src/test/test.js'), {
-      function: {},
-    })
+    Program.parse(resolve(process.cwd(), './src/test/test.js'))
 
   } catch (error) {
     console.log(error)
