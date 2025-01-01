@@ -70,7 +70,7 @@ class Parser {
 
   private context = {
     global: {},
-    buffer: [["Body", ContextData(), 0]]
+    buffer: [["Program", ContextData(), 0]]
   }
 
   private curr_context: {
@@ -80,7 +80,6 @@ class Parser {
     start: number;
   }
 
-  private parser: any = {}
   private start_string: Quotes | '' = '';
   private cache = new Set<any>();
   private rules: ContextRules = {}
@@ -90,8 +89,8 @@ class Parser {
     this.curr_node = this.nodes[0];
 
     this.curr_context = {
-      name: 'Body',
-      type: 'parseBody',
+      name: 'Program',
+      type: 'parseProgram',
       data: this.context.buffer[0][1],
       start: 0
     }
@@ -107,6 +106,7 @@ class Parser {
 
   private update_context = (Context: string, data = {}, start_offset = 0) => {
 
+
     const curr_context = this.curr_context.name;
     const context_start = this.index - start_offset;
 
@@ -121,13 +121,17 @@ class Parser {
       start: context_start
     }
 
-    log('context:', `${curr_context} --> ${Context} at ${context_start};y`)
+    log(`context [${this.context.buffer.length}]`, `${curr_context} --> ${Context} at ${context_start};y`)
 
   }
 
   private end_context = () => {
 
     const curr_context = this.curr_context.name;
+
+    if (this.context.buffer.length === 1) {
+      console.log(this.context.buffer)
+    }
 
     this.context.buffer.pop();
     const [Context, Data, start] = this.context.buffer.at(-1) as any;
@@ -141,7 +145,8 @@ class Parser {
       start
     }
 
-    log('context:', `${Context} <-- ${curr_context} at ${this.index} ;y`)
+    this.parser[`parse${Context}`].call(Data, { char: {} })
+    log(`context [${this.context.buffer.length}]`, `${Context} <-- ${curr_context} at ${this.index} ;y`)
   }
 
   private set_sequence_rule = (rule: ContextRules['sequenceRule']) => {
@@ -177,7 +182,6 @@ class Parser {
 
       if (/\s/.test(this.char.curr) && check_prev) {
         ++this.index;
-        // ++this.output_index
         return true;
       }
 
@@ -243,16 +247,9 @@ class Parser {
     "}": 'curlyR',
   }
 
-  /**
-   * Checks if the current or next character is a bracket.
-   * This allows you to anticipate actions, such as changing context,
-   * where the context will start exactly where the bracket begins.
-   * 
-   * @param {boolean} [next_char=true] - If true, checks the next character; otherwise, checks the current character.
-   * @returns {string} - Returns the type of bracket if found, otherwise an empty string.
-   */
-  private check_brackets = (next_char: boolean = true): string => {
-    const char = this.char[(next_char ? 'next' : 'curr')];
+  private check_brackets = (curr_char = false): string => {
+
+    const char = this.char[(curr_char ? 'curr' : 'next')];
     if (this.brackets[char]) {
       return this.brackets[char];
     }
@@ -276,6 +273,14 @@ class Parser {
     curlyL: (n: boolean) => this.check_brackets(n) === 'curlyL',
     curlyR: (n: boolean) => this.check_brackets(n) === 'curlyR',
   } as any;
+
+  private parser: any = {}
+
+  private parseProgram: any = (api: any) => ({
+    parseProgram({ char }) {
+      // log(char.curr)
+    }
+  })
 
   private line: string = ''
 
@@ -353,7 +358,8 @@ class Parser {
 
     instance.parser = {
       ...instance.parser,
-      ...parser(instance.api)
+      ...parser(instance.api),
+      ...instance.parseProgram(instance.api)
     }
 
     return instance;

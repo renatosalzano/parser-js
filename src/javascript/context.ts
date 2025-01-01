@@ -3,7 +3,7 @@ import { defineContext as def } from "define";
 export default {
   Body: def(null, { avoidWhitespace: "multiple" }),
   Function: def({ async: false, arrow: false }, { avoidWhitespace: "multiple" }),
-  Params: def({ funcNode: {} }, { avoidWhitespace: true }),
+  Params: def({}, { avoidWhitespace: true }),
   Pattern: def(
     { type: 'object' as 'object' | 'array' },
     {

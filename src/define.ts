@@ -55,12 +55,12 @@ type ParserApi<C, L> = {
   endNode<T>(node: T): T;
   getNode<T>(index?: number): Node<T>;
   appendNode<T>(node: T): void;
-  bracketL(nextChar?: boolean): boolean;
-  bracketR(nextChar?: boolean): boolean;
-  squareL(nextChar?: boolean): boolean;
-  squareR(nextChar?: boolean): boolean;
-  curlyL(nextChar?: boolean): boolean;
-  curlyR(nextChar?: boolean): boolean;
+  bracketL(currChar?: boolean): boolean;
+  bracketR(currChar?: boolean): boolean;
+  squareL(currChar?: boolean): boolean;
+  squareR(currChar?: boolean): boolean;
+  curlyL(currChar?: boolean): boolean;
+  curlyR(currChar?: boolean): boolean;
 }
   & JS["lexical"] & L
 

@@ -65,7 +65,7 @@ const JS: Define<C, L> = {
 
       }
 
-      if (/}/.test(char.curr)) {
+      if (curlyR(true)) {
         endContext();
       }
 
@@ -86,11 +86,15 @@ const JS: Define<C, L> = {
 
       if (bracketL()) {
         this.parsed_params = true;
+        if (sequence) {
+          this.node.name = sequence
+        }
         updateContext('Params', { params: this.params });
         return
       }
 
-      if (/[{]/.test(char.curr)) {
+      if (curlyL()) {
+        this.parsed_body = true;
         updateContext('Body', { body: this.body });
         return
       }
@@ -108,7 +112,12 @@ const JS: Define<C, L> = {
         }
       }
 
-      if (/}/.test(char.prev)) {
+      if (curlyR(true)) {
+        console.log('end')
+      }
+
+      if (this.parsed_body) {
+        console.log('end function')
         endNode(this.node);
         this.node.params = this.params;
         appendNode(this.node);
@@ -116,21 +125,22 @@ const JS: Define<C, L> = {
         // console.log('get node', getNode())
         endContext();
       }
+
     },
 
     parseParams({ char }) {
 
-      if (/{/.test(char.curr)) {
-        updateContext('Pattern', { type: 'object', params: this.params }, -1);
+      if (curlyL()) {
+        updateContext('Pattern', { type: 'object', params: this.params });
         return;
       }
 
       if (/\[/.test(char.curr)) {
-        updateContext('Pattern', { type: 'array', params: this.params }, -1);
+        updateContext('Pattern', { type: 'array', params: this.params });
         return;
       }
 
-      if (/[)]/.test(char.curr)) {
+      if (bracketR(true)) {
         endContext();
         return;
       }
@@ -145,7 +155,7 @@ const JS: Define<C, L> = {
 
     parsePattern({ char, sequence }) {
 
-      if (/[{]/.test(char.curr)) {
+      if (curlyL()) {
         updateContext('Pattern', { type: "object" },)
         return;
       }
@@ -172,7 +182,7 @@ const JS: Define<C, L> = {
         // array
       }
 
-      if (/[}\]]/.test(char.curr)) {
+      if (curlyR(true)) {
         // end pattern
         if (isSpread(sequence)) {
           const key = sequence.slice(3)
