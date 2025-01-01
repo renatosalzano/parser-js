@@ -11,7 +11,7 @@ async function main() {
 
   try {
 
-    Parser.transform(resolve(process.cwd(), './.local/test.jst'), {
+    Parser.transform(resolve(process.cwd(), './src/test/test.js'), {
       function: {},
     })
 

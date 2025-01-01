@@ -328,8 +328,8 @@ class Parser {
     }
 
 
-    writeFileSync(resolve(process.cwd(), './.local/parser.output.js'), this.output)
-    writeFileSync(resolve(process.cwd(), './.local/parser.output.json'), JSON.stringify(this.ast, null, 2))
+    writeFileSync(resolve(process.cwd(), './dist/parser.output.js'), this.output)
+    writeFileSync(resolve(process.cwd(), './dist/parser.output.json'), JSON.stringify(this.ast, null, 2))
   }
 
   static extend: Extend = ({ context, lexical, parser }) => {

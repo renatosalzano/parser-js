@@ -12,11 +12,11 @@ const lexical = defineLexical((ctx: Ctx<ContextJS>) => {
       var: ctx('Variable', { kind: 'var' }),
       let: ctx('Variable', { kind: 'let' }),
       const: ctx('Variable', { kind: 'const' }),
-      Function: ctx('Function'),
-      Class: ctx('Class'),
+      function: ctx('Function'),
+      class: ctx('Class'),
       import: ctx('Module'),
       export: ctx('Module'),
-      'Function*': ctx('Function')
+      'function*': ctx('Function')
     },
 
     keyword: {
