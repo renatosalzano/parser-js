@@ -110,7 +110,7 @@ function defineLexical<T extends DefineLexical = DefineLexical>(lexical: T) {
         const ret = output[key].hasOwnProperty(sequence);
 
         if (ret && updateContext) {
-          this.api.startContext(key, output[key])
+          this.api.startContext(key, output[key], sequence.length)
         }
 
         return ret;

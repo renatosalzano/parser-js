@@ -1,6 +1,5 @@
 import { log } from "utils";
 import PluginJS from 'javascript';
-import Reader from "Reader";
 import { ParserConfig } from "plugin";
 
 let program: Program | null = null;
@@ -23,10 +22,10 @@ class Program {
     return program;
   }
 
-  static parse = async (path: string) => {
+  static parse = async (code: string) => {
     program ??= new this() as Program;
 
-    const parser = new Parser(program, path, program.plugins);
+    const parser = new Parser(program, code, program.plugins);
     await parser.Parse()
 
     console.log('end program')
@@ -47,8 +46,9 @@ class Context {
     })
   }
 
-  start(name: string, data = {}) {
-    log(`start context ${name};y`, data)
+  start = (name: string, data = {}, start_offset = 0) => {
+    log('start context', `${name} at ${this.Parser.index - start_offset};y`, data)
+    this.buffer.push({ name, data })
   }
 
   end() {
@@ -56,7 +56,7 @@ class Context {
   }
 
   curr_context() {
-    return
+    return this.buffer.at(-1)
   }
 
   load(name: string, config: any) {
@@ -70,7 +70,7 @@ class Context {
 
 class Parser {
 
-  Reader: Reader;
+  source = '';
 
   program_context = new Set<string>()
   context: Context;
@@ -79,9 +79,9 @@ class Parser {
     avoidWhitespace: 'multiple'
   }
 
-  constructor(public program: Program, path: string, plugins: any[]) {
+  constructor(public program: Program, source: string, plugins: any[]) {
     this.context = new Context(this);
-    this.Reader = new Reader(path);
+    this.source = source;
 
     this.api = {
       startContext: this.context.start,
@@ -91,6 +91,8 @@ class Parser {
     }
 
     this.load_plugins(plugins);
+
+    // this.parseProgram();
   }
 
   load_plugins(plugins: any[]) {
@@ -156,6 +158,10 @@ class Parser {
         this.parse_string = this.char;
       }
     }
+    if (!!this.parse_string) {
+      ++this.index;
+      ++this.pos;
+    }
     return !!this.parse_string;
   }
 
@@ -172,6 +178,7 @@ class Parser {
 
       if (/\s/.test(this.char) && check_prev) {
         ++this.index;
+        ++this.pos;
         return true;
       }
 
@@ -179,17 +186,22 @@ class Parser {
   }
 
   line = ''
+  pos = 0;
   next_line: Function = () => { };
+
+  eat = (sequence: string) => {
+
+  }
 
   next = (breakReg = /[\s()\[\]]/) => {
     let walk = true;
     this.sequence = '';
 
-    while (walk && this.index < this.line.length) {
+    while (walk && this.pos < this.line.length) {
 
-      this.char = this.line[this.index];
-      this.prev_char = this.line[this.index - 1];
-      this.next_char = this.line[this.index + 1];
+      this.char = this.line[this.pos];
+      this.prev_char = this.line[this.pos - 1];
+      this.next_char = this.line[this.pos + 1];
 
       if (this.is_parsing_string()) {
         continue;
@@ -202,37 +214,43 @@ class Parser {
       if (!breakReg.test(this.char)) {
         this.sequence += this.char;
       } else {
-        console.log(this.sequence)
+        log(`"${this.sequence}";y`)
         walk = false;
       }
 
+      ++this.pos;
       ++this.index;
     }
 
+    if (this.pos >= this.line.length) {
+      this.pos = 0;
+      console.log('next line', walk)
+      this.next_line();
+    }
   }
 
   readline = (line: string, next_line: Function, ln: number) => {
+    log('readline;c')
     this.next_line = next_line;
     this.line = line;
-    this.parseProgram()
   }
 
   parseProgram() {
     this.next();
-    for (const isContext of this.program_context) {
-      if (this.api[isContext](this.sequence, true)) {
-        break;
-      }
-    }
+    this.next();
+    this.next();
+    // for (const isContext of this.program_context) {
+    //   if (this.api[isContext](this.sequence, true)) {
+    //     break;
+    //   }
+    // }
 
   }
 
 
   async Parse() {
-    await this.Reader.read(this.readline)
+
   }
-
-
 
 }
 
