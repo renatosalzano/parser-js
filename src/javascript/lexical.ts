@@ -5,6 +5,25 @@ type Context = typeof context;
 
 type Ctx<C> = (name: keyof C, data?: any) => (parser: any) => void;
 
+
+
+export default defineLexical({
+  Variable: {
+    'const': { setNode: { tag: 'const' } },
+    'let': { setNode: { tag: 'let' } },
+    'var': { setNode: { tag: 'var' } }
+  },
+  Function: {
+    'function': null,
+    'async': { eat: 'function', setNode: { async: true } },
+  },
+  Expression: {
+    '=': null
+  },
+  isIdentifier: /^[a-zA-Z_$][a-zA-Z0-9_$]*$/,
+  isArrowFunction: /\(.*?=>/
+})
+
 // declarator: {
 //   var: ctx('Variable', { kind: 'var' }),
 //     let: ctx('Variable', { kind: 'let' }),
@@ -87,24 +106,3 @@ type Ctx<C> = (name: keyof C, data?: any) => (parser: any) => void;
 //   "{": { type: "CurlyBracketR" },
 //   "}": { type: "CurlyBracketL" }
 // }
-
-export default defineLexical<Context>({
-  Program: ['Expression', 'Variable', 'Function'],
-  Variable: {
-    'const': { tag: 'const' },
-    'let': { tag: 'let' },
-    'var': { tag: 'var' }
-  },
-  Function: {
-    'function': null,
-    'async': { async: true },
-    '\\(.*?=>': { arrow: true }
-  },
-  Params: {
-    '(': null
-  },
-  Expression: {
-    '={1,3}': null
-  }
-})
-

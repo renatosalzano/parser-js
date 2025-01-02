@@ -2,12 +2,12 @@ import { define } from "plugin";
 import context from "./context";
 import lexical from "./lexical";
 
-
-
 export default define({
   context,
   lexical,
-  parse: function (api) {
+  parse: function ({
+    isBrackets
+  }) {
     return {
       Body() {
       },
@@ -17,6 +17,7 @@ export default define({
       Declaration() { },
 
       Function() {
+
 
       },
 

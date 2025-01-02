@@ -1,11 +1,14 @@
-import { Define, ContextRules, defineContext } from "plugin";
+import { defineContext } from "plugin";
 
 export default defineContext({
-  Body: { parserConfig: { avoidWhitespace: "multiple" } },
+  Program: ['Expression', 'Variable', 'Function'],
+  Body: {
+    parserConfig: { avoidWhitespace: "multiple", hasExpression: true }
+  },
   Function: {
     node: {
       tag: 'function',
-      name: '',
+      id: '',
       async: false,
       arrow: false,
       params: [],
@@ -13,23 +16,19 @@ export default defineContext({
       returnType: 'void'
     },
     contextData: { parsedParams: false, parsedBody: false },
-    parserConfig: { avoidWhitespace: "multiple" },
-    expected: ['Params', 'Body'],
+    parserConfig: { avoidWhitespace: "multiple" }
   },
   Params: {
-    contextData: { params: [] },
+    contextData: { params: [], declaration: false },
     parserConfig: { avoidWhitespace: true }
   },
   Expression: { parserConfig: { avoidWhitespace: true } },
   Variable: {
     node: {
       tag: 'var' as 'var' | 'let' | 'const',
-      declarations: []
     },
     parserConfig: { avoidWhitespace: 'multiple' },
-    expected: ['Declaration']
   },
-  Declaration: {},
   Object: {
     node: {
       tag: 'object',
@@ -37,22 +36,3 @@ export default defineContext({
     }
   }
 })
-
-// export default {
-//   Body: def(null, { avoidWhitespace: "multiple" }),
-//   Function: def({ async: false, arrow: false }, { avoidWhitespace: "multiple" }),
-//   Params: def({}, { avoidWhitespace: true }),
-//   Pattern: def(
-//     { type: 'object' as 'object' | 'array' },
-//     {
-//       avoidWhitespace: true,
-//       sequenceRule: { breakReg: /[,{}\[\]]/ }
-//     }
-//   ),
-//   Object: def(null, { avoidWhitespace: true }),
-//   Array: null,
-//   Expression: null,
-//   Variable: def({ kind: 'var' as 'var' | 'const' | 'let' }, { avoidWhitespace: "multiple" }),
-//   Module: null,
-//   Class: null
-// }

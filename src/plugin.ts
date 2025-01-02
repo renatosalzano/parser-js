@@ -35,37 +35,6 @@ type IsString<T> = keyof T extends string ? T : never
 type IsValidLexical<T> = { [K in keyof T]: T[K] extends { [key: string]: (parser: any) => void; } ? T[K] : never; };
 
 
-type ParserApi<C, L> = {
-  avoidWhitespace(onlyMultiple?: boolean): boolean;
-  setSequenceRule(breakReg?: RegExp, replaceReg?: RegExp): void;
-  // updateContext<T>(newContext: keyof JS['context'] | keyof C, data?: T, startOffset?: number): void;
-  endContext(): void;
-  // startNode<T>(name: keyof JS['context'] | keyof C, data?: T): Node<T>;
-  // endNode<T>(node: T): T;
-  // getNode<T>(index?: number): Node<T>;
-  appendNode<T>(node: T): void;
-  bracketL(currChar?: boolean): boolean;
-  bracketR(currChar?: boolean): boolean;
-  squareL(currChar?: boolean): boolean;
-  squareR(currChar?: boolean): boolean;
-  curlyL(currChar?: boolean): boolean;
-  curlyR(currChar?: boolean): boolean;
-}
-
-type Define<
-  C,
-  L
-> = {
-  context: C;
-  lexical: L;
-  parser: (api: ParserApi<C, L>) => {
-    [K in keyof C as `parse${K & string}`]: ParseCtx<C[K]>
-  }
-}
-
-
-type Extend = <C, L>(define: Define<C, L>) => void;
-
 function ctx<T>(
   context: keyof T,
   context_data = {}
@@ -77,24 +46,24 @@ function ctx<T>(
 
 type Obj<T> = { [key: string]: T }
 
-type ContextRules = {
+type ParserConfig = {
   avoidWhitespace?: boolean | "multiple",
   hasExpression?: boolean,
-  sequenceRule?: {
-    breakReg: RegExp, replaceReg?: RegExp
-  }
+  sequenceRule?: RegExp
 }
 
 type ContextObject = {
   node?: Node;
   contextData?: LiteralObject;
-  parserConfig?: ContextRules;
-  expected?: (string)[]
+  parserConfig?: ParserConfig;
+  include?: (string | [string, LiteralObject])[]
 }
 
 
 type DefineContext<T extends { [key: string]: ContextObject } = { [key: string]: ContextObject }> = {
   [K in keyof T as K extends string ? K : never]: T[K]
+} & {
+  Program: string[]
 }
 
 function defineContext<T extends DefineContext = DefineContext>(context: T) {
@@ -102,44 +71,82 @@ function defineContext<T extends DefineContext = DefineContext>(context: T) {
   return context as T
 }
 
-type DefineLexical<T extends DefineContext = DefineContext> = {
-  [K in keyof T]?: {
-    [key: string]: Partial<T[K]['node']> | null
+
+type LexicalOptions = {
+  test?: RegExp,
+  eat?: string,
+  setNode?: { [key: string]: any }
+} | null
+
+type Lexical = {
+  [key: string]: {
+    [key: string]: LexicalOptions
   }
-} & {
-  [key: string]: any
-} & {
-  Program?: (keyof T)[]
+} | {
+  [K in string as `is${string}`]: RegExp
 }
 
-function defineLexical<T extends DefineContext = DefineContext>(lexical: DefineLexical<T>) {
+type DefineLexical<T extends Lexical = Lexical> = {
+  [K in keyof T as K extends string ? K : never]: T[K]
+}
+
+function defineLexical<T extends DefineLexical = DefineLexical>(lexical: T) {
 
   console.log('define lexical')
-  const kw = {};
-  const regexp = {};
-  for (const context of Object.keys(lexical)) {
-    if (context === 'Program') continue;
-    const keyword_map = lexical[context];
+  const output: any = lexical;
 
-    for (const kw of Object.keys(keyword_map)) {
-      console.log(kw)
+  for (const key of Object.keys(lexical)) {
+
+    if (key.startsWith('is')) {
+
+      output[key] = function (sequence: string) {
+        const reg = output[key] as RegExp;
+        return reg.test(sequence);
+      };
+
+    } else {
+      output[`is${key}`] = function (this: any, sequence: string, updateContext?: boolean) {
+
+        const ret = output[key].hasOwnProperty(sequence);
+
+        if (ret && updateContext) {
+          this.api.startContext(key, output[key])
+        }
+
+        return ret;
+      }
     }
 
   }
 
-  return lexical
+  return output as T;
+}
+
+type Brackets =
+  | 'L'
+  | 'R'
+  | 'squareL'
+  | 'squareR'
+  | 'curlyL'
+  | 'curlyR'
+
+type ParserApi<L> = {
+  startContext(context: string): void;
+  endContext(): void;
+  isBrackets: { [K in Brackets]: (currentChar?: boolean) => boolean };
+} & {
+  [K in keyof L as K extends string ? `is${K}` : never]: (sequence: string, updateContext?: boolean) => boolean
 }
 
 function define<T, C extends DefineContext = DefineContext, L = DefineLexical>(
   define: T & {
     context: C,
     lexical: L,
-    parse: (api: any) => {
-      [K in keyof C]: C[K] extends { node: infer U }
+    parse: (api: ParserApi<L>) => {
+      [K in keyof C]?: C[K] extends { node: infer U }
       ? (this: C[K]['contextData'] & (U extends undefined ? {} : { node: U })) => void
       : (this: C[K]['contextData']) => void
     }
-
   }
 ) {
 
@@ -151,10 +158,11 @@ function define<T, C extends DefineContext = DefineContext, L = DefineLexical>(
 }
 
 
+
+
 export {
-  Extend,
-  Define,
-  ContextRules,
+  ParserConfig,
+  DefineLexical,
   define,
   defineContext,
   defineLexical
