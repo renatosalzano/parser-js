@@ -32,7 +32,7 @@ type Api = {
 type ParserApi<T, A> = {
   startContext(context: string): void;
   endContext(): void;
-  isBrackets: { [K in Brackets]: (currentChar?: boolean) => boolean };
+  brackets: { [K in Brackets]: (currentChar?: boolean) => boolean };
 } & {
   [K in keyof T as K extends string ? `is${K}` : never]: (sequence: string, updateContext?: boolean) => boolean
 } & {
@@ -43,10 +43,19 @@ type DefaultApi = {
   setRules(rules: ParserRules): void;
   appendNode: Program['appendNode'];
   createNode: Program['createNode'];
-  next(breakReg?: RegExp): string;
+  eat(sequence: string, breakReg?: RegExp): void;
+  expected(value: string | RegExp): boolean;
+  /**
+   * Advances the parsing of the source and constructs a sequence of characters.
+   * 
+   * @param {RegExp|true} [include=true] - Regular expression to include characters or boolean to include all characters.
+   * @param {RegExp|false} [exclude=RegExp] - Regular expression to exclude characters or boolean to exclude nothing.
+   * @param {boolean} [debug=false] - If true, enables debugging and logs inclusion/exclusion information.
+   * @returns {string} - The constructed sequence of characters.
+  */
+  next(include?: RegExp | true, exclude?: RegExp | false, debug?: boolean): string;
   startContext(context: string): void;
   endContext(): void;
-  isBracket: { [K in Brackets]: (currentChar?: boolean) => boolean };
 }
 
 
@@ -81,3 +90,5 @@ export {
 }
 
 // export default Plugin;
+
+

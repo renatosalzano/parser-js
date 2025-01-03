@@ -62,12 +62,12 @@ export default (config: any) => {
     api,
     parse: ({
       next,
+      expected,
       appendNode,
       createNode,
       setRules,
       isIdentifier,
       inFunction,
-      isBracket,
     }: Api) => ({
       Variable() { },
       Function({ async, arrow }: Context['Function']['props']) {
@@ -77,15 +77,19 @@ export default (config: any) => {
 
         if (!arrow) {
           // func declaration
-          const sequence = next();
-          if (isIdentifier(sequence)) {
-            node.id = sequence;
+          const id = next();
+          if (isIdentifier(id)) {
+            node.id = id;
           }
         }
 
-        if (isBracket.L()) {
+        setRules({ avoidWhitespace: true });
+
+        if (expected('\\(')) {
           // params
           this.Params(node);
+        } else {
+          // throw error
         }
 
         appendNode(node)
@@ -94,8 +98,9 @@ export default (config: any) => {
       },
 
       Params(node: FuncNode) {
-        setRules({ avoidWhitespace: true, hasExpression: true });
-        console.log('paraaaaaaaaams')
+        next(/[{]/, false, true)
+        // next(/[{]/, false, true)
+        // console.log('params', next(/[{]/, false, true))
       },
     })
   }
