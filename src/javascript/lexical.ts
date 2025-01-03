@@ -1,28 +1,28 @@
-import context from './context';
-import { defineLexical } from '../plugin';
+// import context from './context';
+// import { defineLexical } from '../plugin';
 
-type Context = typeof context;
+// type Context = typeof context;
 
-type Ctx<C> = (name: keyof C, data?: any) => (parser: any) => void;
+// type Ctx<C> = (name: keyof C, data?: any) => (parser: any) => void;
 
 
 
-export default defineLexical({
-  Variable: {
-    'const': { setNode: { tag: 'const' } },
-    'let': { setNode: { tag: 'let' } },
-    'var': { setNode: { tag: 'var' } }
-  },
-  Function: {
-    'function': null,
-    'async': { eat: 'function', setNode: { async: true } },
-  },
-  Expression: {
-    '=': null
-  },
-  isIdentifier: /^[a-zA-Z_$][a-zA-Z0-9_$]*$/,
-  isArrowFunction: /\(.*?=>/
-})
+// export default defineLexical({
+//   Variable: {
+//     'const': { setNode: { tag: 'const' } },
+//     'let': { setNode: { tag: 'let' } },
+//     'var': { setNode: { tag: 'var' } }
+//   },
+//   Function: {
+//     'function': null,
+//     'async': { eat: 'function', setNode: { async: true } },
+//   },
+//   Expression: {
+//     '=': null
+//   },
+//   isIdentifier: /^[a-zA-Z_$][a-zA-Z0-9_$]*$/,
+//   isArrowFunction: /\(.*?=>/
+// })
 
 // declarator: {
 //   var: ctx('Variable', { kind: 'var' }),

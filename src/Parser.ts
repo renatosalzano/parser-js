@@ -1,32 +1,47 @@
 import { log } from "utils";
-import PluginJS from 'javascript';
-import { ParserConfig } from "plugin";
+import javascript from "plugin/javascript";
+import { Plugin, plugin, createPlugin } from "plugin";
 
 let program: Program | null = null;
+
+type Config = {
+
+}
 
 class Program {
 
   body: any[] = [];
 
-  private plugins: any[] = [];
+  private allow_config = true;
+  private plugin = {} as plugin;
 
-  private constructor() {
-
+  private constructor(config = {}) {
+    // @ts-ignore
+    this.plugin = createPlugin(javascript(config));
   }
 
-  static extend = (plugin: any) => {
-    program ??= new this()
-    log('Extend parser;y');
+  static config = (config: Config) => {
+    program ??= new this(config)
+    if (!program.allow_config) {
+      throw 'should be before extend'
+    }
+    return program;
+  }
 
-    program.plugins.push(plugin);
+  static extend = (plugin: Plugin) => {
+    program ??= new this();
+    program.allow_config = false;
+
+    log('Extend parser;y');
+    // TODO EXTEND PLUG IN
+
     return program;
   }
 
   static parse = async (code: string) => {
     program ??= new this() as Program;
-
-    const parser = new Parser(program, code, program.plugins);
-    await parser.Parse()
+    const parser = new Parser(code, program.plugin);
+    // await parser.Parse()
 
     console.log('end program')
   }
@@ -68,6 +83,11 @@ class Context {
 
 }
 
+type ParserRules = {
+  avoidWhitespace?: boolean | "multiple",
+  hasExpression?: boolean,
+}
+
 class Parser {
 
   source = '';
@@ -75,11 +95,11 @@ class Parser {
   program_context = new Set<string>()
   context: Context;
   api: any = {};
-  rules: ParserConfig = {
+  rules: ParserRules = {
     avoidWhitespace: 'multiple'
   }
 
-  constructor(public program: Program, source: string, plugins: any[]) {
+  constructor(source: string, plugin: plugin) {
     this.context = new Context(this);
     this.source = source;
 
@@ -90,9 +110,8 @@ class Parser {
       isBracket: this.isBracket,
     }
 
-    this.load_plugins(plugins);
+    // this.load_plugins(plugin);
 
-    // this.parseProgram();
   }
 
   load_plugins(plugins: any[]) {
@@ -139,6 +158,7 @@ class Parser {
     curlyR: (cc = false) => this.is_bracket(cc, '}'),
   }
 
+  line = 1
   index = 0;
   char = '';
   prev_char = '';
@@ -146,6 +166,22 @@ class Parser {
   sequence = '';
   parse_string = '';
   parse: any = {}
+
+  is_new_line() {
+    if (/[\r\n]/.test(this.char)) {
+      if (this.char === '\r') {
+        // if is windows eat \r\n
+        this.index += 2
+      } else {
+        this.index += 1
+      }
+      this.pos = 1;
+      ++this.line;
+      log('new line;c')
+      return true;
+    }
+    return false;
+  }
 
   is_parsing_string() {
     if (/['|"|`]/.test(this.char)) {
@@ -185,9 +221,7 @@ class Parser {
     }
   }
 
-  line = ''
-  pos = 0;
-  next_line: Function = () => { };
+  pos = 1;
 
   eat = (sequence: string) => {
 
@@ -197,11 +231,15 @@ class Parser {
     let walk = true;
     this.sequence = '';
 
-    while (walk && this.pos < this.line.length) {
+    while (walk && this.index < this.source.length) {
 
-      this.char = this.line[this.pos];
-      this.prev_char = this.line[this.pos - 1];
-      this.next_char = this.line[this.pos + 1];
+      this.char = this.source[this.index];
+      this.prev_char = this.source[this.index - 1];
+      this.next_char = this.source[this.index + 1];
+
+      if (this.is_new_line()) {
+        continue
+      }
 
       if (this.is_parsing_string()) {
         continue;
@@ -222,22 +260,9 @@ class Parser {
       ++this.index;
     }
 
-    if (this.pos >= this.line.length) {
-      this.pos = 0;
-      console.log('next line', walk)
-      this.next_line();
-    }
-  }
-
-  readline = (line: string, next_line: Function, ln: number) => {
-    log('readline;c')
-    this.next_line = next_line;
-    this.line = line;
   }
 
   parseProgram() {
-    this.next();
-    this.next();
     this.next();
     // for (const isContext of this.program_context) {
     //   if (this.api[isContext](this.sequence, true)) {
@@ -249,12 +274,13 @@ class Parser {
 
 
   async Parse() {
-
+    this.parseProgram()
   }
 
 }
 
-
-Program.extend(PluginJS);
+export {
+  ParserRules
+}
 
 export default Program;
