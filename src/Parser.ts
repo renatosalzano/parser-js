@@ -1,16 +1,15 @@
 import { log } from "utils";
 import javascript from "plugin/javascript";
 import { Plugin, plugin } from "plugin";
+import Program from "Progam";
 
-let program: Program | null = null;
+let program: Parser | null = null;
 
 type Config = {
 
 }
 
-class Program {
-
-  body: any[] = [];
+class Parser {
 
   private allow_config = true;
   private plugin: any = {};
@@ -38,8 +37,8 @@ class Program {
   }
 
   static parse = async (code: string) => {
-    program ??= new this() as Program;
-    const parser = new Parser(code, program.plugin);
+    program ??= new this() as Parser;
+    const parser = new ParserJS(code, program.plugin);
     await parser.Parse()
 
     console.log('end program')
@@ -52,24 +51,28 @@ class Context {
   context: any = {};
   buffer: any = [];
 
-  constructor(public Parser: Parser) {
+  constructor(public Parser: ParserJS) {
 
     this.buffer.push({
       name: 'Program',
-      data: {}
+      props: {}
     })
   }
 
-  start = (name: string, data = {}, start_offset = 0) => {
-    log('start context', `${name} at ${this.Parser.index - start_offset - 1};y`, data)
-    this.buffer.push({ name, data })
+  start = (name: string, data: any = {}, start_offset = 0) => {
+    const props = data?.props || {}
+    log('start context', `${name} at ${this.Parser.index - start_offset - 1};y`, props)
+    this.buffer.push({ name, props })
+    if (data.eat) {
+      this.Parser.eat(data.eat);
+    }
   }
 
   end() {
 
   }
 
-  curr_context() {
+  current() {
     return this.buffer.at(-1)
   }
 
@@ -87,10 +90,10 @@ type ParserRules = {
   hasExpression?: boolean,
 }
 
-class Parser {
+class ParserJS {
 
+  Program = new Program();
   source = '';
-
   program_context = new Set<string>()
   context: Context;
   api: any = {};
@@ -102,11 +105,31 @@ class Parser {
     this.context = new Context(this);
     this.source = source;
 
+    const isBracket = {
+      L: (cc = false) => this.is_bracket(cc, '('),
+      R: (cc = false) => this.is_bracket(cc, ')'),
+      squareL: (cc = false) => this.is_bracket(cc, '['),
+      squareR: (cc = false) => this.is_bracket(cc, ']'),
+      curlyL: (cc = false) => this.is_bracket(cc, '{'),
+      curlyR: (cc = false) => this.is_bracket(cc, '}'),
+    }
+
+    const setRules = (rules?: ParserRules) => {
+      if (rules) {
+        this.rules = rules;
+      } else {
+        this.rules = {};
+      }
+    }
+
     this.api = {
+      setRules,
+      createNode: this.Program.createNode,
+      appendNode: this.Program.appendNode,
       startContext: this.context.start,
       endContext: this.context.end,
       next: this.next,
-      isBracket: this.isBracket,
+      isBracket
     }
 
     this.load_plugin(plugin)
@@ -161,21 +184,19 @@ class Parser {
 
     }
 
+    this.parse = parse(this.api);
+
   }
 
-  is_bracket = (current_char = false, bracket: string) => {
-    return current_char
-      ? this.char === bracket
-      : this.next_char === bracket
+  start_node = (type: string, ...props: any[]) => {
+
   }
 
-  isBracket = {
-    L: (cc = false) => this.is_bracket(cc, '('),
-    R: (cc = false) => this.is_bracket(cc, ')'),
-    squareL: (cc = false) => this.is_bracket(cc, '['),
-    squareR: (cc = false) => this.is_bracket(cc, ']'),
-    curlyL: (cc = false) => this.is_bracket(cc, '{'),
-    curlyR: (cc = false) => this.is_bracket(cc, '}'),
+  is_bracket = (next_char = false, bracket: string) => {
+    if (next_char) {
+      return this.next_char === bracket;
+    }
+    return this.char === bracket;
   }
 
   line = 1
@@ -244,7 +265,18 @@ class Parser {
   pos = 1;
 
   eat = (sequence: string) => {
+    this.next();
+    if (this.sequence !== sequence) {
+      this.prev();
+    } else {
+      log('eated', `${sequence};y`)
+    }
+  }
 
+  prev = () => {
+    const len = this.sequence.length + 1;
+    this.index -= len;
+    this.pos -= len;
   }
 
   next = (breakReg = /[\s()\[\]]/) => {
@@ -274,6 +306,9 @@ class Parser {
       } else {
         log(`"${this.sequence}";y`)
         walk = false;
+        ++this.pos;
+        ++this.index;
+        return this.sequence;
       }
 
       ++this.pos;
@@ -283,11 +318,13 @@ class Parser {
   }
 
   parseProgram() {
+    this.rules = { avoidWhitespace: "multiple" };
     this.next();
-    console.log(this.program_context)
 
     for (const inContext of this.program_context) {
       if (this.api[inContext](this.sequence, true)) {
+        const curr = this.context.current()
+        this.parse[curr.name](curr.props)
         break;
       }
     }
@@ -305,4 +342,4 @@ export {
   ParserRules
 }
 
-export default Program;
+export default Parser;

@@ -1,3 +1,5 @@
+import { ParserRules } from "Parser";
+import Program from "Progam";
 import { log } from "utils";
 
 type Brackets =
@@ -38,10 +40,13 @@ type ParserApi<T, A> = {
 }
 
 type DefaultApi = {
+  setRules(rules: ParserRules): void;
+  appendNode: Program['appendNode'];
+  createNode: Program['createNode'];
   next(breakReg?: RegExp): string;
   startContext(context: string): void;
   endContext(): void;
-  isBrackets: { [K in Brackets]: (currentChar?: boolean) => boolean };
+  isBracket: { [K in Brackets]: (currentChar?: boolean) => boolean };
 }
 
 
