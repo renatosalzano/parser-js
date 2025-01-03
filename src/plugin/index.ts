@@ -59,49 +59,7 @@ type DefaultApi = {
 // }) {
 
 // }
-function createPlugin({ context, api = {}, parse }: plugin) {
-  let output = { context, api, parse } as any;
-  let Program = new Set<string>();
 
-  for (const ctx of Object.keys(context)) {
-
-    if (ctx === 'Program') {
-      Program = new Set(context.Program);
-      delete context.Program;
-    }
-
-    output.api[`in${ctx}`] = function (this: any, sequence: string, updateContext?: boolean) {
-
-      const ret = output.context[ctx].keyword.hasOwnProperty(sequence);
-
-      if (ret && updateContext) {
-        this.api.startContext(ctx, output.context.props[ctx], sequence.length)
-      }
-
-      return ret;
-    }
-  }
-
-  let valid_context = ''
-  for (const ctx of Program) {
-    if (!output.context.hasOwnProperty(ctx)) {
-      log('[warn];y', `Program: [${valid_context}`, `"${ctx}";y`, 'is not defined in', context)
-      Program.delete(ctx);
-    } else {
-      valid_context += `'${ctx}',`
-    }
-  }
-
-  for (const k of Object.keys(api)) {
-
-    output.api[k] = function (sequence: string) {
-      const reg = output.api[k] as RegExp;
-      return reg.test(sequence);
-    }
-  }
-
-  return output as plugin;
-}
 
 type plugin = {
   context: { [K in Exclude<string, 'Program'>]: ContextObject } & { Program?: string[] };
@@ -114,8 +72,7 @@ type Plugin = (config?: { [key: string]: any }) => plugin
 export {
   Plugin,
   plugin,
-  DefaultApi,
-  createPlugin
+  DefaultApi
 }
 
 // export default Plugin;

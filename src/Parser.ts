@@ -1,6 +1,6 @@
 import { log } from "utils";
 import javascript from "plugin/javascript";
-import { Plugin, plugin, createPlugin } from "plugin";
+import { Plugin, plugin } from "plugin";
 
 let program: Program | null = null;
 
@@ -13,11 +13,10 @@ class Program {
   body: any[] = [];
 
   private allow_config = true;
-  private plugin = {} as plugin;
+  private plugin: any = {};
 
   private constructor(config = {}) {
-    // @ts-ignore
-    this.plugin = createPlugin(javascript(config));
+    this.plugin = javascript(config);
   }
 
   static config = (config: Config) => {
@@ -41,7 +40,7 @@ class Program {
   static parse = async (code: string) => {
     program ??= new this() as Program;
     const parser = new Parser(code, program.plugin);
-    // await parser.Parse()
+    await parser.Parse()
 
     console.log('end program')
   }
@@ -62,7 +61,7 @@ class Context {
   }
 
   start = (name: string, data = {}, start_offset = 0) => {
-    log('start context', `${name} at ${this.Parser.index - start_offset};y`, data)
+    log('start context', `${name} at ${this.Parser.index - start_offset - 1};y`, data)
     this.buffer.push({ name, data })
   }
 
@@ -110,35 +109,56 @@ class Parser {
       isBracket: this.isBracket,
     }
 
-    // this.load_plugins(plugin);
+    this.load_plugin(plugin)
 
   }
 
-  load_plugins(plugins: any[]) {
+  load_plugin({ context, api, parse }: plugin) {
 
-    for (const { context, lexical, parse } of plugins) {
+    let context_to_check = new Set<string>();
 
-      if (context.Program) {
-        for (const ctx of context.Program) {
-          this.program_context.add(`is${ctx}`)
+    for (const ctx of Object.keys(context)) {
+
+      if (ctx === 'Program') {
+        context_to_check = new Set(context.Program);
+        continue;
+      }
+
+      this.context.load(ctx, context[ctx]);
+
+      const parser = this;
+
+      this.api[`in${ctx}`] = function (sequence: string, updateContext?: boolean) {
+
+        const ret = context[ctx].keyword.hasOwnProperty(sequence);
+
+        if (ret && updateContext) {
+          const props = context[ctx].keyword[sequence];
+          parser.api.startContext(ctx, props, sequence.length)
         }
-        delete context.Program;
+
+        return ret;
+      }
+    }
+
+    let valid_context = ''
+    for (const ctx of context_to_check) {
+
+      if (!context.hasOwnProperty(ctx)) {
+        log('[warn];y', `Program: [${valid_context}`, `"${ctx}";y`, 'is not defined in', context)
+      } else {
+        valid_context += `'${ctx}',`;
+        this.program_context.add(`in${ctx}`);
+      }
+    }
+
+    for (const k of Object.keys(api)) {
+
+      this.api[k] = function (sequence: string) {
+        const reg = api[k as keyof typeof api] as RegExp;
+        return reg.test(sequence);
       }
 
-      for (const k of Object.keys(context)) {
-        this.context.load(k, context[k]);
-      }
-
-      for (const k of Object.keys(lexical)) {
-        if (k.startsWith('is')) {
-          this.api[k] = (...args: any[]) => lexical[k].apply(this, args);
-        }
-      }
-
-      this.parse = {
-        ...this.parse,
-        ...parse(this.api)
-      }
     }
 
   }
@@ -264,11 +284,13 @@ class Parser {
 
   parseProgram() {
     this.next();
-    // for (const isContext of this.program_context) {
-    //   if (this.api[isContext](this.sequence, true)) {
-    //     break;
-    //   }
-    // }
+    console.log(this.program_context)
+
+    for (const inContext of this.program_context) {
+      if (this.api[inContext](this.sequence, true)) {
+        break;
+      }
+    }
 
   }
 
