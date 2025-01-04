@@ -121,6 +121,7 @@ class ParserJS {
       startContext: this.context.start,
       endContext: this.context.end,
       next: this.next,
+      nextChar: this.next_char,
       eat: this.eat,
       expected: this.expected,
     }
@@ -161,7 +162,7 @@ class ParserJS {
     for (const ctx of context_to_check) {
 
       if (!context.hasOwnProperty(ctx)) {
-        log('[warn];y', `Program: [${valid_context}`, `"${ctx}";y`, 'is not defined in', context)
+        log('[warn];y', `Program: [${valid_context}`, `"${ctx}";y`, 'is not defined')
       } else {
         valid_context += `'${ctx}',`;
         this.program_context.add(`in${ctx}`);
@@ -181,33 +182,27 @@ class ParserJS {
 
   }
 
-  start_node = (type: string, ...props: any[]) => {
-
-  }
-
-  is_bracket = (next_char = false, bracket: string) => {
-    if (next_char) {
-      return this.next_char === bracket;
-    }
-    console.log('char', this.char, 'bracket', bracket)
-    return this.char === bracket;
-  }
 
   line = 1
   pos = 1;
 
   index = 0;
-  char = '';
-  prev_char = '';
-  next_char = '';
+  char = {
+    curr: '',
+    prev: '',
+    next: ''
+  }
   sequence = '';
+
   parse_string = '';
+  parse_expression = false;
+
   parse: any = {};
   expected_test?: [number, RegExp];
 
   is_new_line() {
-    if (/[\r\n]/.test(this.char)) {
-      if (this.char === '\r') {
+    if (/[\r\n]/.test(this.char.curr)) {
+      if (this.char.curr === '\r') {
         // if is windows eat \r\n
         this.index += 2
       } else {
@@ -222,14 +217,14 @@ class ParserJS {
   }
 
   is_parsing_string() {
-    if (/['|"|`]/.test(this.char)) {
+    if (/['|"|`]/.test(this.char.curr)) {
       if (this.parse_string) {
-        if (`${this.prev_char}${this.char}` !== `\\${this.parse_string}`) {
+        if (`${this.char.prev}${this.char}` !== `\\${this.parse_string}`) {
           // end parsing string
           this.parse_string = '';
         }
       } else {
-        this.parse_string = this.char;
+        this.parse_string = this.char.curr;
       }
     }
     if (!!this.parse_string) {
@@ -239,22 +234,36 @@ class ParserJS {
     return !!this.parse_string;
   }
 
-  avoid_whitespace = () => {
+  has_expression() {
+    const rule = this.rules?.hasExpression;
+
+    if (rule) {
+      if (/\(/.test(this.char.curr)) {
+        this.parse_expression = true;
+      }
+    }
+
+    return this.parse_expression;
+  }
+
+  avoid_whitespace = (debug = false) => {
     // dont eat whitespace during parse string
     if (this.parse_string) return false;
 
     const rule = this.rules?.avoidWhitespace;
 
     if (rule) {
-      const prev_char = this.prev_char !== undefined
-        ? this.prev_char
-        : ' ';
+
+
 
       const check_prev = rule === 'multiple'
-        ? this.char === prev_char
+        ? this.char.curr === (this.char.prev === undefined ? " " : this.char.prev)
         : true
 
-      if (/\s/.test(this.char) && check_prev) {
+      if (/\s/.test(this.char.curr) && check_prev) {
+        if (debug) {
+          log('skip whitespace;m')
+        }
         ++this.index;
         ++this.pos;
         return true;
@@ -270,10 +279,18 @@ class ParserJS {
     }
   }
 
-  expected = (value: string) => {
+  expected = (value: string | RegExp) => {
 
-    const len = value.replace('\\', '').length;
-    const reg = toRegExp(value);
+    let len = 0, reg: RegExp | undefined;
+
+    if (typeof value === 'string') {
+      len = value.replace('\\', '').length;
+      reg = toRegExp(value)
+    } else {
+      len = value.source.replace('\\', '').length
+      reg = value;
+    }
+
     if (!reg) return false;
 
     this.expected_test = [len, reg]
@@ -285,6 +302,24 @@ class ParserJS {
     const len = this.sequence.length + 1;
     this.index -= len;
     this.pos -= len;
+  }
+
+  next_char = () => {
+
+    while (this.index < this.source.length) {
+
+      this.char.curr = this.source[this.index];
+
+      if (this.is_new_line()) {
+        continue
+      }
+
+      if (this.avoid_whitespace()) {
+        continue;
+      }
+
+      return this.source[this.index]
+    }
   }
 
   next = (
@@ -303,30 +338,32 @@ class ParserJS {
 
     while (should_continue && this.index < this.source.length) {
 
-
-
-      this.char = this.source[this.index];
-      this.prev_char = this.source[this.index - 1];
-      this.next_char = this.source[this.index + 1];
+      this.char.prev = this.source[this.index - 1];
+      this.char.curr = this.source[this.index];
+      this.char.next = this.source[this.index + 1];
 
       if (!this.char) {
         log('undefined;r')
-      }
-
-      if (this.is_new_line()) {
-        continue
       }
 
       if (this.is_parsing_string()) {
         continue;
       }
 
+      if (this.is_new_line()) {
+        continue
+      }
+
       if (this.avoid_whitespace()) {
         continue;
       }
 
+      if (this.has_expression()) {
+        continue;
+      }
+
       if (this.expected_test) {
-        this.sequence += this.char;
+        this.sequence += this.char.curr;
         if (this.sequence.length === this.expected_test[0]) {
 
           const expectation = this.expected_test[1].test(this.sequence);
@@ -343,17 +380,17 @@ class ParserJS {
         continue;
       }
 
-      let _include = typeof include === 'boolean' ? true : include.test(this.char);
-      let _exclude = typeof exclude === 'boolean' ? true : !exclude.test(this.char);
+      let _include = typeof include === 'boolean' ? true : include.test(this.char.curr);
+      let _exclude = typeof exclude === 'boolean' ? true : !exclude.test(this.char.curr);
 
       if (debug) {
         // @ts-ignore
-        log('test:;m', this.char, 'include:;m', debug_include, _include, 'exclude:;m', debug_exclude, !_exclude)
+        log('test:;m', this.char.curr, 'include:;m', debug_include, _include, 'exclude:;m', debug_exclude, !_exclude)
       }
 
 
       if (_include && _exclude) {
-        this.sequence += this.char;
+        this.sequence += this.char.curr;
       } else {
         if (this.sequence) {
           if (debug) {
@@ -372,6 +409,13 @@ class ParserJS {
 
   parseProgram() {
     this.rules = { avoidWhitespace: "multiple" };
+    let a = 1;
+    const obj = {
+      async func(prop = (a === 1 ? a = 2 : a = 0, a)) {
+
+      },
+
+    }
     this.next()
     for (const inContext of this.program_context) {
       if (this.api[inContext](this.sequence, true)) {

@@ -54,6 +54,7 @@ type DefaultApi = {
    * @returns {string} - The constructed sequence of characters.
   */
   next(include?: RegExp | true, exclude?: RegExp | false, debug?: boolean): string;
+  nextChar(): string;
   startContext(context: string): void;
   endContext(): void;
 }

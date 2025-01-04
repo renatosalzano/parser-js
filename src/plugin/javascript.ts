@@ -62,6 +62,7 @@ export default (config: any) => {
     api,
     parse: ({
       next,
+      nextChar,
       expected,
       appendNode,
       createNode,
@@ -85,7 +86,7 @@ export default (config: any) => {
 
         setRules({ avoidWhitespace: true });
 
-        if (expected('\\(')) {
+        if (expected(/\(/)) {
           // params
           this.Params(node);
         } else {
@@ -98,7 +99,13 @@ export default (config: any) => {
       },
 
       Params(node: FuncNode) {
-        next(/[{]/, false, true)
+        setRules({ avoidWhitespace: true });
+
+        console.log(nextChar())
+        // switch (seq[0]) {
+        //   case '{':
+        //   case '[':
+        // }
         // next(/[{]/, false, true)
         // console.log('params', next(/[{]/, false, true))
       },
