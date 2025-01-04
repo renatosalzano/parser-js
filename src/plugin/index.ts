@@ -56,6 +56,7 @@ type DefaultApi = {
   */
   next(include?: RegExp | true, exclude?: RegExp | false, debug?: boolean): string;
   nextChar(): string;
+  eachChar(callback: (char: string) => any, debug?: boolean): void;
   startContext(context: string): void;
   endContext(): void;
 }

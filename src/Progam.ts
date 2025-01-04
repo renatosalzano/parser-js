@@ -24,10 +24,6 @@ class Program {
   appendNode = (node: Node) => {
     this.body.push(node);
   }
-
-  log() {
-    console.log(this.body)
-  }
 }
 
 export { Node }

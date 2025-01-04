@@ -116,6 +116,7 @@ class ParserJS {
 
     this.api = {
       char: this.char,
+      eachChar: this.each_char,
       setRules,
       createNode: this.Program.createNode,
       appendNode: this.Program.appendNode,
@@ -229,6 +230,7 @@ class ParserJS {
       }
     }
     if (!!this.parse_string) {
+      this.sequence += this.char.curr
       ++this.index;
       ++this.pos;
     }
@@ -293,7 +295,7 @@ class ParserJS {
     }
 
     if (debug) {
-      log(`avoid whitespace[${rule}];m`, `char:"${this.char.curr}"`, is_whitespace)
+      log(`[${this.line},${this.index + 1}];`, 'is whitespace[;m', `${rule}`, '];m', `"${this.char.curr}"`, is_whitespace)
     }
 
     if (is_whitespace) {
@@ -349,7 +351,7 @@ class ParserJS {
         continue
       }
 
-      if (this.avoid_whitespace(true)) {
+      if (this.avoid_whitespace(debug)) {
         continue;
       }
 
@@ -396,10 +398,6 @@ class ParserJS {
       this.char.curr = this.source[this.index];
       this.char.next = this.source[this.index + 1];
 
-      if (!this.char) {
-        log('undefined;r')
-      }
-
       if (this.is_parsing_string()) {
         continue;
       }
@@ -421,9 +419,13 @@ class ParserJS {
         if (this.sequence.length === this.expected_test[0]) {
 
           const expectation = this.expected_test[1].test(this.sequence);
+
+          if (expectation) {
+            ++this.index;
+            ++this.pos;
+          }
+
           this.expected_test = undefined;
-          ++this.index;
-          ++this.pos;
 
           return expectation;
 
@@ -459,18 +461,55 @@ class ParserJS {
 
   }
 
+  each_char = (callback: (char: string) => boolean, debug = false) => {
+
+
+    if (debug) {
+      log('each char start at;m', this.char.curr)
+    }
+
+    let should_continue = true;
+
+    while (should_continue && this.index < this.source.length) {
+
+      this.char.prev = this.source[this.index - 1];
+      this.char.curr = this.source[this.index];
+      this.char.next = this.source[this.index + 1];
+
+      if (this.is_new_line()) {
+        continue
+      }
+
+      if (this.avoid_whitespace()) {
+        continue;
+      }
+
+      if (callback(this.char.curr)) {
+        should_continue = false;
+      }
+
+      ++this.index;
+      ++this.pos;
+    }
+
+
+    if (debug) {
+      log('each char end at;m', this.char.curr)
+      // console.log(this.source.slice(this.index))
+    }
+
+  }
+
   parseProgram() {
     this.rules = { avoidWhitespace: "multiple" };
-    this.next(undefined, undefined, true)
-    this.next(undefined, undefined, true)
-    this.next_char(true)
-    // for (const inContext of this.program_context) {
-    //   if (this.api[inContext](this.sequence, true)) {
-    //     const curr = this.context.current()
-    //     this.parse[curr.name](curr.props)
-    //     break;
-    //   }
-    // }
+    this.next()
+    for (const inContext of this.program_context) {
+      if (this.api[inContext](this.sequence, true)) {
+        const curr = this.context.current()
+        this.parse[curr.name](curr.props)
+        break;
+      }
+    }
 
   }
 

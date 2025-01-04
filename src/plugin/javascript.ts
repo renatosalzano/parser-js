@@ -64,6 +64,8 @@ export default (config: any) => {
       char,
       next,
       nextChar,
+      eachChar,
+      eat,
       expected,
       appendNode,
       createNode,
@@ -78,9 +80,8 @@ export default (config: any) => {
         node.async = async;
 
         if (!arrow) {
-          // func declaration
-          const id = next(/[a-zA-Z_$]/, undefined, true);
-          console.log('id test', id)
+          // check if have identifier
+          const id = next(/[a-zA-Z_$]/);
           if (isIdentifier(id)) {
             node.id = id;
           }
@@ -102,19 +103,147 @@ export default (config: any) => {
 
       Params(node: FuncNode) {
 
+        let params = [];
+
         switch (nextChar()) {
           case "{":
+            this.Pattern('object')
+            break;
           case "[":
-            console.log('pattern');
-            console.log(next(true, /[,]/))
+            this.Pattern('array')
         }
       },
 
-      Pattern() {
+      Pattern(type: "object" | 'array') {
+
+        const entries: { key?: string, value?: any }[] = [];
+        let entry: { key?: string, value?: any } = {}
+
+        let sequence = '';
+        let key = '';
+        let value: any = ''
+
+        if (type === 'object') {
+
+          console.log(char)
+          next(true, /[,]/, true)
+          nextChar()
+          next(true, /[,]/, true)
+          nextChar()
+          next(true, /[,{=]/, true)
+          console.log(char)
+          nextChar()
+
+          // eachChar((ch) => {
+
+          //   if (!entry.key && /[a-zA-Z0-9\[\]:'"`$_=]/.test(ch)) {
+
+          //   }
+
+          //   if (!/[a-zA-Z0-9\[\]:'"`$_=]/.test(ch)) {
+          //     console.log(sequence)
+          //     entry.key = sequence;
+          //     sequence = '';
+          //     return;
+          //   }
+
+          //   if (entry.key && /[{\[]/.test(ch)) {
+          //     switch (ch) {
+          //       case "{":
+          //         nextChar()
+          //         entry.value = this.Object()
+          //         break;
+          //       case "[":
+          //         nextChar()
+          //         entry.value = this.Array()
+          //         break;
+          //     }
+          //     return;
+          //   }
+
+          //   if (/[,}]/.test(ch)) {
+          //     console.log(sequence, entry)
+          //     if (!entry.key) {
+          //       entry.key = sequence;
+          //     } else if (!entry.value) {
+          //       entry.value = sequence;
+          //     }
+          //     entries.push(entry)
+          //     entry = {}
+          //     sequence = ''
+          //     if (ch === '}') {
+          //       console.log('end pattern object')
+          //     }
+          //     return ch === '}'
+          //   }
+
+          //   sequence += ch;
+          //   return
+          // }, true)
+
+        }
+
+        console.log(entries)
+      },
+
+      Object() {
+        // key: value
+        // 'key-string': value
+        // [computed]: value
+        const entries: { key?: string, value?: any }[] = [];
+
+        let entry: { key?: string, value?: any } = {}
+
+        let sequence = ''
+        eachChar((ch) => {
+
+          if (/[:]/.test(ch)) {
+            entry.key = sequence;
+            // TODO check computed key reference
+            sequence = ''
+            return
+          }
+
+          if (entry.key && /[(\[{]/.test(ch)) {
+            switch (ch) {
+              case "(":
+                // TODO
+                break;
+              case "[":
+                this.Array()
+                break;
+              case "{":
+                nextChar()
+                console.log('nested object')
+                entry.value = this.Object()
+                break;
+            }
+            return
+          }
+
+          if (/[,}]/.test(ch)) {
+            if (!entry.value) {
+              entry.value = sequence;
+            }
+            entries.push(entry)
+            entry = {}
+            sequence = ''
+            if (ch === '}') {
+              console.log('end object')
+            }
+            return ch === '}'
+          }
+
+          sequence += ch;
+          return
+        }, true)
+        return entries;
+
+      },
+
+      Array() {
 
       }
-
-
     })
   }
 }
