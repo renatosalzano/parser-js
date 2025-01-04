@@ -40,6 +40,7 @@ type ParserApi<T, A> = {
 }
 
 type DefaultApi = {
+  char: { curr: string, prev: string, next: string },
   setRules(rules: ParserRules): void;
   appendNode: Program['appendNode'];
   createNode: Program['createNode'];

@@ -15,3 +15,7 @@ export function toRegExp(value: string, flags?: string) {
     log(`${value} is not valid RegExp;r`);
   }
 }
+
+export function isQuote(char: string) {
+  return /['|"|`]/.test(char);
+}

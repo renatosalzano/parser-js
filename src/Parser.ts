@@ -2,7 +2,7 @@ import { log } from "utils";
 import javascript from "plugin/javascript";
 import { Plugin, plugin } from "plugin";
 import Program from "Progam";
-import { toRegExp } from "./utils/parser";
+import { isQuote, toRegExp } from "./utils/parser";
 
 let program: Parser | null = null;
 
@@ -115,6 +115,7 @@ class ParserJS {
     }
 
     this.api = {
+      char: this.char,
       setRules,
       createNode: this.Program.createNode,
       appendNode: this.Program.appendNode,
@@ -251,24 +252,55 @@ class ParserJS {
     if (this.parse_string) return false;
 
     const rule = this.rules?.avoidWhitespace;
+    let is_whitespace = false
 
-    if (rule) {
+    switch (true) {
+      case (rule === 'multiple'): {
+        if (/\s/.test(this.char.curr) && this.sequence === "") {
+          /*
+            motivo:
+            Quando la regola è "multiple", vengono esclusi soltanto gli spazi adiacenti.
+            Tuttavia, questo crea un effetto collaterale sulla successiva chiamata a next().
+            Se non gestito attraverso i parametri, trovandosi come carattere corrente uno spazio
+            (escluso di default) e il carattere precedente che non è uno spazio,
+            il parser non avanza restando bloccato sullo spazio.
+            Nel contesto di un loop, la chiamata next() in combinazione con questa regola può portare
+            ad un ciclo potenzialmente infinito.
+            Questo non è il comportamento che ci si aspetterebbe
+            utilizzando next() in combinazione con questa regola.
 
-
-
-      const check_prev = rule === 'multiple'
-        ? this.char.curr === (this.char.prev === undefined ? " " : this.char.prev)
-        : true
-
-      if (/\s/.test(this.char.curr) && check_prev) {
-        if (debug) {
-          log('skip whitespace;m')
+            reason:
+            When the rule is "multiple", only adjacent spaces are excluded.
+            However, this creates a side effect on the next next() call.
+            If not handled through the parameters, finding the current character as a space
+            (excluded by default) and the previous character not a space,
+            the parser does not advance and gets stuck on the space.
+            In the context of a loop, the next() call in combination with this rule can lead
+            to a potentially infinite loop.
+            This is not the behavior you would expect when using next() in combination with this rule.
+          */
+          is_whitespace = true;
+          break;
         }
-        ++this.index;
-        ++this.pos;
-        return true;
+        const char_prev = this.char.prev === undefined ? " " : this.char.prev;
+        is_whitespace = /\s/.test(this.char.curr) && this.char.curr === char_prev;
+        break;
       }
+      case (rule === true): {
+        is_whitespace = /\s/.test(this.char.curr);
+        break;
+      }
+    }
 
+    if (debug) {
+      log(`avoid whitespace[${rule}];m`, `char:"${this.char.curr}"`, is_whitespace)
+    }
+
+    if (is_whitespace) {
+
+      ++this.index;
+      ++this.pos;
+      return true;
     }
   }
 
@@ -304,7 +336,10 @@ class ParserJS {
     this.pos -= len;
   }
 
-  next_char = () => {
+  next_char = (debug = false) => {
+
+    // clean old sequence
+    this.sequence = '';
 
     while (this.index < this.source.length) {
 
@@ -314,11 +349,30 @@ class ParserJS {
         continue
       }
 
-      if (this.avoid_whitespace()) {
+      if (this.avoid_whitespace(true)) {
         continue;
       }
 
-      return this.source[this.index]
+      if (isQuote(this.char.curr)) {
+        /*
+          se il carattere corrente è un apice (',",`) "index" non viene incrementato,
+          perché alla successiva esecuzione di next() il parser non sarebbe in grado di parsare
+          correttamente la stringa.
+
+          if the current character is a quote (',",`), "index" is not incremented,
+          because on the next execution of next() the parser would not be able to parse
+          the string correctly.
+        */
+        if (debug) log('next char is quote:;m', `(${this.char.curr})`)
+        return this.char.curr;
+      }
+
+      if (debug) {
+
+      }
+
+      if (debug) log('current char:;m', `${this.source[this.index + 0]}`)
+      return (++this.index, ++this.pos, this.char.curr);
     }
   }
 
@@ -392,13 +446,11 @@ class ParserJS {
       if (_include && _exclude) {
         this.sequence += this.char.curr;
       } else {
-        if (this.sequence) {
-          if (debug) {
-            log('sequence:;m', `"${this.sequence}";y`);
-          }
-          should_continue = false;
-          return this.sequence;
+        if (debug) {
+          log('sequence:;m', `"${this.sequence}";y`);
         }
+        should_continue = false;
+        return this.sequence;
       }
 
       ++this.pos;
@@ -409,21 +461,16 @@ class ParserJS {
 
   parseProgram() {
     this.rules = { avoidWhitespace: "multiple" };
-    let a = 1;
-    const obj = {
-      async func(prop = (a === 1 ? a = 2 : a = 0, a)) {
-
-      },
-
-    }
-    this.next()
-    for (const inContext of this.program_context) {
-      if (this.api[inContext](this.sequence, true)) {
-        const curr = this.context.current()
-        this.parse[curr.name](curr.props)
-        break;
-      }
-    }
+    this.next(undefined, undefined, true)
+    this.next(undefined, undefined, true)
+    this.next_char(true)
+    // for (const inContext of this.program_context) {
+    //   if (this.api[inContext](this.sequence, true)) {
+    //     const curr = this.context.current()
+    //     this.parse[curr.name](curr.props)
+    //     break;
+    //   }
+    // }
 
   }
 

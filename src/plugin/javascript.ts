@@ -61,6 +61,7 @@ export default (config: any) => {
     context,
     api,
     parse: ({
+      char,
       next,
       nextChar,
       expected,
@@ -78,7 +79,8 @@ export default (config: any) => {
 
         if (!arrow) {
           // func declaration
-          const id = next();
+          const id = next(/[a-zA-Z_$]/, undefined, true);
+          console.log('id test', id)
           if (isIdentifier(id)) {
             node.id = id;
           }
@@ -99,16 +101,20 @@ export default (config: any) => {
       },
 
       Params(node: FuncNode) {
-        setRules({ avoidWhitespace: true });
 
-        console.log(nextChar())
-        // switch (seq[0]) {
-        //   case '{':
-        //   case '[':
-        // }
-        // next(/[{]/, false, true)
-        // console.log('params', next(/[{]/, false, true))
+        switch (nextChar()) {
+          case "{":
+          case "[":
+            console.log('pattern');
+            console.log(next(true, /[,]/))
+        }
       },
+
+      Pattern() {
+
+      }
+
+
     })
   }
 }
