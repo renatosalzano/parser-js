@@ -369,10 +369,6 @@ class ParserJS {
         return this.char.curr;
       }
 
-      if (debug) {
-
-      }
-
       if (debug) log('current char:;m', `${this.source[this.index + 0]}`)
       return (++this.index, ++this.pos, this.char.curr);
     }

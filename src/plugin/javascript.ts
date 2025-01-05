@@ -120,19 +120,17 @@ export default (config: any) => {
         let entry: { key?: string, value?: any } = {}
 
         let sequence = '';
-        let key = '';
-        let value: any = ''
 
         if (type === 'object') {
 
           console.log(char)
-          next(true, /[,]/, true)
-          nextChar()
-          next(true, /[,]/, true)
-          nextChar()
           next(true, /[,{=]/, true)
-          console.log(char)
+          switch (nextChar()) {
+            case "{":
+
+          }
           nextChar()
+          console.log(char.curr)
 
           // eachChar((ch) => {
 
