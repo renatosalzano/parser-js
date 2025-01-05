@@ -196,11 +196,13 @@ class ParserJS {
   }
   sequence = '';
 
+  history = new History(this);
+
   parse_string = '';
   parse_expression = false;
 
   parse: any = {};
-  expected_test?: [number, RegExp];
+  expected_test = () => false;
 
   is_new_line() {
     if (/[\r\n]/.test(this.char.curr)) {
@@ -313,23 +315,47 @@ class ParserJS {
     }
   }
 
-  expected = (value: string | RegExp) => {
+  expected = (value: string | RegExp, debug = false) => {
 
-    let len = 0, reg: RegExp | undefined;
+    const self = this;
+    let expectation = false;
 
-    if (typeof value === 'string') {
-      len = value.replace('\\', '').length;
-      reg = toRegExp(value)
-    } else {
-      len = value.source.replace('\\', '').length
-      reg = value;
+    this.expected_test = () => {
+      switch (true) {
+        case typeof value === 'string': {
+
+          if (self.sequence.length === value.length) {
+            if (self.sequence === value) {
+              expectation = true;
+              ++self.index;
+              ++self.pos;
+              return false;
+            } else {
+              self.history.prev();
+              return false;
+            }
+          }
+          break;
+        }
+        case value instanceof RegExp: {
+
+          if (value.test(self.sequence)) {
+
+          } else {
+            self.history.prev();
+            return false;
+          }
+          break;
+        }
+        default:
+          log('not allowed;r');
+          return false;
+      }
+
+      return true;
     }
 
-    if (!reg) return false;
-
-    this.expected_test = [len, reg]
-
-    return this.next()
+    return expectation;
   }
 
   prev = () => {
@@ -380,6 +406,8 @@ class ParserJS {
     debug = false
   ) => {
 
+    this.history.push()
+
     let should_continue = true;
     this.sequence = '';
 
@@ -410,25 +438,25 @@ class ParserJS {
         continue;
       }
 
-      if (this.expected_test) {
-        this.sequence += this.char.curr;
-        if (this.sequence.length === this.expected_test[0]) {
+      if (this.expected_test()) {
+        // this.sequence += this.char.curr;
+        // if (this.sequence.length === this.expected_test[0]) {
 
-          const expectation = this.expected_test[1].test(this.sequence);
+        //   const expectation = this.expected_test[1].test(this.sequence);
 
-          if (expectation) {
-            ++this.index;
-            ++this.pos;
-          }
+        //   if (expectation) {
+        //     ++this.index;
+        //     ++this.pos;
+        //   }
 
-          this.expected_test = undefined;
+        //   this.expected_test = undefined;
 
-          return expectation;
+        //   return expectation;
 
-        } else {
-          ++this.index;
-          ++this.pos;
-        }
+        // } else {
+        //   ++this.index;
+        //   ++this.pos;
+        // }
         continue;
       }
 
@@ -437,7 +465,7 @@ class ParserJS {
 
       if (debug) {
         // @ts-ignore
-        log('test:;m', this.char.curr, 'include:;m', debug_include, _include, 'exclude:;m', debug_exclude, !_exclude)
+        log(`[${this.line},${this.index + 1}];`, 'test:;m', this.char.curr, 'include:;m', debug_include, _include, 'exclude:;m', debug_exclude, !_exclude)
       }
 
 
@@ -445,7 +473,7 @@ class ParserJS {
         this.sequence += this.char.curr;
       } else {
         if (debug) {
-          log('sequence:;m', `"${this.sequence}";y`);
+          log('sequence:;m', `"${this.sequence}";y`, 'current char:;m', `"${this.char.curr}";y`);
         }
         should_continue = false;
         return this.sequence;
@@ -498,20 +526,46 @@ class ParserJS {
 
   parseProgram() {
     this.rules = { avoidWhitespace: "multiple" };
-    this.next()
-    for (const inContext of this.program_context) {
-      if (this.api[inContext](this.sequence, true)) {
-        const curr = this.context.current()
-        this.parse[curr.name](curr.props)
-        break;
-      }
-    }
+    // this.next()
+    this.expected(/(\()?(.*?)\)?.*?(=>)/, true)
+    // for (const inContext of this.program_context) {
+    //   if (this.api[inContext](this.sequence, true)) {
+    //     const curr = this.context.current()
+    //     this.parse[curr.name](curr.props)
+    //     break;
+    //   }
+    // }
 
   }
 
 
   async Parse() {
     this.parseProgram()
+  }
+
+}
+
+class History {
+
+  history: [number, number, number][] = []
+
+  constructor(public Parser: ParserJS) {
+
+  }
+
+  push = () => {
+    const { index, line, pos } = this.Parser;
+    this.history.push([index, line, pos])
+  }
+
+  prev = () => {
+    if (this.history.length !== 1) {
+      this.history.pop()
+    }
+    const [index, line, pos] = this.history.at(-1) as [number, number, number];
+    this.Parser.index = index;
+    this.Parser.line = line;
+    this.Parser.pos = pos;
   }
 
 }

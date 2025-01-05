@@ -22,7 +22,7 @@ const context = {
 
 const api = {
   isIdentifier: /^[a-zA-Z_$][a-zA-Z0-9_$]*$/,
-  isArrowFunction: /\(.*?=>/
+  isArrowFunction: /\(?.*?\)?\s+=>/
 }
 
 type Context = typeof context;
@@ -72,176 +72,225 @@ export default (config: any) => {
       setRules,
       isIdentifier,
       inFunction,
-    }: Api) => ({
-      Variable() { },
-      Function({ async, arrow }: Context['Function']['props']) {
+    }: Api) => {
 
-        const node = createNode(FuncNode);
-        node.async = async;
+      function recursiveObjectPattern(node: any) {
 
-        if (!arrow) {
-          // check if have identifier
-          const id = next(/[a-zA-Z_$]/);
-          if (isIdentifier(id)) {
-            node.id = id;
-          }
-        }
-
-        setRules({ avoidWhitespace: true });
-
-        if (expected(/\(/)) {
-          // params
-          this.Params(node);
-        } else {
-          // throw error
-        }
-
-        appendNode(node)
-
-        // console.log(node)
-      },
-
-      Params(node: FuncNode) {
-
-        let params = [];
+        const id = next(true, /[:=,}]/, true);
 
         switch (nextChar()) {
-          case "{":
-            this.Pattern('object')
+          case ":":
+            // alias | nested destructuring
+            console.log('alias|destructuring', id)
+            if (expected('{')) {
+              console.log('nested pattern')
+            } else {
+              console.log('alias')
+            }
             break;
-          case "[":
-            this.Pattern('array')
+          case "=":
+            // assignament
+            console.log('assignament')
+            break;
+          case ",":
+            // next
+            node.properties.push({ tag: 'identifier', id })
+            recursiveObjectPattern(node)
+            console.log('end prop')
+            break;
+          case "}":
+            // end pattern
+            console.log('next')
         }
-      },
-
-      Pattern(type: "object" | 'array') {
-
-        const entries: { key?: string, value?: any }[] = [];
-        let entry: { key?: string, value?: any } = {}
-
-        let sequence = '';
-
-        if (type === 'object') {
-
-          console.log(char)
-          next(true, /[,{=]/, true)
-          switch (nextChar()) {
-            case "{":
-
-          }
-          nextChar()
-          console.log(char.curr)
-
-          // eachChar((ch) => {
-
-          //   if (!entry.key && /[a-zA-Z0-9\[\]:'"`$_=]/.test(ch)) {
-
-          //   }
-
-          //   if (!/[a-zA-Z0-9\[\]:'"`$_=]/.test(ch)) {
-          //     console.log(sequence)
-          //     entry.key = sequence;
-          //     sequence = '';
-          //     return;
-          //   }
-
-          //   if (entry.key && /[{\[]/.test(ch)) {
-          //     switch (ch) {
-          //       case "{":
-          //         nextChar()
-          //         entry.value = this.Object()
-          //         break;
-          //       case "[":
-          //         nextChar()
-          //         entry.value = this.Array()
-          //         break;
-          //     }
-          //     return;
-          //   }
-
-          //   if (/[,}]/.test(ch)) {
-          //     console.log(sequence, entry)
-          //     if (!entry.key) {
-          //       entry.key = sequence;
-          //     } else if (!entry.value) {
-          //       entry.value = sequence;
-          //     }
-          //     entries.push(entry)
-          //     entry = {}
-          //     sequence = ''
-          //     if (ch === '}') {
-          //       console.log('end pattern object')
-          //     }
-          //     return ch === '}'
-          //   }
-
-          //   sequence += ch;
-          //   return
-          // }, true)
-
-        }
-
-        console.log(entries)
-      },
-
-      Object() {
-        // key: value
-        // 'key-string': value
-        // [computed]: value
-        const entries: { key?: string, value?: any }[] = [];
-
-        let entry: { key?: string, value?: any } = {}
-
-        let sequence = ''
-        eachChar((ch) => {
-
-          if (/[:]/.test(ch)) {
-            entry.key = sequence;
-            // TODO check computed key reference
-            sequence = ''
-            return
-          }
-
-          if (entry.key && /[(\[{]/.test(ch)) {
-            switch (ch) {
-              case "(":
-                // TODO
-                break;
-              case "[":
-                this.Array()
-                break;
-              case "{":
-                nextChar()
-                console.log('nested object')
-                entry.value = this.Object()
-                break;
-            }
-            return
-          }
-
-          if (/[,}]/.test(ch)) {
-            if (!entry.value) {
-              entry.value = sequence;
-            }
-            entries.push(entry)
-            entry = {}
-            sequence = ''
-            if (ch === '}') {
-              console.log('end object')
-            }
-            return ch === '}'
-          }
-
-          sequence += ch;
-          return
-        }, true)
-        return entries;
-
-      },
-
-      Array() {
 
       }
-    })
+
+      return ({
+        Variable() { },
+        Function({ async, arrow }: Context['Function']['props']) {
+
+          const node = createNode(FuncNode);
+          node.async = async;
+
+          if (!arrow) {
+            // check if have identifier
+            const id = next(/[a-zA-Z_$]/);
+            if (isIdentifier(id)) {
+              node.id = id;
+            }
+          }
+
+          setRules({ avoidWhitespace: true });
+
+          if (expected(/\(/)) {
+            // params
+            this.Params(node);
+          } else {
+            // throw error
+          }
+
+          appendNode(node)
+
+          // console.log(node)
+        },
+
+        Params(node: FuncNode) {
+
+          let params = [];
+
+          switch (nextChar()) {
+            case "{":
+              this.Pattern('object')
+              break;
+            case "[":
+              this.Pattern('array')
+          }
+        },
+
+        Pattern(type: "object" | 'array') {
+
+          const entries: { key?: string, value?: any }[] = [];
+          let entry: { key?: string, value?: any } = {}
+
+          let sequence = '';
+
+          if (type === 'object') {
+
+            const node = recursiveObjectPattern({
+              tag: 'pattern',
+              type: 'object',
+              properties: []
+            })
+
+            // console.log(char)
+            // next(true, /[:=,}]/, true)
+            // switch (nextChar()) {
+            //   case ":":
+            //     // alias | nested destructuring
+            //     console.log('alias')
+            //     break;
+            //   case "=":
+            //     // assignament
+            //     console.log('assignament')
+            //     break;
+            //   case ",":
+            //     // next
+            //     console.log('end prop')
+            //   case "}":
+            //     // end pattern
+            //     console.log('next')
+            // }
+            // console.log(char.curr)
+
+            // eachChar((ch) => {
+
+            //   if (!entry.key && /[a-zA-Z0-9\[\]:'"`$_=]/.test(ch)) {
+
+            //   }
+
+            //   if (!/[a-zA-Z0-9\[\]:'"`$_=]/.test(ch)) {
+            //     console.log(sequence)
+            //     entry.key = sequence;
+            //     sequence = '';
+            //     return;
+            //   }
+
+            //   if (entry.key && /[{\[]/.test(ch)) {
+            //     switch (ch) {
+            //       case "{":
+            //         nextChar()
+            //         entry.value = this.Object()
+            //         break;
+            //       case "[":
+            //         nextChar()
+            //         entry.value = this.Array()
+            //         break;
+            //     }
+            //     return;
+            //   }
+
+            //   if (/[,}]/.test(ch)) {
+            //     console.log(sequence, entry)
+            //     if (!entry.key) {
+            //       entry.key = sequence;
+            //     } else if (!entry.value) {
+            //       entry.value = sequence;
+            //     }
+            //     entries.push(entry)
+            //     entry = {}
+            //     sequence = ''
+            //     if (ch === '}') {
+            //       console.log('end pattern object')
+            //     }
+            //     return ch === '}'
+            //   }
+
+            //   sequence += ch;
+            //   return
+            // }, true)
+
+          }
+        },
+
+        Object() {
+          // key: value
+          // 'key-string': value
+          // [computed]: value
+          const entries: { key?: string, value?: any }[] = [];
+
+          let entry: { key?: string, value?: any } = {}
+
+          let sequence = ''
+          eachChar((ch) => {
+
+            if (/[:]/.test(ch)) {
+              entry.key = sequence;
+              // TODO check computed key reference
+              sequence = ''
+              return
+            }
+
+            if (entry.key && /[(\[{]/.test(ch)) {
+              switch (ch) {
+                case "(":
+                  // TODO
+                  break;
+                case "[":
+                  this.Array()
+                  break;
+                case "{":
+                  nextChar()
+                  console.log('nested object')
+                  entry.value = this.Object()
+                  break;
+              }
+              return
+            }
+
+            if (/[,}]/.test(ch)) {
+              if (!entry.value) {
+                entry.value = sequence;
+              }
+              entries.push(entry)
+              entry = {}
+              sequence = ''
+              if (ch === '}') {
+                console.log('end object')
+              }
+              return ch === '}'
+            }
+
+            sequence += ch;
+            return
+          }, true)
+          return entries;
+
+        },
+
+        Array() {
+
+        }
+      })
+    }
   }
 }
