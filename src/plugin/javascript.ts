@@ -2,10 +2,18 @@ import { Node } from "Progam";
 import type { DefaultApi } from "./";
 
 const context = {
-  Program: ['Variable', 'Function', 'Expression'],
+  Program: ['Variable', 'Function', 'Group'],
+  Group: {
+    keyword: {
+      '(': null
+    },
+    props: { context: 'Program', expression: [] }
+  },
   Variable: {
     keyword: {
-      'let': null
+      'var': { hoisting: true, props: { kind: 'var' } },
+      'const': { props: { kind: 'const' } },
+      'let': { props: { kind: 'let' } }
     }
   },
   Function: {
@@ -14,15 +22,48 @@ const context = {
       arrow: false,
     },
     keyword: {
-      'function': null,
-      'async': { eat: "function", props: { async: true } }
+      'function': { hoisting: true },
+      'async': { hoisting: true, eat: "function", props: { async: true } }
     }
   }
 }
 
 const api = {
-  isIdentifier: /^[a-zA-Z_$][a-zA-Z0-9_$]*$/,
-  isArrowFunction: /\(?.*?\)?\s+=>/
+  isIdentifier: /^[a-zA-Z_$][a-zA-Z0-9_$]*$/
+}
+
+const operators = {
+  '+': 'addition',
+  '-': 'subtraction',
+  '*': 'multiplication',
+  '/': 'division',
+  '%': 'modulus',
+  '>': 'greater than',
+  '<': 'less than',
+  '!': 'logical NOT',
+  '=': 'assignment',
+  '&': 'bitwise AND',
+  '|': 'bitwise OR',
+  '^': 'bitwise XOR',
+  '~': 'bitwise NOT',
+  '++': 'increment',
+  '--': 'decrement',
+  '==': 'equality',
+  '!=': 'inequality',
+  '>=': 'greater than or equal to',
+  '<=': 'less than or equal to',
+  '&&': 'logical AND',
+  '||': 'logical OR',
+  '+=': 'addition assignment',
+  '-=': 'subtraction assignment',
+  '*=': 'multiplication assignment',
+  '/=': 'division assignment',
+  '%=': 'modulus assignment',
+  '<<': 'left shift',
+  '>>': 'right shift',
+  '===': 'strict equality',
+  '!==': 'strict inequality',
+  '>>>': 'unsigned right shift',
 }
 
 type Context = typeof context;
@@ -57,9 +98,12 @@ class FuncNode implements Node {
 
 export default (config: any) => {
 
+  const identifiers = new Map<string, string>()
+
   return {
     context,
     api,
+    operators,
     parse: ({
       char,
       next,
@@ -72,6 +116,7 @@ export default (config: any) => {
       setRules,
       isIdentifier,
       inFunction,
+      currentContext,
     }: Api) => {
 
       function recursiveObjectPattern(node: any) {
@@ -106,7 +151,50 @@ export default (config: any) => {
       }
 
       return ({
+
+        Group({ context, expression }: Context['Group']['props']) {
+          setRules({ avoidWhitespace: true })
+          console.log('parse group', context)
+
+          if (context === 'Program') {
+            if (expected('(|function', true)) {
+              // possibly IIFE
+              console.log('work')
+            } else {
+              if (expected('(|[|{', true)) {
+                // possibly group, destructured array or object
+              } else {
+
+                let key = ''
+                const seq = next(true, /[,=]/, true)
+                if (isIdentifier(seq)) {
+                  key = seq;
+                  console.log(seq)
+                } else {
+                  // ERROR!
+                }
+                switch (char.curr) {
+                  case "=":
+                  // assignament
+
+                  case ",":
+                  // end instruction
+                }
+
+              }
+
+
+            }
+          }
+          // next(undefined, undefined, true)
+        },
+
+        Expression(expression: any[]) {
+          let entry
+        },
+
         Variable() { },
+
         Function({ async, arrow }: Context['Function']['props']) {
 
           const node = createNode(FuncNode);
@@ -122,7 +210,7 @@ export default (config: any) => {
 
           setRules({ avoidWhitespace: true });
 
-          if (expected(/\(/)) {
+          if (expected("(")) {
             // params
             this.Params(node);
           } else {

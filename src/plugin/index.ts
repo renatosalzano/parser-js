@@ -17,7 +17,7 @@ type ContextObject = {
     hasExpression?: boolean,
   },
   keyword: {
-    [key: string]: { eat?: string, props?: { [key: string]: any } } | null;
+    [key: string]: { hoisting?: boolean, eat?: string, props?: { [key: string]: any } } | null;
   }
 }
 
@@ -45,7 +45,7 @@ type DefaultApi = {
   appendNode: Program['appendNode'];
   createNode: Program['createNode'];
   eat(sequence: string, breakReg?: RegExp): void;
-  expected(value: string | RegExp): boolean;
+  expected(value: string, debug?: boolean): boolean;
   /**
    * Advances the parsing of the source and constructs a sequence of characters.
    * 
@@ -59,6 +59,8 @@ type DefaultApi = {
   eachChar(callback: (char: string) => any, debug?: boolean): void;
   startContext(context: string): void;
   endContext(): void;
+  error(message: string): void;
+  currentContext: { name: string, props: { [key: string]: any } }
 }
 
 
@@ -81,6 +83,7 @@ type DefaultApi = {
 type plugin = {
   context: { [K in Exclude<string, 'Program'>]: ContextObject } & { Program?: string[] };
   api: Api;
+  operators: { [key: string]: string };
   parse: (api: any) => { [key: string]: () => any }
 }
 

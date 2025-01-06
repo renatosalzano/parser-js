@@ -12,6 +12,7 @@ class Program {
   body: Node[] = [];
   private buffer: Node[] = []
   private reference = new Set<string>();
+  referenceTree: any;
 
   constructor() {
 

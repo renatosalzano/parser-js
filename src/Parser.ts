@@ -41,8 +41,6 @@ class Parser {
     program ??= new this() as Parser;
     const parser = new ParserJS(code, program.plugin);
     await parser.Parse()
-
-    console.log('end program')
   }
 }
 
@@ -51,6 +49,7 @@ class Context {
 
   context: any = {};
   buffer: any = [];
+  current: { name: string, props: any };
 
   constructor(public Parser: ParserJS) {
 
@@ -58,23 +57,22 @@ class Context {
       name: 'Program',
       props: {}
     })
+
+    this.current = this.buffer.at(-1);
   }
 
-  start = (name: string, data: any = {}, start_offset = 0) => {
-    const props = data?.props || {}
+  start = (name: string, props: any = {}, instruction: any = {}, start_offset = 0) => {
+
     log('start context', `${name} at ${this.Parser.index - start_offset - 1};y`, props)
     this.buffer.push({ name, props })
-    if (data.eat) {
-      this.Parser.eat(data.eat);
-    }
+    this.current = this.buffer.at(-1);
+    // if (data.eat) {
+    //   this.Parser.eat(data.eat);
+    // }
   }
 
   end() {
 
-  }
-
-  current() {
-    return this.buffer.at(-1)
   }
 
   load(name: string, config: any) {
@@ -95,12 +93,14 @@ class ParserJS {
 
   Program = new Program();
   source = '';
-  program_context = new Set<string>()
+  program_keyword = new Map<string, Function>()
   context: Context;
   api: any = {};
   rules: ParserRules = {
     avoidWhitespace: 'multiple'
   }
+
+  reference = new Map<string, string>();
 
   constructor(source: string, plugin: plugin) {
     this.context = new Context(this);
@@ -116,6 +116,7 @@ class ParserJS {
 
     this.api = {
       char: this.char,
+      currentContext: this.context.current,
       eachChar: this.each_char,
       setRules,
       createNode: this.Program.createNode,
@@ -126,15 +127,17 @@ class ParserJS {
       nextChar: this.next_char,
       eat: this.eat,
       expected: this.expected,
+      error: this.error
     }
 
-    this.load_plugin(plugin)
+    this.load_plugin(plugin);
 
   }
 
   load_plugin({ context, api, parse }: plugin) {
 
     let context_to_check = new Set<string>();
+    const start_context_map: { [key: string]: Function } = {}
 
     for (const ctx of Object.keys(context)) {
 
@@ -146,17 +149,21 @@ class ParserJS {
       this.context.load(ctx, context[ctx]);
 
       const parser = this;
-
       this.api[`in${ctx}`] = function (sequence: string, updateContext?: boolean) {
 
         const ret = context[ctx].keyword.hasOwnProperty(sequence);
 
         if (ret && updateContext) {
-          const props = context[ctx].keyword[sequence];
-          parser.api.startContext(ctx, props, sequence.length)
+          const { props = {}, ...instruction } = context[ctx].keyword[sequence] || {};
+          parser.api.startContext(ctx, Object.assign(context[ctx].props || {}, props), instruction, sequence.length);
         }
 
         return ret;
+      }
+
+      start_context_map[ctx] = function (key: string) {
+        const { props = {}, ...instruction } = context[ctx].keyword[key] || {};
+        parser.api.startContext(ctx, Object.assign(context[ctx].props || {}, props), instruction, key.length);
       }
     }
 
@@ -167,16 +174,36 @@ class ParserJS {
         log('[warn];y', `Program: [${valid_context}`, `"${ctx}";y`, 'is not defined')
       } else {
         valid_context += `'${ctx}',`;
-        this.program_context.add(`in${ctx}`);
+        for (const kw of Object.keys(context[ctx].keyword)) {
+          if (this.program_keyword.has(kw)) {
+            log(`duplicate keyword "${kw}" in: ${ctx};r`)
+          } else {
+            this.program_keyword.set(kw, () => start_context_map[ctx](kw))
+          }
+        }
       }
     }
 
     for (const k of Object.keys(api)) {
+      let isApi: any = (api as any)[k];
 
-      this.api[k] = function (sequence: string) {
-        const reg = api[k as keyof typeof api] as RegExp;
-        return reg.test(sequence);
+      if (isApi instanceof RegExp) {
+        this.api[k] = function (sequence: string) {
+          return isApi.test(sequence)
+        }
+        continue;
       }
+
+      if (isApi instanceof Object) {
+        const testMap: { [key: number]: string[] } = {};
+
+        for (const test_key of Object.keys(isApi)) {
+          testMap[test_key.length] = isApi
+        }
+
+      }
+
+
 
     }
 
@@ -199,9 +226,15 @@ class ParserJS {
   history = new History(this);
 
   parse_string = '';
-  parse_expression = false;
+  should_continue = false;
+  blocking_error = false;
 
   parse: any = {};
+
+  is_identifier = (sequence: string) => {
+    return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(sequence);
+  }
+
   expected_test = () => false;
 
   is_new_line() {
@@ -237,18 +270,6 @@ class ParserJS {
       ++this.pos;
     }
     return !!this.parse_string;
-  }
-
-  has_expression() {
-    const rule = this.rules?.hasExpression;
-
-    if (rule) {
-      if (/\(/.test(this.char.curr)) {
-        this.parse_expression = true;
-      }
-    }
-
-    return this.parse_expression;
   }
 
   avoid_whitespace = (debug = false) => {
@@ -315,44 +336,62 @@ class ParserJS {
     }
   }
 
-  expected = (value: string | RegExp, debug = false) => {
+  expected = (value: string, debug = false) => {
 
-    const self = this;
     let expectation = false;
 
+    const values = value
+      .split('|')
+      .sort((a, b) => a.length - b.length) // [x, xx, xxx]
+      .reduce<{ [key: number]: Set<string> }>((ret, curr) => {
+        if (!ret[curr.length]) ret[curr.length] = new Set([curr]);
+        else ret[curr.length].add(curr);
+        return ret;
+      }, {})
+
     this.expected_test = () => {
-      switch (true) {
-        case typeof value === 'string': {
 
-          if (self.sequence.length === value.length) {
-            if (self.sequence === value) {
-              expectation = true;
-              ++self.index;
-              ++self.pos;
-              return false;
-            } else {
-              self.history.prev();
-              return false;
-            }
+      this.sequence += this.char.curr;
+
+      ++this.index, ++this.pos;
+
+      if (values[this.sequence.length]) {
+
+        for (const value of values[this.sequence.length]) {
+
+          if (debug) {
+            log('expected;m', `"${value}";y`, 'sequence:;m', `"${this.sequence}";y`)
           }
-          break;
-        }
-        case value instanceof RegExp: {
 
-          if (value.test(self.sequence)) {
+          if (this.sequence === value) {
+            expectation = true;
 
-          } else {
-            self.history.prev();
-            return false;
+            this.expected_test = () => false;
+            return false; // stop test
           }
-          break;
+
         }
-        default:
-          log('not allowed;r');
-          return false;
+
+        delete values[this.sequence.length]
+      }
+
+      if (Object.values(values).length === 0) {
+        this.expected_test = () => false;
+        return false
       }
 
       return true;
+    }
+
+    this.next()
+
+    if (!expectation) {
+
+      if (debug) {
+        log('expected failed;m')
+      }
+      this.history.prev();
+
     }
 
     return expectation;
@@ -396,7 +435,9 @@ class ParserJS {
       }
 
       if (debug) log('current char:;m', `${this.source[this.index + 0]}`)
-      return (++this.index, ++this.pos, this.char.curr);
+
+      ++this.index, ++this.pos, this.history.push();
+      return this.char.curr;
     }
   }
 
@@ -434,29 +475,7 @@ class ParserJS {
         continue;
       }
 
-      if (this.has_expression()) {
-        continue;
-      }
-
       if (this.expected_test()) {
-        // this.sequence += this.char.curr;
-        // if (this.sequence.length === this.expected_test[0]) {
-
-        //   const expectation = this.expected_test[1].test(this.sequence);
-
-        //   if (expectation) {
-        //     ++this.index;
-        //     ++this.pos;
-        //   }
-
-        //   this.expected_test = undefined;
-
-        //   return expectation;
-
-        // } else {
-        //   ++this.index;
-        //   ++this.pos;
-        // }
         continue;
       }
 
@@ -479,10 +498,52 @@ class ParserJS {
         return this.sequence;
       }
 
-      ++this.pos;
-      ++this.index;
+      ++this.index, ++this.pos
     }
 
+  }
+
+  parse_program() {
+    log('start parse program;y');
+
+    this.rules = { avoidWhitespace: "multiple" };
+    this.next()
+    if (!this.sequence && this.program_keyword.has(this.char.curr)) {
+      const start_context = this.program_keyword.get(this.char.curr) as Function;
+      start_context();
+      this.next_char();
+      this.parse[this.context.current.name](this.context.current.props);
+      return;
+    } else if (this.program_keyword.has(this.sequence)) {
+      const start_context = this.program_keyword.get(this.sequence) as Function;
+      start_context();
+      return;
+    }
+    log('end parse program;g')
+
+    // let context_found = false;
+    // this.next_char();
+    // for (const inContext of this.program_context) {
+    //   if (this.api[inContext](this.char.curr, true)) {
+    //     const curr = this.context.current
+    //     this.parse[curr.name](curr.props)
+    //     break;
+    //   }
+    // }
+
+    // this.next(true, /[\s]/, true);
+    // for (const inContext of this.program_context) {
+    //   if (this.api[inContext](this.sequence, true)) {
+    //     const curr = this.context.current
+    //     this.parse[curr.name](curr.props)
+    //     break;
+    //   }
+    // }
+
+  }
+
+  error = (message: string) => {
+    log('ERROR;R', `${message} at ${this.line}:${this.pos}`);
   }
 
   each_char = (callback: (char: string) => boolean, debug = false) => {
@@ -512,8 +573,7 @@ class ParserJS {
         should_continue = false;
       }
 
-      ++this.index;
-      ++this.pos;
+      ++this.index, ++this.pos;
     }
 
 
@@ -524,26 +584,13 @@ class ParserJS {
 
   }
 
-  parseProgram() {
-    this.rules = { avoidWhitespace: "multiple" };
-    // this.next()
-    this.expected(/(\()?(.*?)\)?.*?(=>)/, true)
-    // for (const inContext of this.program_context) {
-    //   if (this.api[inContext](this.sequence, true)) {
-    //     const curr = this.context.current()
-    //     this.parse[curr.name](curr.props)
-    //     break;
-    //   }
-    // }
-
-  }
-
 
   async Parse() {
-    this.parseProgram()
+    this.parse_program()
   }
 
 }
+
 
 class History {
 
@@ -563,9 +610,15 @@ class History {
       this.history.pop()
     }
     const [index, line, pos] = this.history.at(-1) as [number, number, number];
+    console.log('history prev', index)
     this.Parser.index = index;
     this.Parser.line = line;
     this.Parser.pos = pos;
+    this.Parser.char.prev = this.Parser.source[index - 1]
+    this.Parser.char.curr = this.Parser.source[index]
+    this.Parser.char.next = this.Parser.source[index + 1]
+    console.log(this.Parser.char)
+
   }
 
 }
