@@ -13,7 +13,7 @@ type Brackets =
 type ContextObject = {
   props?: { [key: string]: any };
   rules?: {
-    avoidWhitespace?: boolean | "multiple",
+    skipWhitespace?: boolean | "multiple",
     hasExpression?: boolean,
   },
   keyword: {

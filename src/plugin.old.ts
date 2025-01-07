@@ -47,7 +47,7 @@ function ctx<T>(
 type Obj<T> = { [key: string]: T }
 
 type ParserConfig = {
-  avoidWhitespace?: boolean | "multiple",
+  skipWhitespace?: boolean | "multiple",
   hasExpression?: boolean,
   sequenceRule?: RegExp
 }

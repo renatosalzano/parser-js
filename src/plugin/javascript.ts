@@ -2,12 +2,11 @@ import { Node } from "Progam";
 import type { DefaultApi } from "./";
 
 const context = {
-  Program: ['Variable', 'Function', 'Group'],
-  Group: {
+  Program: ['Variable', 'Function', 'Expression', 'Block'],
+  Block: {
     keyword: {
-      '(': null
-    },
-    props: { context: 'Program', expression: [] }
+      "{": null,
+    }
   },
   Variable: {
     keyword: {
@@ -17,6 +16,7 @@ const context = {
     }
   },
   Function: {
+    default: true,
     props: {
       async: false,
       arrow: false,
@@ -25,6 +25,12 @@ const context = {
       'function': { hoisting: true },
       'async': { hoisting: true, eat: "function", props: { async: true } }
     }
+  },
+  Expression: {
+    default: true,
+    keyword: {
+      '(': null,
+    },
   }
 }
 
@@ -152,46 +158,48 @@ export default (config: any) => {
 
       return ({
 
-        Group({ context, expression }: Context['Group']['props']) {
-          setRules({ avoidWhitespace: true })
-          console.log('parse group', context)
+        // Group({ context, expression }: Context['Group']['props']) {
+        //   setRules({ skipWhitespace: true })
+        //   console.log('parse group', context)
 
-          if (context === 'Program') {
-            if (expected('(|function', true)) {
-              // possibly IIFE
-              console.log('work')
-            } else {
-              if (expected('(|[|{', true)) {
-                // possibly group, destructured array or object
-              } else {
+        //   if (context === 'Program') {
+        //     if (expected('(|function', true)) {
+        //       // possibly IIFE
+        //       console.log('work')
+        //     } else {
+        //       if (expected('(|[|{', true)) {
+        //         // possibly group, destructured array or object
+        //       } else {
 
-                let key = ''
-                const seq = next(true, /[,=]/, true)
-                if (isIdentifier(seq)) {
-                  key = seq;
-                  console.log(seq)
-                } else {
-                  // ERROR!
-                }
-                switch (char.curr) {
-                  case "=":
-                  // assignament
+        //         let key = ''
+        //         const seq = next(true, /[,=]/, true)
+        //         if (isIdentifier(seq)) {
+        //           key = seq;
+        //           console.log(seq)
+        //         } else {
+        //           // ERROR!
+        //         }
+        //         switch (char.curr) {
+        //           case "=":
+        //           // assignament
 
-                  case ",":
-                  // end instruction
-                }
+        //           case ",":
+        //           // end instruction
+        //         }
 
-              }
+        //       }
 
 
-            }
-          }
-          // next(undefined, undefined, true)
-        },
+        //     }
+        //   }
+        //   // next(undefined, undefined, true)
+        // },
 
         Expression(expression: any[]) {
           let entry
         },
+
+        Block() { },
 
         Variable() { },
 
@@ -208,7 +216,7 @@ export default (config: any) => {
             }
           }
 
-          setRules({ avoidWhitespace: true });
+          setRules({ skipWhitespace: true });
 
           if (expected("(")) {
             // params

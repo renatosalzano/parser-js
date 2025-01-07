@@ -27,7 +27,7 @@ function log(...logs) {
       continue;
     }
 
-    let match = message.match(/;.*?$/g);
+    let match = message.match(/([;].){1}$/gm);
 
     if (match) {
       match = match[0].trim();

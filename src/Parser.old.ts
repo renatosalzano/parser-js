@@ -173,7 +173,7 @@
 //     // dont eat whitespace during parse string
 //     if (this.start_string) return false;
 
-//     const rule = this.rules?.avoidWhitespace;
+//     const rule = this.rules?.skipWhitespace;
 
 //     if (rule) {
 //       const check_prev = rule === 'multiple'

@@ -47,6 +47,7 @@ class Parser {
 
 class Context {
 
+  default: string = '';
   context: any = {};
   buffer: any = [];
   current: { name: string, props: any };
@@ -76,6 +77,12 @@ class Context {
   }
 
   load(name: string, config: any) {
+    if (config?.default) {
+      if (this.default) {
+        log(`default context is "${name}", was "${this.default}";y`)
+      }
+      this.default = name;
+    }
     this.context[name] = {
       ...this.context[name],
       ...config
@@ -85,19 +92,20 @@ class Context {
 }
 
 type ParserRules = {
-  avoidWhitespace?: boolean | "multiple",
-  hasExpression?: boolean,
+  skipWhitespace?: boolean | "multiple",
+  hasOperators?: boolean,
 }
 
 class ParserJS {
 
   Program = new Program();
   source = '';
-  program_keyword = new Map<string, Function>()
+  program_keyword = new Map<string, Function>();
   context: Context;
   api: any = {};
+  operators: { [key: string]: string } = {};
   rules: ParserRules = {
-    avoidWhitespace: 'multiple'
+    skipWhitespace: 'multiple'
   }
 
   reference = new Map<string, string>();
@@ -130,11 +138,11 @@ class ParserJS {
       error: this.error
     }
 
-    this.load_plugin(plugin);
+    this.load_language(plugin);
 
   }
 
-  load_plugin({ context, api, parse }: plugin) {
+  load_language({ context, api, operators, parse }: plugin) {
 
     let context_to_check = new Set<string>();
     const start_context_map: { [key: string]: Function } = {}
@@ -207,6 +215,8 @@ class ParserJS {
 
     }
 
+    this.operators = operators;
+
     this.parse = parse(this.api);
 
   }
@@ -221,7 +231,11 @@ class ParserJS {
     prev: '',
     next: ''
   }
-  sequence = '';
+  sequence = {
+    prev: '',
+    curr: ''
+  }
+
 
   history = new History(this);
 
@@ -265,23 +279,23 @@ class ParserJS {
       }
     }
     if (!!this.parse_string) {
-      this.sequence += this.char.curr
+      this.sequence.curr += this.char.curr
       ++this.index;
       ++this.pos;
     }
     return !!this.parse_string;
   }
 
-  avoid_whitespace = (debug = false) => {
+  skip_whitespace = (debug = false) => {
     // dont eat whitespace during parse string
     if (this.parse_string) return false;
 
-    const rule = this.rules?.avoidWhitespace;
+    const rule = this.rules?.skipWhitespace;
     let is_whitespace = false
 
     switch (true) {
       case (rule === 'multiple'): {
-        if (/\s/.test(this.char.curr) && this.sequence === "") {
+        if (/\s/.test(this.char.curr) && this.sequence.curr === "") {
           /*
             motivo:
             Quando la regola è "multiple", vengono esclusi soltanto gli spazi adiacenti.
@@ -329,6 +343,37 @@ class ParserJS {
     }
   }
 
+  parsing_operator = false;
+  expression = [];
+
+  has_operators = (debug = true) => {
+
+    const rule = this.rules?.hasOperators;
+    if (rule) {
+      // if (/\s/.test(this.char.curr)) return false;
+      let sequence = this.sequence.curr + this.char.curr;
+      const is_operator = this.operators.hasOwnProperty(sequence);
+
+      if (is_operator) {
+        // console.log('operator found', this.sequence)
+        this.parsing_operator = true;
+        this.sequence.curr += this.char.curr;
+        ++this.index, ++this.pos;
+        return true;
+      } else {
+        if (this.parsing_operator) {
+          this.should_continue = false;
+          this.parsing_operator = false;
+          if (debug) log('operator:;m', `"${this.sequence.curr}";y`, 'type:;m', this.operators[this.sequence.curr] + ';g')
+        }
+
+      }
+
+    }
+
+    return false;
+  }
+
   eat = (sequence: string, breakReg?: RegExp) => {
 
     if (sequence !== this.next(breakReg)) {
@@ -351,19 +396,19 @@ class ParserJS {
 
     this.expected_test = () => {
 
-      this.sequence += this.char.curr;
+      this.sequence.curr += this.char.curr;
 
       ++this.index, ++this.pos;
 
-      if (values[this.sequence.length]) {
+      if (values[this.sequence.curr.length]) {
 
-        for (const value of values[this.sequence.length]) {
+        for (const value of values[this.sequence.curr.length]) {
 
           if (debug) {
             log('expected;m', `"${value}";y`, 'sequence:;m', `"${this.sequence}";y`)
           }
 
-          if (this.sequence === value) {
+          if (this.sequence.curr === value) {
             expectation = true;
 
             this.expected_test = () => false;
@@ -372,7 +417,7 @@ class ParserJS {
 
         }
 
-        delete values[this.sequence.length]
+        delete values[this.sequence.curr.length]
       }
 
       if (Object.values(values).length === 0) {
@@ -398,15 +443,16 @@ class ParserJS {
   }
 
   prev = () => {
-    const len = this.sequence.length + 1;
-    this.index -= len;
-    this.pos -= len;
+    // const len = this.sequence.length + 1;
+    // this.index -= len;
+    // this.pos -= len;
   }
 
   next_char = (debug = false) => {
 
     // clean old sequence
-    this.sequence = '';
+    this.sequence.prev = this.sequence.curr;
+    this.sequence.curr = '';
 
     while (this.index < this.source.length) {
 
@@ -416,7 +462,7 @@ class ParserJS {
         continue
       }
 
-      if (this.avoid_whitespace(debug)) {
+      if (this.skip_whitespace(debug)) {
         continue;
       }
 
@@ -443,14 +489,15 @@ class ParserJS {
 
   next = (
     include: RegExp | true = true,
-    exclude: RegExp | true = /[\s(\[{;:]/,
+    exclude: RegExp | true = /[\s(\[{,;:]/,
     debug = false
   ) => {
 
     this.history.push()
 
     let should_continue = true;
-    this.sequence = '';
+    this.sequence.prev = this.sequence.curr;
+    this.sequence.curr = '';
 
     if (debug) {
       var debug_include = typeof include === 'boolean' ? 'boolean' : include;
@@ -471,7 +518,11 @@ class ParserJS {
         continue
       }
 
-      if (this.avoid_whitespace()) {
+      if (this.skip_whitespace()) {
+        continue;
+      }
+
+      if (this.has_operators()) {
         continue;
       }
 
@@ -489,16 +540,19 @@ class ParserJS {
 
 
       if (_include && _exclude) {
-        this.sequence += this.char.curr;
+        this.sequence.curr += this.char.curr;
       } else {
         if (debug) {
-          log('sequence:;m', `"${this.sequence}";y`, 'current char:;m', `"${this.char.curr}";y`);
+          log('sequence:;m', `"${this.sequence.curr}";y`);
         }
-        should_continue = false;
-        return this.sequence;
+        if (this.sequence.curr) {
+          should_continue = false;
+          return this.sequence.curr;
+        }
       }
 
-      ++this.index, ++this.pos
+      ++this.index, ++this.pos;
+
     }
 
   }
@@ -506,19 +560,26 @@ class ParserJS {
   parse_program() {
     log('start parse program;y');
 
-    this.rules = { avoidWhitespace: "multiple" };
-    this.next()
-    if (!this.sequence && this.program_keyword.has(this.char.curr)) {
-      const start_context = this.program_keyword.get(this.char.curr) as Function;
-      start_context();
-      this.next_char();
-      this.parse[this.context.current.name](this.context.current.props);
-      return;
-    } else if (this.program_keyword.has(this.sequence)) {
-      const start_context = this.program_keyword.get(this.sequence) as Function;
-      start_context();
-      return;
-    }
+    this.rules = { skipWhitespace: "multiple", hasOperators: true };
+
+    (a = 1);
+    var a = undefined;
+    console.log('result', a)
+
+    this.next(undefined, undefined, true)
+    this.next(undefined, undefined, true)
+    this.next(undefined, undefined, true)
+    // if (!this.sequence && this.program_keyword.has(this.char.curr)) {
+    //   const start_context = this.program_keyword.get(this.char.curr) as Function;
+    //   start_context();
+    //   this.next_char();
+    //   this.parse[this.context.current.name](this.context.current.props);
+    //   return;
+    // } else if (this.program_keyword.has(this.sequence)) {
+    //   const start_context = this.program_keyword.get(this.sequence) as Function;
+    //   start_context();
+    //   return;
+    // }
     log('end parse program;g')
 
     // let context_found = false;
@@ -565,7 +626,7 @@ class ParserJS {
         continue
       }
 
-      if (this.avoid_whitespace()) {
+      if (this.skip_whitespace()) {
         continue;
       }
 
@@ -610,14 +671,14 @@ class History {
       this.history.pop()
     }
     const [index, line, pos] = this.history.at(-1) as [number, number, number];
-    console.log('history prev', index)
+    // console.log('history prev', index)
     this.Parser.index = index;
     this.Parser.line = line;
     this.Parser.pos = pos;
     this.Parser.char.prev = this.Parser.source[index - 1]
     this.Parser.char.curr = this.Parser.source[index]
     this.Parser.char.next = this.Parser.source[index + 1]
-    console.log(this.Parser.char)
+    // console.log(this.Parser.char)
 
   }
 
