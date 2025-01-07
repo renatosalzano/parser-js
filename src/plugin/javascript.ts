@@ -4,7 +4,7 @@ import type { DefaultApi } from "./";
 const context = {
   Program: ['Variable', 'Function', 'Expression', 'Block'],
   Block: {
-    keyword: {
+    token: {
       "{": null,
     }
   },
@@ -28,9 +28,9 @@ const context = {
   },
   Expression: {
     default: true,
-    keyword: {
-      '(': null,
-    },
+    token: {
+      '(': null
+    }
   }
 }
 
@@ -69,7 +69,7 @@ const operators = {
   '>>': 'right shift',
   '===': 'strict equality',
   '!==': 'strict inequality',
-  '>>>': 'unsigned right shift',
+  '>>>': 'unsigned right shift'
 }
 
 type Context = typeof context;

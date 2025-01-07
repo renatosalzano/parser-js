@@ -16,6 +16,9 @@ type ContextObject = {
     skipWhitespace?: boolean | "multiple",
     hasExpression?: boolean,
   },
+  token: {
+    [key: string]: { hoisting?: boolean, eat?: string, props?: { [key: string]: any } } | null;
+  },
   keyword: {
     [key: string]: { hoisting?: boolean, eat?: string, props?: { [key: string]: any } } | null;
   }
