@@ -2,7 +2,7 @@ import { Node } from "Progam";
 import type { DefaultApi } from "./";
 
 const context = {
-  Program: ['Variable', 'Function', 'Expression', 'Block'],
+  Program: ['Variable', 'Function', 'Expression', 'Block', 'Statement'],
   Block: {
     token: {
       "{": null,
@@ -31,6 +31,13 @@ const context = {
     token: {
       '(': null
     }
+  },
+  Statement: {
+    token: {
+      'if': null,
+      'else': null,
+      'switch': null
+    }
   }
 }
 
@@ -43,7 +50,8 @@ const operators = {
   '-': 'subtraction',
   '*': 'multiplication',
   '/': 'division',
-  '%': 'modulus',
+  '%': 'reminder',
+  '.': 'dot notation',
   '>': 'greater than',
   '<': 'less than',
   '!': 'logical NOT',
@@ -52,6 +60,10 @@ const operators = {
   '|': 'bitwise OR',
   '^': 'bitwise XOR',
   '~': 'bitwise NOT',
+  '?': 'ternary start',
+  '?.': 'optional chaining',
+  '??': 'nullish coalescing',
+  '??=': 'nullish coalescing assignment',
   '++': 'increment',
   '--': 'decrement',
   '==': 'equality',
@@ -69,7 +81,9 @@ const operators = {
   '>>': 'right shift',
   '===': 'strict equality',
   '!==': 'strict inequality',
-  '>>>': 'unsigned right shift'
+  '>>>': 'unsigned right shift',
+  '>>>=': 'unsigned right shift assignment',
+  '...': 'spread'
 }
 
 type Context = typeof context;
@@ -97,6 +111,8 @@ class FuncNode implements Node {
     const params = this.params.map(n => n.toString()).join(',');
     if (this.arrow) {
       return `(${params})=>{}`
+    } else if (true) {
+
     }
     return `function ${this.id}(${params}){}`
   }

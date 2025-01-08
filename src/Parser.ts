@@ -255,10 +255,7 @@ class ParserJS {
     prev: '',
     next: ''
   }
-  sequence = {
-    prev: '',
-    curr: ''
-  }
+  sequence = ''
 
 
   history = new History(this);
@@ -268,6 +265,11 @@ class ParserJS {
   blocking_error = false;
 
   parse: any = {};
+
+  is = {
+    bracket: (char: string) => /[()\[\]{}]/.test(char),
+    identifier: (sequence: string) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(sequence)
+  }
 
   is_identifier = (sequence: string) => {
     return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(sequence);
@@ -291,9 +293,9 @@ class ParserJS {
     return false;
   }
 
-  is_parsing_string() {
+  parsing_string() {
+
     if (this.expected_test.is_testing) {
-      console.log('is testing')
       return false;
     }
 
@@ -302,101 +304,59 @@ class ParserJS {
         if (`${this.char.prev}${this.char.curr}` !== `\\${this.parse_string}`) {
           // end parsing string
           this.parse_string = '';
+          this.should_continue = false;
+          this.sequence += this.char.curr;
         }
       } else {
         this.parse_string = this.char.curr;
       }
     }
     if (!!this.parse_string) {
-      this.sequence.curr += this.char.curr
+      this.sequence += this.char.curr
       ++this.index;
       ++this.pos;
     }
     return !!this.parse_string;
   }
 
-  skip_whitespace = (debug = false) => {
+  is_ws = (char: string) => /[\s\t]/.test(char)
+  skip_multiple_whitespace = (debug = false) => {
     // dont eat whitespace during parse string
     if (this.parse_string) return false;
-
-    const rule = this.rules?.skipWhitespace;
-    let is_whitespace = false
-
-    switch (true) {
-      case (rule === 'multiple'): {
-        if (/\s/.test(this.char.curr) && this.sequence.curr === "") {
-          /*
-            motivo:
-            Quando la regola è "multiple", vengono esclusi soltanto gli spazi adiacenti.
-            Tuttavia, questo crea un effetto collaterale sulla successiva chiamata a next().
-            Se non gestito attraverso i parametri, trovandosi come carattere corrente uno spazio
-            (escluso di default) e il carattere precedente che non è uno spazio,
-            il parser non avanza restando bloccato sullo spazio.
-            Nel contesto di un loop, la chiamata next() in combinazione con questa regola può portare
-            ad un ciclo potenzialmente infinito.
-            Questo non è il comportamento che ci si aspetterebbe
-            utilizzando next() in combinazione con questa regola.
-
-            reason:
-            When the rule is "multiple", only adjacent spaces are excluded.
-            However, this creates a side effect on the next next() call.
-            If not handled through the parameters, finding the current character as a space
-            (excluded by default) and the previous character not a space,
-            the parser does not advance and gets stuck on the space.
-            In the context of a loop, the next() call in combination with this rule can lead
-            to a potentially infinite loop.
-            This is not the behavior you would expect when using next() in combination with this rule.
-          */
-          is_whitespace = true;
-          break;
-        }
-        const char_prev = this.char.prev === undefined ? " " : this.char.prev;
-        is_whitespace = /\s/.test(this.char.curr) && this.char.curr === char_prev;
-        break;
-      }
-      case (rule === true): {
-        is_whitespace = /\s/.test(this.char.curr);
-        break;
-      }
-    }
-
-    if (debug) {
-      log(`[${this.line},${this.index + 1}];`, 'is whitespace[;m', `${rule}`, '];m', `"${this.char.curr}"`, is_whitespace)
-    }
-
-    if (is_whitespace) {
-
-      ++this.index;
-      ++this.pos;
-      return true;
+    if (this.is_ws(this.char.curr) && (this.is_ws(this.char.next) || this.sequence === '')) {
+      ++this.index, ++this.pos;
+      return true
     }
   }
 
   parsing_operator = false;
-  expression = [];
 
-  has_operators = (debug = false) => {
+  parsing_operators = (debug = false) => {
 
-    const rule = this.rules?.hasOperators;
-    if (rule) {
-      // if (/\s/.test(this.char.curr)) return false;
-      let sequence = this.sequence.curr + this.char.curr;
-      const is_operator = this.operators.hasOwnProperty(sequence);
+    if (!this.parsing_operator) {
 
-      if (is_operator) {
-        if (debug) console.log('operator', sequence)
-        // console.log('operator found', this.sequence)
-        this.parsing_operator = true;
-        this.sequence.curr += this.char.curr;
-        ++this.index, ++this.pos;
-        return true;
-      } else {
-        if (this.parsing_operator) {
-          this.should_continue = false;
-          this.parsing_operator = false;
-          if (debug) log('operator:;m', `"${this.sequence.curr}";y`, 'type:;m', this.operators[this.sequence.curr] + ';g')
-        }
+      if (this.sequence && this.operators.hasOwnProperty(this.char.curr)) {
+        if (debug) log('operator found stop immediate;y')
+        this.stop_immediate = true;
+        return false;
+      }
 
+    }
+
+
+    let sequence = this.sequence + this.char.curr;
+    const is_operator = this.operators.hasOwnProperty(sequence);
+
+    if (is_operator) {
+      this.parsing_operator = true;
+      this.sequence += this.char.curr;
+      ++this.index, ++this.pos;
+      return true;
+    } else {
+      if (this.parsing_operator) {
+        this.stop_immediate = true;
+        this.parsing_operator = false;
+        if (debug) log('operator:;m', `"${this.sequence}";y`, 'type:;m', this.operators[this.sequence] + ';g')
       }
 
     }
@@ -406,9 +366,9 @@ class ParserJS {
 
   eat = (sequence: string, breakReg?: RegExp) => {
 
-    if (sequence !== this.next(breakReg)) {
-      this.prev();
-    }
+    // if (sequence !== this.next(breakReg)) {
+    //   this.prev();
+    // }
   }
 
   expected = (value: string, debug = false) => {
@@ -426,19 +386,19 @@ class ParserJS {
 
     this.expected_test = function () {
 
-      this.sequence.curr += this.char.curr;
+      this.sequence += this.char.curr;
 
       ++this.index, ++this.pos;
 
-      if (values[this.sequence.curr.length]) {
+      if (values[this.sequence.length]) {
 
-        for (const value of values[this.sequence.curr.length]) {
+        for (const value of values[this.sequence.length]) {
 
           if (debug) {
-            log('expected;m', `"${value}";y`, 'sequence:;m', `"${this.sequence.curr}";y`)
+            log('expected;m', `"${value}";y`, 'sequence:;m', `"${this.sequence}";y`)
           }
 
-          if (this.sequence.curr === value) {
+          if (this.sequence === value) {
             expectation = true;
             this.should_continue = false;
             this.expected_test = function () { };
@@ -448,7 +408,7 @@ class ParserJS {
 
         }
 
-        delete values[this.sequence.curr.length]
+        delete values[this.sequence.length]
       }
 
       if (Object.values(values).length === 0) {
@@ -485,8 +445,7 @@ class ParserJS {
   next_char = (debug = false) => {
 
     // clean old sequence
-    this.sequence.prev = this.sequence.curr;
-    this.sequence.curr = '';
+    this.sequence = '';
 
     while (this.index < this.source.length) {
 
@@ -496,7 +455,7 @@ class ParserJS {
         continue
       }
 
-      if (this.skip_whitespace(debug)) {
+      if (this.skip_multiple_whitespace(debug)) {
         continue;
       }
 
@@ -523,22 +482,14 @@ class ParserJS {
     return this.char.curr;
   }
 
-  next = (
-    include: RegExp | true = true,
-    exclude: RegExp | true = /[\s(\[{,;:]/,
-    debug = false
-  ) => {
+  stop_immediate = false;
+
+  next = (debug = false) => {
 
     this.history.push()
 
     this.should_continue = true;
-    this.sequence.prev = this.sequence.curr;
-    this.sequence.curr = '';
-
-    if (debug) {
-      var debug_include = typeof include === 'boolean' ? 'boolean' : include;
-      var debug_exclude = typeof exclude === 'boolean' ? 'boolean' : exclude;
-    }
+    this.sequence = '';
 
     while (this.should_continue && this.index < this.source.length) {
 
@@ -546,46 +497,48 @@ class ParserJS {
       this.char.curr = this.source[this.index];
       this.char.next = this.source[this.index + 1];
 
-      if (this.is_parsing_string()) {
+      if (this.parsing_string()) {
         continue;
       }
 
-      if (this.skip_new_line()) {
-        continue
-      }
-
-      if (this.skip_whitespace()) {
+      if (this.skip_multiple_whitespace()) {
         continue;
       }
 
-      if (this.expected_test()) {
+      if (this.parsing_operators(debug)) {
         continue;
       }
 
-      if (this.has_operators()) {
-        continue;
-      }
-
-      let _include = typeof include === 'boolean' ? true : include.test(this.char.curr);
-      let _exclude = typeof exclude === 'boolean' ? true : !exclude.test(this.char.curr);
-
-      if (debug) {
-        // @ts-ignore
-        log(`[${this.line},${this.index + 1}];`, 'test:;m', this.char.curr, 'include:;m', debug_include, _include, 'exclude:;m', debug_exclude, !_exclude)
-      }
-
-
-      if (_include && _exclude) {
-        this.sequence.curr += this.char.curr;
-      } else {
-        if (debug) {
-          log('sequence:;m', `"${this.sequence.curr}";y`);
-        }
-        if (this.sequence.curr) {
+      if (this.is.bracket(this.char.curr)) {
+        if (this.sequence) {
           this.should_continue = false;
-          return this.sequence.curr;
+        } else {
+          log('bracket:;m', this.char.curr)
+          ++this.index, ++this.pos;
+          return this.char.curr;
         }
       }
+
+      if (this.stop_immediate) {
+        this.stop_immediate = false;
+        return this.sequence;
+      }
+
+      if (!this.should_continue) {
+        if (debug) log('sequence:;m', this.sequence);
+
+        ++this.index, ++this.pos;
+        return this.sequence;
+      }
+
+
+      if (/[\s\r\n,:;]/.test(this.char.curr)) {
+        if (debug) log('sequence:;m', this.sequence);
+        ++this.index, ++this.pos;
+        return this.sequence;
+      }
+
+      this.sequence += this.char.curr;
 
       ++this.index, ++this.pos;
 
@@ -595,19 +548,17 @@ class ParserJS {
 
   parse_program() {
     log('start parse program;y');
-
-    this.rules = { skipWhitespace: true, hasOperators: true };
-
-    if (this.expected('"|\'|`|(|{|[', true)) {
-      console.log(this.char, this.index)
-      // this.next(undefined, undefined, true)
-      return;
+    let index = 36
+    while (index !== 0) {
+      this.next(true);
+      log(`curr char;g`, this.char.curr)
+      --index;
     }
+
 
     // console.log(this.next())
 
     log('end parse program;g')
-
 
 
   }
@@ -619,7 +570,7 @@ class ParserJS {
   each_char = (callback: (char: string, sequence: string) => boolean | undefined) => {
 
     this.should_continue = true;
-    this.sequence.curr = '';
+    this.sequence = '';
 
     while (this.should_continue && this.index < this.source.length) {
 
@@ -631,13 +582,13 @@ class ParserJS {
         continue
       }
 
-      if (this.skip_whitespace()) {
+      if (this.skip_multiple_whitespace()) {
         continue;
       }
 
-      this.sequence.curr += this.char.curr;
+      this.sequence += this.char.curr;
 
-      if (callback(this.char.curr, this.sequence.curr)) {
+      if (callback(this.char.curr, this.sequence)) {
         this.should_continue = false;
         return;
       }
