@@ -1,4 +1,4 @@
-import { Node } from "Progam";
+import { Node } from "parser/Progam";
 import type { DefaultApi } from "./";
 
 const context = {
@@ -33,16 +33,12 @@ const context = {
     }
   },
   Statement: {
-    token: {
+    keyword: {
       'if': null,
       'else': null,
       'switch': null
     }
   }
-}
-
-const api = {
-  isIdentifier: /^[a-zA-Z_$][a-zA-Z0-9_$]*$/
 }
 
 const operators = {
@@ -86,12 +82,26 @@ const operators = {
   '...': 'spread'
 }
 
+const brackets = {
+  "(": "bracket R",
+  ")": "bracket L",
+  "[": "square bracket R",
+  "]": "square bracket L",
+  "{": "curly bracketR",
+  "}": "curly bracket L",
+}
+
+const separators = {
+  ',': 'comma',
+  ':': 'colon',
+  ';': 'semicolon',
+  '\n': 'line feed',
+}
+
 type Context = typeof context;
 
 type Api = DefaultApi & {
   [K in keyof typeof context as `in${K}`]: (sequence: string, startContext?: boolean) => boolean;
-} & {
-  [K in keyof typeof api]: (sequence: string) => boolean;
 }
 
 class FuncNode implements Node {
@@ -124,51 +134,50 @@ export default (config: any) => {
 
   return {
     context,
-    api,
+    brackets,
     operators,
+    separators,
     parse: ({
       char,
       next,
-      nextChar,
       eachChar,
       eat,
       expected,
       appendNode,
       createNode,
       setRules,
-      isIdentifier,
       inFunction,
       currentContext,
     }: Api) => {
 
       function recursiveObjectPattern(node: any) {
 
-        const id = next(true, /[:=,}]/, true);
+        // const id = next(true, /[:=,}]/, true);
 
-        switch (nextChar()) {
-          case ":":
-            // alias | nested destructuring
-            console.log('alias|destructuring', id)
-            if (expected('{')) {
-              console.log('nested pattern')
-            } else {
-              console.log('alias')
-            }
-            break;
-          case "=":
-            // assignament
-            console.log('assignament')
-            break;
-          case ",":
-            // next
-            node.properties.push({ tag: 'identifier', id })
-            recursiveObjectPattern(node)
-            console.log('end prop')
-            break;
-          case "}":
-            // end pattern
-            console.log('next')
-        }
+        // switch (nextChar()) {
+        //   case ":":
+        //     // alias | nested destructuring
+        //     console.log('alias|destructuring', id)
+        //     if (expected('{')) {
+        //       console.log('nested pattern')
+        //     } else {
+        //       console.log('alias')
+        //     }
+        //     break;
+        //   case "=":
+        //     // assignament
+        //     console.log('assignament')
+        //     break;
+        //   case ",":
+        //     // next
+        //     node.properties.push({ tag: 'identifier', id })
+        //     recursiveObjectPattern(node)
+        //     console.log('end prop')
+        //     break;
+        //   case "}":
+        //     // end pattern
+        //     console.log('next')
+        // }
 
       }
 
@@ -221,42 +230,42 @@ export default (config: any) => {
 
         Function({ async, arrow }: Context['Function']['props']) {
 
-          const node = createNode(FuncNode);
-          node.async = async;
+          // const node = createNode(FuncNode);
+          // node.async = async;
 
-          if (!arrow) {
-            // check if have identifier
-            const id = next(/[a-zA-Z_$]/);
-            if (isIdentifier(id)) {
-              node.id = id;
-            }
-          }
+          // if (!arrow) {
+          //   // check if have identifier
+          //   const id = next(/[a-zA-Z_$]/);
+          //   if (isIdentifier(id)) {
+          //     node.id = id;
+          //   }
+          // }
 
-          setRules({ skipWhitespace: true });
+          // setRules({ skipWhitespace: true });
 
-          if (expected("(")) {
-            // params
-            this.Params(node);
-          } else {
-            // throw error
-          }
+          // if (expected("(")) {
+          //   // params
+          //   this.Params(node);
+          // } else {
+          //   // throw error
+          // }
 
-          appendNode(node)
+          // appendNode(node)
 
-          // console.log(node)
+          // // console.log(node)
         },
 
         Params(node: FuncNode) {
 
-          let params = [];
+          // let params = [];
 
-          switch (nextChar()) {
-            case "{":
-              this.Pattern('object')
-              break;
-            case "[":
-              this.Pattern('array')
-          }
+          // switch (nextChar()) {
+          //   case "{":
+          //     this.Pattern('object')
+          //     break;
+          //   case "[":
+          //     this.Pattern('array')
+          // }
         },
 
         Pattern(type: "object" | 'array') {
@@ -348,54 +357,54 @@ export default (config: any) => {
           // key: value
           // 'key-string': value
           // [computed]: value
-          const entries: { key?: string, value?: any }[] = [];
+          // const entries: { key?: string, value?: any }[] = [];
 
-          let entry: { key?: string, value?: any } = {}
+          // let entry: { key?: string, value?: any } = {}
 
-          let sequence = ''
-          eachChar((ch) => {
+          // let sequence = ''
+          // eachChar((ch) => {
 
-            if (/[:]/.test(ch)) {
-              entry.key = sequence;
-              // TODO check computed key reference
-              sequence = ''
-              return
-            }
+          //   if (/[:]/.test(ch)) {
+          //     entry.key = sequence;
+          //     // TODO check computed key reference
+          //     sequence = ''
+          //     return
+          //   }
 
-            if (entry.key && /[(\[{]/.test(ch)) {
-              switch (ch) {
-                case "(":
-                  // TODO
-                  break;
-                case "[":
-                  this.Array()
-                  break;
-                case "{":
-                  nextChar()
-                  console.log('nested object')
-                  entry.value = this.Object()
-                  break;
-              }
-              return
-            }
+          //   if (entry.key && /[(\[{]/.test(ch)) {
+          //     switch (ch) {
+          //       case "(":
+          //         // TODO
+          //         break;
+          //       case "[":
+          //         this.Array()
+          //         break;
+          //       case "{":
+          //         nextChar()
+          //         console.log('nested object')
+          //         entry.value = this.Object()
+          //         break;
+          //     }
+          //     return
+          //   }
 
-            if (/[,}]/.test(ch)) {
-              if (!entry.value) {
-                entry.value = sequence;
-              }
-              entries.push(entry)
-              entry = {}
-              sequence = ''
-              if (ch === '}') {
-                console.log('end object')
-              }
-              return ch === '}'
-            }
+          //   if (/[,}]/.test(ch)) {
+          //     if (!entry.value) {
+          //       entry.value = sequence;
+          //     }
+          //     entries.push(entry)
+          //     entry = {}
+          //     sequence = ''
+          //     if (ch === '}') {
+          //       console.log('end object')
+          //     }
+          //     return ch === '}'
+          //   }
 
-            sequence += ch;
-            return
-          }, true)
-          return entries;
+          //   sequence += ch;
+          //   return
+          // }, true)
+          // return entries;
 
         },
 

@@ -1,6 +1,7 @@
 const colors = {
   // fg
   0: 30,
+  1: 90,
   r: 31,
   g: 32,
   y: 33,
@@ -17,6 +18,24 @@ const colors = {
   C: 46,
   W: 47
 };
+
+function color(n,s) {
+  return `\x1b[${n}m${s}\x1b[0m`
+}
+
+function extend_string_proto() {
+  String.prototype.red = function() {return color(colors.r,this)}
+  String.prototype.green = function() {return color(colors.g,this)}
+  String.prototype.yellow = function() {return color(colors.y,this)}
+  String.prototype.cyan = function() {return color(colors.c,this)}
+  String.prototype.gray = function() {return color(colors[1],this)}
+}
+
+extend_string_proto()
+
+let test = 'test'.gray()
+
+console .log(test)
 
 function log(...logs) {
   let output = [];

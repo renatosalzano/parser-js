@@ -1,5 +1,5 @@
 import { ParserRules } from "Parser";
-import Program from "Progam";
+import Program from "parser/Progam";
 import { log } from "utils";
 
 type Brackets =
@@ -57,8 +57,7 @@ type DefaultApi = {
    * @param {boolean} [debug=false] - If true, enables debugging and logs inclusion/exclusion information.
    * @returns {string} - The constructed sequence of characters.
   */
-  next(include?: RegExp | true, exclude?: RegExp | false, debug?: boolean): string;
-  nextChar(): string;
+  next(debug?: boolean): {};
   eachChar(callback: (char: string) => any, debug?: boolean): void;
   startContext(context: string): void;
   endContext(): void;
