@@ -2,31 +2,32 @@ import { Node } from "parser/Progam";
 import type { DefaultApi } from "./";
 
 const context = {
-  Program: ['Variable', 'Function', 'Expression', 'Block', 'Statement', 'Class'],
+  Program: ['Variable', 'Function', 'Expression', 'Block', 'Statement', 'Class', 'Invalid'],
   Block: {
     startWith: {
       "{": null,
     }
   },
   Variable: {
-    lexical: {
+    keyword: {
       'var': { hoisting: true, props: { kind: 'var' } },
       'const': { props: { kind: 'const' } },
       'let': { props: { kind: 'let' } }
     }
   },
   Function: {
+    default: true,
     props: {
       async: false,
       arrow: false,
     },
-    lexical: {
+    keyword: {
       'function': { hoisting: true },
       'async': { eat: "function", props: { async: true } }
     }
   },
   Class: {
-    lexical: {
+    keyword: {
       'class': null
     }
   },
@@ -37,7 +38,7 @@ const context = {
     }
   },
   Statement: {
-    lexical: {
+    keyword: {
       'if': null,
       'else': null,
       'switch': null,

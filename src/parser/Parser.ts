@@ -63,16 +63,10 @@ class Parser {
         }
         this.lexical.set(l, t);
         this[type].set(l, t);
+        this.is.lexical = (_:string) => this.lexical.has(_);
+        this.is[type] = (_:string) => this[type].has(_);
       }
     }
-
-    const entries = Object.entries(map)
-    this[type] = new Map([...this[type], ...entries]);
-    this.lexical = new Map([...this.lexical, ...entries]);
-
-    let key = type.slice(0, -1) as keyof typeof this.is;
-    this.is[key] = (_: string) => this[type].has(_);
-    this.is.lexical = (_: string) => this.lexical.has(_);
   }
 
   is = {
@@ -168,10 +162,6 @@ class Parser {
     return !!this.parsing_string;
   }
 
-  parse_number() {
-
-  }
-
   skip_multiple_whitespace = (debug = false) => {
     // dont eat whitespace during parse string
     if (this.parsing_string) return false;
@@ -193,18 +183,26 @@ class Parser {
     const is_lexical = this.is.lexical(sequence);
 
     if (is_lexical) {
+
       this.parsing_lexical = true;
       this.sequence.value += this.char.curr;
       ++this.index, ++this.pos;
       return true;
+
     } else {
+
+      if (this.parsing_lexical && this.is.identifier(sequence)) {
+        if (debug) {
+          log('is not lexical;r', sequence);
+        }
+        this.parsing_lexical = false;
+        return false;
+      }
 
       if (this.parsing_lexical) {
         // end parsing lexical
-
-        if (this.is.identifier(this.char.curr)) {
-          this.parsing_lexical = false;
-          return false;
+        if (debug) {
+          log('end parse lexical;y')
         }
 
         if (this.is.operator(this.sequence.value)) {
@@ -223,7 +221,9 @@ class Parser {
 
         this.stop_immediate = true;
         this.parsing_lexical = false;
-        if (debug) log(this.history.loc(), 'operator:;m', `"${this.sequence.value}";y`, 'type:;m', this.lexical.get(this.sequence.value) + ';g')
+
+        // @ts-ignore
+        if (debug) log(this.history.loc(), this.sequence.type.magenta(), `"${this.sequence.value}";y`, 'type:;m', this.lexical.get(this.sequence.value) + ';g')
       }
 
     }
@@ -323,7 +323,7 @@ class Parser {
     this.sequence.name = '';
 
     // @ts-ignore
-    var print = () => log(this.history.loc(), this.sequence.type.magenta(), this.sequence.value || this.char.curr)
+    var print = () => log(this.history.loc(), this.sequence.type.magenta() + (this.sequence.name ? ` ${this.sequence.name}`.green() : ''), this.sequence.value || this.char.curr)
 
     while (!this.blocking_error && this.index < this.source.length) {
 
@@ -347,6 +347,7 @@ class Parser {
         continue;
       }
 
+
       if (/[\s\r\n]/.test(this.char.curr)) {
         if (this.sequence.value) {
           this.stop_immediate = true;
@@ -361,13 +362,13 @@ class Parser {
 
         if (this.sequence.type === 'unknown') {
 
-          // if (this.program.keyword.has(this.sequence.value)) {
-          //   this.sequence.type = 'keyword'
-          // } else if (this.is.identifier(this.sequence.value)) {
-          //   this.sequence.type = 'identifier'
-          // } else if (this.is.number(this.sequence.value)) {
-          //   this.sequence.type = 'number'
-          // }
+          if (this.is.keyword(this.sequence.value)) {
+            this.sequence.type = 'keyword'
+          } else if (this.is.identifier(this.sequence.value)) {
+            this.sequence.type = 'identifier'
+          } else if (this.is.number(this.sequence.value)) {
+            this.sequence.type = 'number'
+          }
         }
 
         if (debug) print();
@@ -386,13 +387,30 @@ class Parser {
   parse_program() {
     log('start parse program;y');
 
-    // this.next(true);
-    // this.next(true);
-    // this.next(true);
-    // this.next(true);
-    // this.next(true);
-    // this.next(true);
-    // this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+    this.next(true);
+
+
+
 
 
 

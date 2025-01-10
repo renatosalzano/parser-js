@@ -1,11 +1,16 @@
 import { log } from "utils";
 import Parser from "./Parser";
 
-type DefaultStartContext = Function & { $name: string };
+type ContextObject = {
+  name: string;
+  default?: boolean;
+  lexical: Map<string, any>;
+  has: (lexical: string, updateContext?: any) => boolean;
+}
 
 class Context {
 
-  default: DefaultStartContext = null as unknown as DefaultStartContext;
+  default: ContextObject | null = null;
   context: any = {};
   buffer: any = [];
   current: { name: string, props: any };
@@ -34,19 +39,15 @@ class Context {
 
   }
 
-  load(name: string, config: any, start_context: DefaultStartContext) {
-    if (config?.default) {
-      start_context.$name = name;
+  load(context: ContextObject) {
+    if (context?.default) {
 
       if (this.default) {
-        log(`default context is "${name}", was "${this.default.$name}";y`)
+        log(`default context is "${context.name}", was "${this.default.name}";y`)
       }
-      this.default = start_context;
+      this.default = context;
     }
-    this.context[name] = {
-      ...this.context[name],
-      ...config
-    }
+    this.context[context.name] = context;
   }
 }
 

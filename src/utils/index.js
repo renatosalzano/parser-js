@@ -43,12 +43,13 @@ function log(...logs) {
       continue;
     }
 
-    let match = message.match(/([;].){1}$/gm);
+    let match = message.match(/;[a-zA-Z0-9]+$/gm);
 
     if (match) {
       match = match[0].trim();
       message = message.replace(match, '');
       for (let index = 1; index < match.length; ++index) {
+
         message = `\x1b[${colors[match[index]]}m${message}`;
       }
       message += '\x1b[0m';

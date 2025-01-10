@@ -55,16 +55,17 @@ class ParserConfig {
 
       const Context = context[name];
 
-      if (!Context?.lexical && !Context?.startWith) {
+      if (!Context?.keyword && !Context?.startWith) {
         log(`invalid context ${name};r`);
         continue;
       }
 
-      const key = Context.hasOwnProperty('lexical') ? 'lexical' : 'startWith';
+      const key = Context.hasOwnProperty('keyword') ? 'keyword' : 'startWith';
 
       Context.lexical = new Map(Object.entries(Context[key]));
+      Context.name = name;
 
-      if (key === 'lexical') {
+      if (key === 'keyword') {
 
         for (const [lexical] of Context.lexical) {
 
@@ -72,6 +73,7 @@ class ParserConfig {
             if (!Parser.lexical.has(lexical)) {
               Parser.keyword.set(lexical, name);
             } else {
+              Context.lexical.delete(lexical);
               log(`duplicate "${lexical}", found in context: ${name};r`);
             }
           } else {
@@ -102,44 +104,25 @@ class ParserConfig {
         return check;
       }
 
-      if (program_ctx.has(name)) {
-        for (const [lexical] of Context.lexical) {
-
-          if (!Parser.program.has(lexical)) {
-            Parser.program.set(lexical, () => Context.has(lexical, true))
-          } else {
-            log(`duplicate '${lexical}'`)
-          }
+      if (Context.default) {
+        Context.start = function(props: any = {}) {
+          Parser.context.start(name, Object.assign(this.props || {}, props));
         }
       }
 
-      start_context_map[name] = function (token: string) {
-        log('start context', name + ';y')
-        const { props = {}, ...instruction } = Context;
-        Parser.api.startContext(name, Object.assign(props, Context.lexical[token] || {}), instruction, token.length);
-      } as any
+      if (program_ctx.has(name)) {
+        for (const [lexical] of Context.lexical) {
+          Parser.program.set(lexical, () => Context.has(lexical, true))
+        }
+        invalid_ctx.delete(name)
+      }
 
-      start_context_map[name].$name = name;
-      Parser.context.load(name, Context, start_context_map[name]);
+      Parser.context.load(Context);
     }
 
-    let valid_context = '';
-
-    // for (const name of context_to_check) {
-
-    //   if (!context.hasOwnProperty(name)) {
-    //     log('[warn];y', `Program: [${valid_context}`, `"${name}";y`, 'is not defined')
-    //   } else {
-    //     valid_context += `'${name}',`;
-    //     const Context = context[name];
-
-    //     for (const lexical of Object.keys(Context?.lexical || {})) {
-    //       if (!invalid_lexical.has(lexical)) {
-    //         Parser.program.set(lexical, () => start_context_map[name](lexical))
-    //       }
-    //     }
-    //   }
-    // }
+    for (const name of invalid_ctx) {
+      log(`invalid context: ${name};r`)
+    }
 
   }
 
