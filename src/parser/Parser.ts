@@ -10,21 +10,20 @@ class Parser {
 
   Program = new Program();
   source = '';
-  program_token = new Map<string, Function>();
-  program = {
-    token: new Map<string, Function>(),
-    keyword: new Map<string, Function>()
-  }
+
 
   context: Context;
 
   api: any = {};
 
-  keywords = new Map<string, string>();
-  tokens = new Map<string, string>();
-  operators = new Map<string, string>();
-  brackets = new Map<string, string>();
-  separators = new Map<string, string>();
+  program = new Map<string, Function>()
+
+  keyword = new Map<string, string>();
+  lexical = new Map<string, string>();
+
+  operator = new Map<string, string>();
+  bracket = new Map<string, string>();
+  separator = new Map<string, string>();
 
   reference = new Map<string, string>();
 
@@ -51,15 +50,42 @@ class Parser {
     this.parse_program()
   }
 
-  extend = (type: "operators" | "brackets" | 'separators', map: { [key: string]: string } = {}) => {
+  extend = (type: "operator" | "bracket" | 'separator', map: { [key: string]: string } = {}) => {
+
+    for (const [l, t] of Object.entries(map)) {
+
+      if (this.lexical.has(l)) {
+        log(`warn: duplicate "${l}" found in ${type};y`)
+      } else {
+        if (this.is.alpha(l)) {
+          this.keyword.set(l, t);
+          this.is.keyword = (_: string) => this.keyword.has(_);
+        }
+        this.lexical.set(l, t);
+        this[type].set(l, t);
+      }
+    }
 
     const entries = Object.entries(map)
     this[type] = new Map([...this[type], ...entries]);
-    this.tokens = new Map([...this.tokens, ...entries]);
+    this.lexical = new Map([...this.lexical, ...entries]);
 
     let key = type.slice(0, -1) as keyof typeof this.is;
     this.is[key] = (_: string) => this[type].has(_);
-    this.is.token = (_: string) => this.tokens.has(_);
+    this.is.lexical = (_: string) => this.lexical.has(_);
+  }
+
+  is = {
+    operator: (_: string) => false,
+    bracket: (_: string) => false,
+    separator: (_: string) => false,
+    lexical: (_: string) => false,
+    keyword: (_: string) => false,
+    quote: (char: string) => /['|"|`]/.test(char),
+    space: (char: string) => /[\s\t]/.test(char),
+    identifier: (sequence: string) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(sequence),
+    alpha: (sequence: string) => /^[a-z]*$/.test(sequence),
+    number: (sequence: any) => !isNaN(sequence)
   }
 
   line = 1
@@ -73,6 +99,7 @@ class Parser {
   }
   sequence = {
     value: '',
+    name: '',
     type: 'unknown' as SequenceType,
 
   }
@@ -86,17 +113,6 @@ class Parser {
   blocking_error = false;
 
   parse: any = {};
-
-  is = {
-    operator: (_: string) => false,
-    bracket: (_: string) => false,
-    separator: (_: string) => false,
-    token: (_: string) => false,
-    quote: (char: string) => /['|"|`]/.test(char),
-    space: (char: string) => /[\s\t]/.test(char),
-    identifier: (sequence: string) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(sequence),
-    number: (sequence: any) => !isNaN(sequence)
-  }
 
   expected_test: { is_testing?: boolean } & (() => boolean | undefined | void) = function () { };
 
@@ -119,7 +135,7 @@ class Parser {
   parsing_string = '';
   parse_string() {
 
-    if (this.parsing_token) {
+    if (this.parsing_lexical) {
       return false;
     }
 
@@ -165,41 +181,49 @@ class Parser {
     }
   }
 
-  parsing_token = false;
-  parse_tokens = (debug = false) => {
+  parsing_lexical = false;
+  parse_lexical = (debug = false) => {
 
-    if (!this.parsing_token) {
-
-      if (this.sequence.value && this.is.token(this.char.curr)) {
-        this.stop_immediate = true;
-        return false;
-      }
-
+    if (!this.parsing_lexical && this.sequence.value && this.is.lexical(this.char.curr)) {
+      this.stop_immediate = true;
+      return false;
     }
 
     let sequence = this.sequence.value + this.char.curr;
-    const is_token = this.is.token(sequence);
+    const is_lexical = this.is.lexical(sequence);
 
-    if (is_token) {
-      this.parsing_token = true;
+    if (is_lexical) {
+      this.parsing_lexical = true;
       this.sequence.value += this.char.curr;
       ++this.index, ++this.pos;
       return true;
     } else {
 
-      if (this.parsing_token) {
-        // end parsing operator
+      if (this.parsing_lexical) {
+        // end parsing lexical
+
+        if (this.is.identifier(this.char.curr)) {
+          this.parsing_lexical = false;
+          return false;
+        }
+
         if (this.is.operator(this.sequence.value)) {
-          this.sequence.type = 'operator'
+          this.sequence.type = 'operator';
+          this.sequence.name = this.operator.get(this.sequence.value) || "";
         } else if (this.is.bracket(this.sequence.value)) {
-          this.sequence.type = 'bracket'
+          this.sequence.type = 'bracket';
+          this.sequence.name = this.bracket.get(this.sequence.value) || "";
         } else if (this.is.separator(this.sequence.value)) {
-          this.sequence.type = 'separator'
+          this.sequence.type = 'separator';
+          this.sequence.name = this.separator.get(this.sequence.value) || "";
+        } else {
+          this.parsing_lexical = false;
+          return false;
         }
 
         this.stop_immediate = true;
-        this.parsing_token = false;
-        if (debug) log(this.history.loc(), 'operator:;m', `"${this.sequence.value}";y`, 'type:;m', this.tokens.get(this.sequence.value) + ';g')
+        this.parsing_lexical = false;
+        if (debug) log(this.history.loc(), 'operator:;m', `"${this.sequence.value}";y`, 'type:;m', this.lexical.get(this.sequence.value) + ';g')
       }
 
     }
@@ -296,8 +320,10 @@ class Parser {
     this.should_continue = true;
     this.sequence.value = '';
     this.sequence.type = 'unknown';
+    this.sequence.name = '';
 
-    var print = () => log(this.history.loc(), this.sequence.type + ';m', this.sequence.value || this.char.curr)
+    // @ts-ignore
+    var print = () => log(this.history.loc(), this.sequence.type.magenta(), this.sequence.value || this.char.curr)
 
     while (!this.blocking_error && this.index < this.source.length) {
 
@@ -317,7 +343,7 @@ class Parser {
         continue;
       }
 
-      if (this.parse_tokens()) {
+      if (this.parse_lexical()) {
         continue;
       }
 
@@ -333,12 +359,15 @@ class Parser {
 
       if (this.stop_immediate) {
 
-        if (this.program.keyword.has(this.sequence.value)) {
-          this.sequence.type = 'keyword'
-        } else if (this.is.identifier(this.sequence.value)) {
-          this.sequence.type = 'identifier'
-        } else if (this.is.number(this.sequence.value)) {
-          this.sequence.type = 'number'
+        if (this.sequence.type === 'unknown') {
+
+          // if (this.program.keyword.has(this.sequence.value)) {
+          //   this.sequence.type = 'keyword'
+          // } else if (this.is.identifier(this.sequence.value)) {
+          //   this.sequence.type = 'identifier'
+          // } else if (this.is.number(this.sequence.value)) {
+          //   this.sequence.type = 'number'
+          // }
         }
 
         if (debug) print();
@@ -356,11 +385,16 @@ class Parser {
 
   parse_program() {
     log('start parse program;y');
-    let index = 36
-    while (index !== 0) {
-      this.next(true);
-      --index;
-    }
+
+    // this.next(true);
+    // this.next(true);
+    // this.next(true);
+    // this.next(true);
+    // this.next(true);
+    // this.next(true);
+    // this.next(true);
+
+
 
 
     // console.log(this.next())

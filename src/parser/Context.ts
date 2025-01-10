@@ -5,7 +5,7 @@ type DefaultStartContext = Function & { $name: string };
 
 class Context {
 
-  default: DefaultStartContext = {} as DefaultStartContext;
+  default: DefaultStartContext = null as unknown as DefaultStartContext;
   context: any = {};
   buffer: any = [];
   current: { name: string, props: any };
@@ -36,7 +36,6 @@ class Context {
 
   load(name: string, config: any, start_context: DefaultStartContext) {
     if (config?.default) {
-
       start_context.$name = name;
 
       if (this.default) {

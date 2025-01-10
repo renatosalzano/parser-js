@@ -33,10 +33,10 @@ class ParserConfig {
       ? plugin(this.plugin)
       : plugin;
 
+    this.parser.extend('separator', separators);
+    this.parser.extend('bracket', brackets);
+    this.parser.extend('operator', operators);
     this.extend_context(context);
-    this.parser.extend('separators', separators);
-    this.parser.extend('brackets', brackets);
-    this.parser.extend('operators', operators);
     Object.assign(this.parser.parse, parse(this.parser.api))
 
   }
@@ -45,44 +45,78 @@ class ParserConfig {
 
     const Parser = this.parser;
     const start_context_map: { [key: string]: DefaultStartContext } = {};
-    let context_to_check = new Set<string>();
+
+    const program_ctx = new Set<string>(context?.Program || []);
+    const invalid_ctx = new Set<string>(program_ctx);
+
+    delete context.Program;
 
     for (const name of Object.keys(context)) {
 
-      if (name === 'Program') {
-        context_to_check = new Set(context.Program);
-        continue;
-      }
-
       const Context = context[name];
 
-      const has_token = Context.hasOwnProperty('token');
-      const has_keyword = Context.hasOwnProperty('keyword')
-
-      if (has_token && has_keyword) {
-        // ERROR
+      if (!Context?.lexical && !Context?.startWith) {
+        log(`invalid context ${name};r`);
         continue;
       }
 
+      const key = Context.hasOwnProperty('lexical') ? 'lexical' : 'startWith';
 
-      const TT = Context.token || Context.keyword;
+      Context.lexical = new Map(Object.entries(Context[key]));
 
-      Parser.api[`in${name}`] = function (sequence: string, updateContext?: boolean) {
+      if (key === 'lexical') {
 
-        const ret = TT.hasOwnProperty(sequence);
+        for (const [lexical] of Context.lexical) {
 
-        if (ret && updateContext) {
-          const { props = {}, ...instruction } = TT[sequence] || {};
-          Parser.context.start(name, Object.assign(Context.props || {}, props), instruction, sequence.length);
+          if (Parser.is.alpha(lexical)) {
+            if (!Parser.lexical.has(lexical)) {
+              Parser.keyword.set(lexical, name);
+            } else {
+              log(`duplicate "${lexical}", found in context: ${name};r`);
+            }
+          } else {
+            Context.lexical.delete(lexical);
+            log(`invalid "${lexical}", should be [a-z] found in context: ${name};r`);
+          }
+        }
+      } else {
+        delete Context.startWith;
+      }
+
+      // Function.has(sequence, { props: {}, eat: {}})
+      Context.has = function (sequence: string, updateContext?: boolean | any) {
+        const check = this.lexical.has(sequence);
+        if (check && updateContext !== undefined) {
+
+          let { props = {}, ...instruction } = this.lexical[sequence] || {};
+
+          if (updateContext.constructor === Object) {
+            let { props: props_override = {}, ...instruction_override } = updateContext || {};
+            props = props_override;
+            instruction = instruction_override;
+          }
+
+          Parser.context.start(name, Object.assign(Context.props || {}, props), instruction);
         }
 
-        return ret;
+        return check;
+      }
+
+      if (program_ctx.has(name)) {
+        for (const [lexical] of Context.lexical) {
+
+          if (!Parser.program.has(lexical)) {
+            Parser.program.set(lexical, () => Context.has(lexical, true))
+          } else {
+            log(`duplicate '${lexical}'`)
+          }
+        }
       }
 
       start_context_map[name] = function (token: string) {
         log('start context', name + ';y')
         const { props = {}, ...instruction } = Context;
-        Parser.api.startContext(name, Object.assign(props, TT[token] || {}), instruction, token.length);
+        Parser.api.startContext(name, Object.assign(props, Context.lexical[token] || {}), instruction, token.length);
       } as any
 
       start_context_map[name].$name = name;
@@ -91,28 +125,21 @@ class ParserConfig {
 
     let valid_context = '';
 
-    for (const name of context_to_check) {
+    // for (const name of context_to_check) {
 
-      if (!context.hasOwnProperty(name)) {
-        log('[warn];y', `Program: [${valid_context}`, `"${name}";y`, 'is not defined')
-      } else {
-        valid_context += `'${name}',`;
+    //   if (!context.hasOwnProperty(name)) {
+    //     log('[warn];y', `Program: [${valid_context}`, `"${name}";y`, 'is not defined')
+    //   } else {
+    //     valid_context += `'${name}',`;
+    //     const Context = context[name];
 
-        const Context = context[name];
-        const key = Context?.token ? "token" : Context?.keyword ? "keyword" : undefined;
-
-        if (key) {
-
-          for (const t of Object.keys(Context[key])) {
-            if (Parser.program[key].has(t)) {
-              log(`duplicate ${key} "${t}" in: ${name};r`)
-            } else {
-              Parser.program[key].set(t, () => start_context_map[name](t))
-            }
-          }
-        }
-      }
-    }
+    //     for (const lexical of Object.keys(Context?.lexical || {})) {
+    //       if (!invalid_lexical.has(lexical)) {
+    //         Parser.program.set(lexical, () => start_context_map[name](lexical))
+    //       }
+    //     }
+    //   }
+    // }
 
   }
 

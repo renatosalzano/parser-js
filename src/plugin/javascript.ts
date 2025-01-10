@@ -2,41 +2,46 @@ import { Node } from "parser/Progam";
 import type { DefaultApi } from "./";
 
 const context = {
-  Program: ['Variable', 'Function', 'Expression', 'Block', 'Statement'],
+  Program: ['Variable', 'Function', 'Expression', 'Block', 'Statement', 'Class'],
   Block: {
-    token: {
+    startWith: {
       "{": null,
     }
   },
   Variable: {
-    keyword: {
+    lexical: {
       'var': { hoisting: true, props: { kind: 'var' } },
       'const': { props: { kind: 'const' } },
       'let': { props: { kind: 'let' } }
     }
   },
   Function: {
-    default: true,
     props: {
       async: false,
       arrow: false,
     },
-    keyword: {
+    lexical: {
       'function': { hoisting: true },
-      'async': { hoisting: true, eat: "function", props: { async: true } }
+      'async': { eat: "function", props: { async: true } }
+    }
+  },
+  Class: {
+    lexical: {
+      'class': null
     }
   },
   Expression: {
     default: true,
-    token: {
+    startWith: {
       '(': null
     }
   },
   Statement: {
-    keyword: {
+    lexical: {
       'if': null,
       'else': null,
-      'switch': null
+      'switch': null,
+      'return': null
     }
   }
 }
@@ -67,7 +72,9 @@ const operators = {
   '>=': 'greater than or equal to',
   '<=': 'less than or equal to',
   '&&': 'logical AND',
+  '&&=': 'logical AND assignment',
   '||': 'logical OR',
+  '||=': 'logical OR assignment',
   '+=': 'addition assignment',
   '-=': 'subtraction assignment',
   '*=': 'multiplication assignment',
@@ -79,7 +86,8 @@ const operators = {
   '!==': 'strict inequality',
   '>>>': 'unsigned right shift',
   '>>>=': 'unsigned right shift assignment',
-  '...': 'spread'
+  '...': 'spread',
+  'new': 'create instance'
 }
 
 const brackets = {
@@ -87,8 +95,8 @@ const brackets = {
   ")": "bracket L",
   "[": "square bracket R",
   "]": "square bracket L",
-  "{": "curly bracketR",
-  "}": "curly bracket L",
+  "{": "curly bracket R",
+  "}": "curly bracket L"
 }
 
 const separators = {
@@ -145,8 +153,6 @@ export default (config: any) => {
       expected,
       appendNode,
       createNode,
-      setRules,
-      inFunction,
       currentContext,
     }: Api) => {
 
@@ -182,43 +188,6 @@ export default (config: any) => {
       }
 
       return ({
-
-        // Group({ context, expression }: Context['Group']['props']) {
-        //   setRules({ skipWhitespace: true })
-        //   console.log('parse group', context)
-
-        //   if (context === 'Program') {
-        //     if (expected('(|function', true)) {
-        //       // possibly IIFE
-        //       console.log('work')
-        //     } else {
-        //       if (expected('(|[|{', true)) {
-        //         // possibly group, destructured array or object
-        //       } else {
-
-        //         let key = ''
-        //         const seq = next(true, /[,=]/, true)
-        //         if (isIdentifier(seq)) {
-        //           key = seq;
-        //           console.log(seq)
-        //         } else {
-        //           // ERROR!
-        //         }
-        //         switch (char.curr) {
-        //           case "=":
-        //           // assignament
-
-        //           case ",":
-        //           // end instruction
-        //         }
-
-        //       }
-
-
-        //     }
-        //   }
-        //   // next(undefined, undefined, true)
-        // },
 
         Expression(expression: any[]) {
           let entry
