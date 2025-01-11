@@ -23,7 +23,7 @@ const context = {
     },
     keyword: {
       'function': { hoisting: true },
-      'async': { eat: "function", props: { async: true } }
+      'async': { eat: "function", props: { async: true } },
     }
   },
   Class: {

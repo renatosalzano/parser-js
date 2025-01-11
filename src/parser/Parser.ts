@@ -3,6 +3,7 @@ import Context from "./Context";
 import History from "./History";
 import parser from './index'
 import Program from "./Progam";
+import { create_fast_get } from "./utils";
 
 type TokenType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number';
 
@@ -20,10 +21,13 @@ class Parser {
 
   
   token = new Map<string, 'operator' | 'bracket' | 'separator'>();
-  uniform_token = new Map<string, 'operator' | 'bracket' | 'separator'>();
-  unexpected_token = new Set<string>();
+  token_max_len = 4;
+  get_token = create_fast_get('token', 4);
 
   keyword = new Map<string, string>();
+  keyword_max_len = 8;
+  get_keyword = create_fast_get('keyword', 8);
+
   operator = new Map<string, string>();
   bracket = new Map<string, string>();
   separator = new Map<string, string>();
@@ -64,45 +68,23 @@ class Parser {
         if (this.is.alpha(token) || type === 'keyword') {
           this.keyword.set(token, t);
           this.is.keyword = (_: string) => this.keyword.has(_);
-        } else {
-          if (this.is_uniform_token(token)) {
-            this.uniform_token.set(token, type)
+          if (token.length > this.keyword_max_len) {
+            this.keyword_max_len = token.length;
+            this.get_keyword = create_fast_get('keyword', token.length);
           }
+        } else {
           this.token.set(token, type);
           this.is.token = (_:string) => this.token.has(_);
+          if (token.length > this.token_max_len) {
+            this.token_max_len = token.length;
+            this.get_token = create_fast_get('token', token.length);
+          }
         }
 
         this[type].set(token, t);
         this.is[type] = (_:string) => this[type].has(_);
       }
     }
-  }
-
-  is_uniform_token = (str: string) => {
-    if (str.length === 1) return false;
-    const first_char = str[0];
-    return str.split('').every(ch => ch === first_char)
-  }
-
-
-  check_uniform_token = () => {
-
-    for (const [token, type] of this.uniform_token) {
-      let len = token.length -2;
-      let char = token[0];
-      while(len > 0) {
-        char += char;
-        if (!this.token.has(char)) {
-          // TODO DESCRIBE WHAT HAPPEN
-          this.unexpected_token.add(char);
-          this.token.set(char, type);
-        }
-        --len;
-      }
-
-      this.uniform_token.delete(token);
-    }
-
   }
 
 
@@ -275,32 +257,29 @@ class Parser {
 
     if (this.expected === 'token') {
 
-      const is_token = this.is.token(this.sequence.value + this.char.curr);
+      const token = this.get_token(this);
 
-      if (is_token) {
-        this.sequence.value += this.char.curr;
-        ++this.index, ++this.pos;
-        return true;
-      } else {
-        // end token
-        console.log('end token', this.sequence.value)
-        const type = this.token.get(this.sequence.value);
-        if (this.is.token(this.char.curr)) {
-          const next_type = this.token.get(this.char.curr);
-          if (type === 'operator' && next_type === 'operator') {
-            log(`unexpected operator "${this.sequence.value + this.char.curr}";r`)
+      if (token) {
+        const token_type = this.token.get(token);
+        if (!token_type) return; // unexpected error;
+        this.index += token.length;
+        this.pos += token.length;
+
+        if (token_type === 'operator') {
+          const next_token = this.get_token(this);
+          if (next_token && this.token.get(next_token) === 'operator') {
+            log(`unexpected operator: ${token + next_token} at ${this.history.loc(true)};r`)
+            // TODO BLOCKING ERROR
           }
         }
 
-        if (type) {
-          this.sequence.type = type
-          this.sequence.name = this[type].get(this.sequence.value) || '';
-          this.stop_immediate = true;
-          return true
-        } else {
-          log('unexpected token;r')
-        }
-        return false
+        this.sequence.value = token;
+        this.sequence.type = token_type;
+        this.sequence.name = this[token_type].get(token) || '';
+        this.stop_immediate = true;
+        return true;
+      } else {
+        log(`error: unexpected token`)
       }
 
     }
@@ -310,30 +289,55 @@ class Parser {
 
   parse_keyword = (debug = false) => {
     if (this.maybe === 'keyword') {
-      if (this.is.alpha(this.sequence.value + this.char.curr)) {
-        this.sequence.value += this.char.curr;
-        ++this.index, ++this.pos;
-        return true;
-      } else {
 
-        if (this.is.identifier(this.sequence.value + this.char.curr)) {
-          this.sequence.type = 'identifier';
-          this.expected = 'identifier';
-          this.maybe = undefined;
-          return false;
-        }
-
-        // check if keyword exist
-        if (this.keyword.get(this.sequence.value)) {
-          this.sequence.type = 'keyword';
-          this.sequence.name = this.keyword.get(this.sequence.name) || '';
-          this.stop_immediate = true;
-          return true
-        } else {
-          log('unexpected keyword;r')
-        }
-
+      const keyword = this.get_keyword(this);
+      if (!keyword) {
+        this.maybe = undefined;
+        this.expected = 'identifier';
+        return false;
       }
+      
+      this.index += keyword.length;
+      this.pos += keyword.length;
+      this.sequence.value += keyword;
+
+      const next_char = this.source[this.index];
+      if (this.is.identifier(keyword + next_char)) {
+        this.sequence.type = 'identifier';
+        this.expected = 'identifier';
+        this.maybe = undefined;
+        return true;
+      }
+
+      this.sequence.type = 'keyword';
+      this.sequence.name = this.keyword.get(keyword) || '';
+      this.stop_immediate = true;
+      return true;
+
+      // if (this.is.alpha(this.sequence.value + this.char.curr)) {
+      //   this.sequence.value += this.char.curr;
+      //   ++this.index, ++this.pos;
+      //   return true;
+      // } else {
+
+      //   if (this.is.identifier(this.sequence.value + this.char.curr)) {
+      //     this.sequence.type = 'identifier';
+      //     this.expected = 'identifier';
+      //     this.maybe = undefined;
+      //     return false;
+      //   }
+
+      //   // check if keyword exist
+      //   if (this.keyword.get(this.sequence.value)) {
+      //     this.sequence.type = 'keyword';
+      //     this.sequence.name = this.keyword.get(this.sequence.name) || '';
+      //     this.stop_immediate = true;
+      //     return true
+      //   } else {
+      //     log('unexpected keyword;r')
+      //   }
+
+      // }
     }
     return false;
   }
@@ -341,6 +345,7 @@ class Parser {
 
   parse_identifier = (debug = false) => {
     if (this.expected === 'identifier') {
+
       if (this.is.identifier(this.sequence.value + this.char.curr)) {
         this.sequence.value += this.char.curr;
         ++this.index, ++this.pos;
@@ -435,7 +440,7 @@ class Parser {
 
   parse_program() {
     log('start parse program;y');
-    let index = 10;
+    let index = 20;
 
     while(index > 0) {
       this.next(true);

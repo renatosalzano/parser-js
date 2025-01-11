@@ -39,7 +39,6 @@ class ParserConfig {
     this.parser.extend('operator', operator);
     this.parser.extend('keyword', keyword);
     this.extend_context(context);
-    this.parser.check_uniform_token();
     Object.assign(this.parser.parse, parse(this.parser.api))
 
   }
@@ -70,20 +69,25 @@ class ParserConfig {
 
       if (key === 'keyword') {
 
+        const context_keyword: {[key: string]: string} = {}
+
         for (const [lexical] of Context.token) {
 
           if (Parser.is.alpha(lexical)) {
-            if (!Parser.token.has(lexical)) {
-              Parser.keyword.set(lexical, name);
+            if (!Parser.keyword.has(lexical)) {
+              // Parser.keyword.set(lexical, name);
+              context_keyword[lexical] = name;
             } else {
               Context.token.delete(lexical);
-              log(`duplicate "${lexical}", found in context: ${name};r`);
+              log(`duplicate keyword "${lexical}", found in context: ${name};r`);
             }
           } else {
             Context.token.delete(lexical);
             log(`invalid "${lexical}", should be [a-z] found in context: ${name};r`);
           }
         }
+
+        Parser.extend('keyword', context_keyword);
       } else {
         delete Context.keyword;
       }

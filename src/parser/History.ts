@@ -29,10 +29,11 @@ class History {
 
   }
 
-  loc = () => {
+  loc = (error = false) => {
     const [, , pos] = this.history.at(-1) as [number, number, number];
     const { line, index, sequence, char } = this.Parser;
     const offset = (sequence.value || char.curr).length;
+    if (error) return `${line}:${pos}`
     // @ts-ignore
     return `${line}`.cyan() + `:${pos},${pos + offset}`;
   }
