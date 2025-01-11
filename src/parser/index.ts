@@ -39,6 +39,7 @@ class ParserConfig {
     this.parser.extend('operator', operator);
     this.parser.extend('keyword', keyword);
     this.extend_context(context);
+    this.parser.check_uniform_token();
     Object.assign(this.parser.parse, parse(this.parser.api))
 
   }
