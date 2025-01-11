@@ -44,12 +44,6 @@ const context = {
       'switch': null,
       'return': null
     }
-  },
-  Comment: {
-    token: {
-      '//': null,
-      '/*': null,
-    }
   }
 }
 
@@ -104,9 +98,13 @@ const bracket = {
   "]": "square L",
   "{": "curly R",
   "}": "curly L",
-  "/*": "comment multiline start",
-  "*/": "comment multiline end"
 }
+
+// const comment = {
+//   '//': "comment",
+//   "/*": "comment multiline start",
+//   "*/": "comment multiline end"
+// }
 
 const separator = {
   ',': 'comma',

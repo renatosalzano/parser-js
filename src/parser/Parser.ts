@@ -98,7 +98,12 @@ class Parser {
     space: (char: string) => /[\s\t]/.test(char),
     identifier: (sequence: string) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(sequence),
     alpha: (sequence: string) => /^[a-z]*$/.test(sequence),
-    number: (sequence: any) => !isNaN(sequence)
+    number: (sequence: any) => !isNaN(sequence),
+    comment: () => {
+      const sequence = `${this.char.curr}${this.char.next}`;
+      if (sequence === '//') return 'comment';
+      if (sequence === '/*') return 'comment multiline';
+    }
   }
 
   line = 1
@@ -123,7 +128,7 @@ class Parser {
 
 
   maybe?: TokenType;
-  expected?: TokenType | 'token';
+  expected?: TokenType | 'token' | 'comment' | 'comment multiline';
 
   should_continue = false;
   blocking_error = false;
@@ -172,7 +177,12 @@ class Parser {
 
   check_token_type = (debug = false) => {
     if (this.expected || this.maybe) return;
-    // console.log('check token:', this.char.curr);
+    const is_comment = this.is.comment();
+    if (!!is_comment) {
+      log('comment start;g')
+      this.expected = is_comment;
+      return;
+    }
     switch (true) {
       case this.is.quote(this.char.curr): {
         this.sequence.type = 'literal';
@@ -202,6 +212,30 @@ class Parser {
       if (debug) log(this.history.loc(), this.char.curr, 'expected:;g', this.expected)
     } else {
       if (debug) log(this.history.loc(), this.char.curr, 'maybe:;y', 'keyword')
+    }
+  }
+
+  parse_comment() {
+    if (this.expected === 'comment') {
+      ++this.index, ++this.pos;
+      if (/[\n]/.test(this.char.curr)) {
+        this.expected = undefined;
+        log('comment single end;g')
+        return true;
+      }
+      return true;
+    }
+
+    if (this.expected === 'comment multiline') {
+      ++this.index, ++this.pos;
+      if (`${this.char.curr}${this.char.next}` === '*/') {
+        ++this.index, ++this.pos;
+        this.expected = undefined;
+        log('comment multine end;g')
+        this.next()
+        return true;
+      }
+      return true;
     }
   }
 
@@ -388,6 +422,10 @@ class Parser {
       this.char.prev = this.source[this.index - 1];
       this.char.curr = this.source[this.index];
       this.char.next = this.source[this.index + 1];
+
+      if (this.parse_comment()) {
+        continue;
+      }
 
       if (this.stop_immediate) {
         if (debug) {
