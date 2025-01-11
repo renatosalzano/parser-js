@@ -4,7 +4,7 @@ import type { DefaultApi } from "./";
 const context = {
   Program: ['Variable', 'Function', 'Expression', 'Block', 'Statement', 'Class', 'Invalid'],
   Block: {
-    startWith: {
+    token: {
       "{": null,
     }
   },
@@ -33,7 +33,7 @@ const context = {
   },
   Expression: {
     default: true,
-    startWith: {
+    token: {
       '(': null
     }
   },
@@ -44,16 +44,22 @@ const context = {
       'switch': null,
       'return': null
     }
+  },
+  Comment: {
+    token: {
+      '//': null,
+      '/*': null,
+    }
   }
 }
 
-const operators = {
+const operator = {
   '+': 'addition',
   '-': 'subtraction',
   '*': 'multiplication',
   '/': 'division',
   '%': 'reminder',
-  '.': 'dot notation',
+  '.': 'member access',
   '>': 'greater than',
   '<': 'less than',
   '!': 'logical NOT',
@@ -91,20 +97,27 @@ const operators = {
   'new': 'create instance'
 }
 
-const brackets = {
-  "(": "bracket R",
-  ")": "bracket L",
-  "[": "square bracket R",
-  "]": "square bracket L",
-  "{": "curly bracket R",
-  "}": "curly bracket L"
+const bracket = {
+  "(": "paren R",
+  ")": "paren L",
+  "[": "square R",
+  "]": "square L",
+  "{": "curly R",
+  "}": "curly L",
+  "/*": "comment multiline start",
+  "*/": "comment multiline end"
 }
 
-const separators = {
+const separator = {
   ',': 'comma',
   ':': 'colon',
   ';': 'semicolon',
   '\n': 'line feed',
+}
+
+const keyword = {
+  'true': 'boolean',
+  'false': 'boolean',
 }
 
 type Context = typeof context;
@@ -143,9 +156,10 @@ export default (config: any) => {
 
   return {
     context,
-    brackets,
-    operators,
-    separators,
+    keyword,
+    bracket,
+    operator,
+    separator,
     parse: ({
       char,
       next,

@@ -4,23 +4,24 @@ import History from "./History";
 import parser from './index'
 import Program from "./Progam";
 
-type SequenceType = 'unknown' | 'string' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number';
+type SequenceType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number';
 
 class Parser {
 
   Program = new Program();
   source = '';
 
-
   context: Context;
+  history = new History(this);
 
   api: any = {};
 
   program = new Map<string, Function>()
 
-  keyword = new Map<string, string>();
-  lexical = new Map<string, string>();
+  
+  token = new Map<string, 'operator' | 'bracket' | 'separator'>();
 
+  keyword = new Map<string, string>();
   operator = new Map<string, string>();
   bracket = new Map<string, string>();
   separator = new Map<string, string>();
@@ -50,20 +51,21 @@ class Parser {
     this.parse_program()
   }
 
-  extend = (type: "operator" | "bracket" | 'separator', map: { [key: string]: string } = {}) => {
+  extend = (type: "operator" | "bracket" | 'separator' | 'keyword', map: { [key: string]: string } = {}) => {
 
-    for (const [l, t] of Object.entries(map)) {
+    for (const [token, t] of Object.entries(map)) {
 
-      if (this.lexical.has(l)) {
-        log(`warn: duplicate "${l}" found in ${type};y`)
+      if (this.token.has(token)) {
+        log(`warn: duplicate "${token}" found in ${type};y`)
       } else {
-        if (this.is.alpha(l)) {
-          this.keyword.set(l, t);
+        if (this.is.alpha(token) || type === 'keyword') {
+          this.keyword.set(token, t);
           this.is.keyword = (_: string) => this.keyword.has(_);
+        } else {
+          this.token.set(token, type);
+          this.is.token = (_:string) => this.token.has(_);
         }
-        this.lexical.set(l, t);
-        this[type].set(l, t);
-        this.is.lexical = (_:string) => this.lexical.has(_);
+        this[type].set(token, t);
         this.is[type] = (_:string) => this[type].has(_);
       }
     }
@@ -73,7 +75,7 @@ class Parser {
     operator: (_: string) => false,
     bracket: (_: string) => false,
     separator: (_: string) => false,
-    lexical: (_: string) => false,
+    token: (_: string) => false,
     keyword: (_: string) => false,
     quote: (char: string) => /['|"|`]/.test(char),
     space: (char: string) => /[\s\t]/.test(char),
@@ -97,11 +99,9 @@ class Parser {
     type: 'unknown' as SequenceType,
 
   }
-  sequence_debug_label = 'sequence';
 
-
-  history = new History(this);
-
+  maybe = new Set<SequenceType | 'token'>();
+  expected = new Set<SequenceType>();
 
   should_continue = false;
   blocking_error = false;
@@ -126,106 +126,141 @@ class Parser {
     }
   }
 
-  parsing_string = '';
-  parse_string() {
+  parsing_literal = '';
+  parse_literal() {
 
-    if (this.parsing_lexical) {
+    if (this.parsing_token) {
       return false;
     }
 
     if (this.is.quote(this.char.curr)) {
-      if (this.parsing_string) {
-        this.sequence.type = 'string';
+
+      if (this.parsing_literal) {
+        this.sequence.type = 'literal';
 
         switch (true) {
-          case (this.char.curr !== this.parsing_string):
+          case (this.char.curr !== this.parsing_literal):
             return true;
-          case (`${this.char.prev}${this.char.curr}` !== `\\${this.parsing_string}`): {
+          case (`${this.char.prev}${this.char.curr}` !== `\\${this.parsing_literal}`): {
             // end parsing string
-            this.parsing_string = '';
+            this.parsing_literal = '';
             this.stop_immediate = true;
             this.sequence.value += this.char.curr;
             ++this.index, ++this.pos;
-            return false;
+            return true;
           }
         }
       } else {
-        this.parsing_string = this.char.curr;
+        this.parsing_literal = this.char.curr;
       }
     }
 
-    if (!!this.parsing_string) {
+    if (!!this.parsing_literal) {
       this.sequence.value += this.char.curr
       ++this.index, ++this.pos;
     }
 
-    return !!this.parsing_string;
+    return !!this.parsing_literal;
+  }
+
+  parsing_number = false;
+  parse_number = () => {
+
+    if (this.expected.has('identifier')) return false;
+    if (this.is.space(this.char.curr)) return false;
+
+    const is_number = this.is.number(this.sequence.value + this.char.curr);
+
+    if (is_number) {
+      this.expected.add('number');
+      this.sequence.type = 'number';
+      
+      this.parsing_number = true;
+      this.sequence.value += this.char.curr;
+      ++this.index, ++this.pos;
+      return true;
+    } else {
+      
+      if (this.parsing_number) {
+        this.parsing_number = false;
+        this.stop_immediate = true;
+        ++this.index, ++this.pos;
+        return true;
+      }
+    }
+
+    return false;
   }
 
   skip_multiple_whitespace = (debug = false) => {
     // dont eat whitespace during parse string
-    if (this.parsing_string) return false;
+    if (this.parsing_literal) return false;
+
     if (this.is.space(this.char.curr) && (this.is.space(this.char.next) || this.sequence.value === '')) {
       ++this.index, ++this.pos;
       return true
     }
   }
 
-  parsing_lexical = false;
-  parse_lexical = (debug = false) => {
-
-    if (!this.parsing_lexical && this.sequence.value && this.is.lexical(this.char.curr)) {
-      this.stop_immediate = true;
-      return false;
-    }
+  parsing_token = false;
+  token_type?: 'token' | 'keyword';
+  parse_token = (debug = false) => {
 
     let sequence = this.sequence.value + this.char.curr;
-    const is_lexical = this.is.lexical(sequence);
 
-    if (is_lexical) {
+    if (this.expected.has('identifier') || this.expected.has('number')) {
+      this.parsing_token = false;
+      return false
+    }
 
-      this.parsing_lexical = true;
+    if (!this.maybe.has('token') && !this.maybe.has('keyword')) {
+      this.parsing_token = false;
+    }
+
+    if (this.maybe.has('token')) {
+      this.token_type = 'token';
+      this.parsing_token = this.is.token(sequence);
+    }
+
+    if (this.maybe.has('keyword')) {
+      this.token_type = 'keyword';
+      this.parsing_token = true;
+    }
+
+    if (this.parsing_token) {
       this.sequence.value += this.char.curr;
       ++this.index, ++this.pos;
       return true;
 
     } else {
 
-      if (this.parsing_lexical && this.is.identifier(sequence)) {
-        if (debug) {
-          log('is not lexical;r', sequence);
-        }
-        this.parsing_lexical = false;
-        return false;
-      }
-
-      if (this.parsing_lexical) {
-        // end parsing lexical
-        if (debug) {
-          log('end parse lexical;y')
-        }
-
-        if (this.is.operator(this.sequence.value)) {
-          this.sequence.type = 'operator';
-          this.sequence.name = this.operator.get(this.sequence.value) || "";
-        } else if (this.is.bracket(this.sequence.value)) {
-          this.sequence.type = 'bracket';
-          this.sequence.name = this.bracket.get(this.sequence.value) || "";
-        } else if (this.is.separator(this.sequence.value)) {
-          this.sequence.type = 'separator';
-          this.sequence.name = this.separator.get(this.sequence.value) || "";
+      // expected end token
+      
+      if (this.token_type === 'token') {
+        // operator | bracket | separator
+        const type = this.token.get(this.sequence.value);
+        if (type) {
+          this.sequence.type = type
+          this.sequence.name = this[type].get(this.sequence.value) || '';
+          this.stop_immediate = true;
+          return true
         } else {
-          this.parsing_lexical = false;
-          return false;
+          log('unexpected error;r')
         }
+      } else {
 
-        this.stop_immediate = true;
-        this.parsing_lexical = false;
-
-        // @ts-ignore
-        if (debug) log(this.history.loc(), this.sequence.type.magenta(), `"${this.sequence.value}";y`, 'type:;m', this.lexical.get(this.sequence.value) + ';g')
+        if (this.keyword.get(this.sequence.value)) {
+          this.sequence.type = 'keyword';
+          this.sequence.name = this.keyword.get(this.sequence.name) || '';
+          this.stop_immediate = true;
+          return true
+        } else {
+          this.sequence.type = 'identifier';
+          this.expected.add('identifier');
+        }
       }
 
+      // console.log(tt, this.sequence.value)
     }
 
     return false;
@@ -240,70 +275,70 @@ class Parser {
     // }
   }
 
-  expected = (value: string, debug = false) => {
+  // expected = (value: string, debug = false) => {
 
-    // let expectation = false;
+  //   // let expectation = false;
 
-    // const values = value
-    //   .split('|')
-    //   .sort((a, b) => a.length - b.length) // [x, xx, xxx]
-    //   .reduce<{ [key: number]: Set<string> }>((ret, curr) => {
-    //     if (!ret[curr.length]) ret[curr.length] = new Set([curr]);
-    //     else ret[curr.length].add(curr);
-    //     return ret;
-    //   }, {})
+  //   // const values = value
+  //   //   .split('|')
+  //   //   .sort((a, b) => a.length - b.length) // [x, xx, xxx]
+  //   //   .reduce<{ [key: number]: Set<string> }>((ret, curr) => {
+  //   //     if (!ret[curr.length]) ret[curr.length] = new Set([curr]);
+  //   //     else ret[curr.length].add(curr);
+  //   //     return ret;
+  //   //   }, {})
 
-    // this.expected_test = function () {
+  //   // this.expected_test = function () {
 
-    //   this.sequence += this.char.curr;
+  //   //   this.sequence += this.char.curr;
 
-    //   ++this.index, ++this.pos;
+  //   //   ++this.index, ++this.pos;
 
-    //   if (values[this.sequence.length]) {
+  //   //   if (values[this.sequence.length]) {
 
-    //     for (const value of values[this.sequence.length]) {
+  //   //     for (const value of values[this.sequence.length]) {
 
-    //       if (debug) {
-    //         log('expected;m', `"${value}";y`, 'sequence:;m', `"${this.sequence}";y`)
-    //       }
+  //   //       if (debug) {
+  //   //         log('expected;m', `"${value}";y`, 'sequence:;m', `"${this.sequence}";y`)
+  //   //       }
 
-    //       if (this.sequence === value) {
-    //         expectation = true;
-    //         this.should_continue = false;
-    //         this.expected_test = function () { };
-    //         this.expected_test.is_testing = false
-    //         return false; // stop test
-    //       }
+  //   //       if (this.sequence === value) {
+  //   //         expectation = true;
+  //   //         this.should_continue = false;
+  //   //         this.expected_test = function () { };
+  //   //         this.expected_test.is_testing = false
+  //   //         return false; // stop test
+  //   //       }
 
-    //     }
+  //   //     }
 
-    //     delete values[this.sequence.length]
-    //   }
+  //   //     delete values[this.sequence.length]
+  //   //   }
 
-    //   if (Object.values(values).length === 0) {
-    //     this.expected_test = function () { };
-    //     this.expected_test.is_testing = false;
-    //     return false
-    //   }
+  //   //   if (Object.values(values).length === 0) {
+  //   //     this.expected_test = function () { };
+  //   //     this.expected_test.is_testing = false;
+  //   //     return false
+  //   //   }
 
-    //   return true;
-    // }
+  //   //   return true;
+  //   // }
 
-    // this.expected_test.is_testing = true;
+  //   // this.expected_test.is_testing = true;
 
-    // this.next()
+  //   // this.next()
 
-    // if (!expectation) {
+  //   // if (!expectation) {
 
-    //   if (debug) {
-    //     log('expected failed;r')
-    //   }
-    //   this.history.prev();
+  //   //   if (debug) {
+  //   //     log('expected failed;r')
+  //   //   }
+  //   //   this.history.prev();
 
-    // }
+  //   // }
 
-    return false;
-  }
+  //   return false;
+  // }
 
   prev = () => {
     // const len = this.sequence.length + 1;
@@ -322,6 +357,11 @@ class Parser {
     this.sequence.type = 'unknown';
     this.sequence.name = '';
 
+    this.maybe = new Set(['token']);
+    this.expected = new Set();
+
+    let check_is_keyword = true;
+
     // @ts-ignore
     var print = () => log(this.history.loc(), this.sequence.type.magenta() + (this.sequence.name ? ` ${this.sequence.name}`.green() : ''), this.sequence.value || this.char.curr)
 
@@ -331,11 +371,23 @@ class Parser {
       this.char.curr = this.source[this.index];
       this.char.next = this.source[this.index + 1];
 
+      if (this.stop_immediate) {
+        if (debug) {
+          print()
+        }
+        this.stop_immediate = false;
+        return this.sequence;
+      }
+
       if (this.check_new_line(debug)) {
         continue;
       }
 
-      if (this.parse_string()) {
+      if (this.parse_literal()) {
+        continue;
+      }
+
+      if (this.parse_number()) {
         continue;
       }
 
@@ -343,14 +395,39 @@ class Parser {
         continue;
       }
 
-      if (this.parse_lexical()) {
+      if (check_is_keyword) {
+
+        check_is_keyword = this.is.alpha(this.sequence.value + this.char.curr);
+        if (check_is_keyword) {
+          if (!this.maybe.has('keyword')) {
+            // log('is keyword;y')
+            this.maybe.add('keyword').delete('token');
+          }
+        } else {
+          this.maybe.delete('keyword');
+          if (this.is.identifier(this.sequence.value + this.char.curr)) {
+            this.sequence.type = 'identifier';
+            this.expected.add('identifier');
+          }
+
+        } 
+      }
+
+      if (this.parse_token()) {
         continue;
       }
 
+      if (this.expected.has('identifier')) {
+        if (!this.is.identifier(this.sequence.value + this.char.curr)) {
+          if (debug) print();
+          return this.sequence;
+        }
+      }
 
       if (/[\s\r\n]/.test(this.char.curr)) {
         if (this.sequence.value) {
           this.stop_immediate = true;
+          continue;
         } else {
           if (debug) print();
           ++this.index, ++this.pos;
@@ -358,23 +435,23 @@ class Parser {
         }
       }
 
-      if (this.stop_immediate) {
+      // if (this.stop_immediate) {
 
-        if (this.sequence.type === 'unknown') {
+      //   if (this.sequence.type === 'unknown') {
 
-          if (this.is.keyword(this.sequence.value)) {
-            this.sequence.type = 'keyword'
-          } else if (this.is.identifier(this.sequence.value)) {
-            this.sequence.type = 'identifier'
-          } else if (this.is.number(this.sequence.value)) {
-            this.sequence.type = 'number'
-          }
-        }
+      //     if (this.is.keyword(this.sequence.value)) {
+      //       this.sequence.type = 'keyword'
+      //     } else if (this.is.identifier(this.sequence.value)) {
+      //       this.sequence.type = 'identifier'
+      //     } else if (this.is.number(this.sequence.value)) {
+      //       this.sequence.type = 'number'
+      //     }
+      //   }
 
-        if (debug) print();
-        this.stop_immediate = false;
-        return this.sequence;
-      }
+      //   if (debug) print();
+      //   this.stop_immediate = false;
+      //   return this.sequence;
+      // }
 
       this.sequence.value += this.char.curr;
 
@@ -386,35 +463,14 @@ class Parser {
 
   parse_program() {
     log('start parse program;y');
+    let index = 40;
 
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-    this.next(true);
-
-
-
-
-
-
-
+    while(index > 0) {
+      this.next(true);
+      --index;
+    }
+    
+   
     // console.log(this.next())
 
     log('end parse program;g')
