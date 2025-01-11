@@ -19,7 +19,7 @@ class Parser {
 
   program = new Map<string, Function>()
 
-  
+
   token = new Map<string, 'operator' | 'bracket' | 'separator'>();
   token_max_len = 4;
   get_token = create_fast_get('token', 4);
@@ -74,7 +74,7 @@ class Parser {
           }
         } else {
           this.token.set(token, type);
-          this.is.token = (_:string) => this.token.has(_);
+          this.is.token = (_: string) => this.token.has(_);
           if (token.length > this.token_max_len) {
             this.token_max_len = token.length;
             this.get_token = create_fast_get('token', token.length);
@@ -82,7 +82,7 @@ class Parser {
         }
 
         this[type].set(token, t);
-        this.is[type] = (_:string) => this[type].has(_);
+        this.is[type] = (_: string) => this[type].has(_);
       }
     }
   }
@@ -114,10 +114,15 @@ class Parser {
     value: '',
     name: '',
     type: 'unknown' as TokenType,
-
+    prev: {
+      value: '',
+      name: '',
+      type: 'unknown' as TokenType,
+    }
   }
 
-  maybe?: 'keyword';
+
+  maybe?: TokenType;
   expected?: TokenType | 'token';
 
   should_continue = false;
@@ -149,6 +154,11 @@ class Parser {
   skip_whitespace = (debug = false) => {
     // dont eat whitespace during parse string
     if (this.expected === 'literal') return false;
+    if (this.expected === 'number') {
+      if (this.is.space(this.char.curr)) {
+        log('unexpected number;r')
+      }
+    }
     if (this.sequence.value === '' && (this.is.space(this.char.curr) || /[\n]/.test(this.char.curr))) {
       ++this.index, ++this.pos;
       return true;
@@ -170,11 +180,13 @@ class Parser {
         break;
       }
       case this.is.number(this.char.curr): {
+        this.sequence.type = 'number';
         this.expected = 'number';
         break;
       }
       case this.is.identifier(this.char.curr): {
         if (this.is.alpha(this.char.curr)) {
+          this.sequence.type = 'identifier';
           this.maybe = 'keyword';
         } else {
           this.sequence.type = 'identifier';
@@ -220,34 +232,25 @@ class Parser {
       return true;
     }
 
-   return false
+    return false
   }
 
   parsing_number = false;
   parse_number = () => {
 
-    // if (this.expected.has('identifier')) return false;
-    // if (this.is.space(this.char.curr)) return false;
+    if (this.expected === 'number') {
 
-    // const is_number = this.is.number(this.sequence.value + this.char.curr);
-
-    // if (is_number) {
-    //   this.expected.add('number');
-    //   this.sequence.type = 'number';
-      
-    //   this.parsing_number = true;
-    //   this.sequence.value += this.char.curr;
-    //   ++this.index, ++this.pos;
-    //   return true;
-    // } else {
-      
-    //   if (this.parsing_number) {
-    //     this.parsing_number = false;
-    //     this.stop_immediate = true;
-    //     ++this.index, ++this.pos;
-    //     return true;
-    //   }
-    // }
+      if (this.is.number(this.sequence.value + this.char.curr)) {
+        this.sequence.value += this.char.curr;
+        ++this.index; ++this.pos;
+        return true;
+      } else {
+        // expected end number;
+        this.stop_immediate = true;
+        ++this.index; ++this.pos;
+        return true;
+      }
+    }
 
     return false;
   }
@@ -264,6 +267,19 @@ class Parser {
         if (!token_type) return; // unexpected error;
         this.index += token.length;
         this.pos += token.length;
+
+        if (token === '-' || token === '+') {
+          const next_token = this.next();
+          if (next_token?.type === 'number') {
+            if (token === '-') {
+              this.sequence.value = '-' + this.sequence.value;
+            }
+            this.stop_immediate = true;
+            return true;
+          } else {
+            this.history.prev();
+          }
+        }
 
         if (token_type === 'operator') {
           const next_token = this.get_token(this);
@@ -296,7 +312,7 @@ class Parser {
         this.expected = 'identifier';
         return false;
       }
-      
+
       this.index += keyword.length;
       this.pos += keyword.length;
       this.sequence.value += keyword;
@@ -313,31 +329,6 @@ class Parser {
       this.sequence.name = this.keyword.get(keyword) || '';
       this.stop_immediate = true;
       return true;
-
-      // if (this.is.alpha(this.sequence.value + this.char.curr)) {
-      //   this.sequence.value += this.char.curr;
-      //   ++this.index, ++this.pos;
-      //   return true;
-      // } else {
-
-      //   if (this.is.identifier(this.sequence.value + this.char.curr)) {
-      //     this.sequence.type = 'identifier';
-      //     this.expected = 'identifier';
-      //     this.maybe = undefined;
-      //     return false;
-      //   }
-
-      //   // check if keyword exist
-      //   if (this.keyword.get(this.sequence.value)) {
-      //     this.sequence.type = 'keyword';
-      //     this.sequence.name = this.keyword.get(this.sequence.name) || '';
-      //     this.stop_immediate = true;
-      //     return true
-      //   } else {
-      //     log('unexpected keyword;r')
-      //   }
-
-      // }
     }
     return false;
   }
@@ -379,6 +370,8 @@ class Parser {
 
     this.history.push()
 
+    this.sequence.prev = this.sequence;
+
     this.should_continue = true;
     this.sequence.value = '';
     this.sequence.type = 'unknown';
@@ -418,6 +411,10 @@ class Parser {
         continue;
       }
 
+      if (this.parse_number()) {
+        continue;
+      }
+
       if (this.parse_token()) {
         continue;
       }
@@ -440,14 +437,15 @@ class Parser {
 
   parse_program() {
     log('start parse program;y');
-    let index = 20;
 
-    while(index > 0) {
+    let index = 40;
+
+    while (index > 0) {
       this.next(true);
       --index;
     }
-    
-   
+
+
     // console.log(this.next())
 
     log('end parse program;g')
