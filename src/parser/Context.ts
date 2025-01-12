@@ -1,16 +1,21 @@
 import { log } from "utils";
 import Parser from "./Parser";
 
-type ContextObject = {
+export type ContextObject = {
   name: string;
   default?: boolean;
-  lexical: Map<string, any>;
-  has: (lexical: string, updateContext?: any) => boolean;
+  token: Map<string, any>;
+  has: (token: string, updateContext?: any) => boolean;
+}
+
+type ContextObjectDefault = ContextObject & {
+  defult: true;
+  start(): void;
 }
 
 class Context {
 
-  default: ContextObject | null = null;
+  default = {} as ContextObjectDefault;
   context: any = {};
   buffer: any = [];
   current: { name: string, props: any };
@@ -33,19 +38,20 @@ class Context {
     // if (data.eat) {
     //   this.Parser.eat(data.eat);
     // }
+    this.Parser.parse[name](props)
   }
 
   end() {
 
   }
 
-  load(context: ContextObject) {
+  load(context: ContextObject | ContextObjectDefault) {
     if (context?.default) {
 
       if (this.default) {
         log(`default context is "${context.name}", was "${this.default.name}";y`)
       }
-      this.default = context;
+      this.default = context as ContextObjectDefault;
     }
     this.context[context.name] = context;
   }

@@ -1,5 +1,7 @@
+import Parser from 'parser/Parser'
 import { Node } from "parser/Progam";
 import type { DefaultApi } from "./";
+import { ContextObject } from 'parser/Context';
 
 const context = {
   Program: ['Variable', 'Function', 'Expression', 'Block', 'Statement', 'Class', 'Invalid'],
@@ -121,7 +123,7 @@ const keyword = {
 type Context = typeof context;
 
 type Api = DefaultApi & {
-  [K in keyof typeof context as `in${K}`]: (sequence: string, startContext?: boolean) => boolean;
+  [K in keyof typeof context]: ContextObject;
 }
 
 class FuncNode implements Node {
@@ -148,6 +150,12 @@ class FuncNode implements Node {
   }
 }
 
+class ExpressionNode implements Node {
+  tag = 'expression';
+  iife = false;
+  expression: Node[] = [];
+}
+
 export default (config: any) => {
 
   const identifiers = new Map<string, string>()
@@ -160,12 +168,15 @@ export default (config: any) => {
     separator,
     parse: ({
       char,
+      token,
       next,
       eachChar,
       eat,
       expected,
       appendNode,
       createNode,
+      Function,
+      Block,
       currentContext,
     }: Api) => {
 
@@ -203,25 +214,63 @@ export default (config: any) => {
       return ({
 
         Expression(expression: any[]) {
-          let entry
+          console.log(token)
+          next();
+          console.log(token)
+          next();
+          console.log(token)
+          // switch (token.type) {
+          //   case 'literal':
+          //     console.log(token)
+          //     break;
+          //   case 'bracket':
+          // }
         },
 
-        Block() { },
+        Group() {
+          const node = createNode(ExpressionNode);
+          console.log('expression group');
+          switch (next().type) {
+            case "keyword":
+              if (token.eq('function')) {
+                Function.has(token.value, true)
+              }
+          }
+        },
+
+        Block() {
+          const block = [];
+          next();
+          console.log(token)
+        },
 
         Variable() { },
 
         Function({ async, arrow }: Context['Function']['props']) {
 
-          // const node = createNode(FuncNode);
+          const node = createNode(FuncNode);
           // node.async = async;
+          next();
 
-          // if (!arrow) {
-          //   // check if have identifier
-          //   const id = next(/[a-zA-Z_$]/);
-          //   if (isIdentifier(id)) {
-          //     node.id = id;
-          //   }
-          // }
+          if (!arrow && token.type === 'identifier') {
+            // check if have identifier
+            node.id = token.value;
+            next();
+          }
+
+          if (token.eq('(')) {
+            console.log('params')
+            this.Params(node);
+          } else {
+            // throw error
+          }
+
+          next();
+          if (!Block.has(token.value, true)) {
+            // throw error
+          }
+
+
 
           // setRules({ skipWhitespace: true });
 
@@ -238,16 +287,18 @@ export default (config: any) => {
         },
 
         Params(node: FuncNode) {
+          let parse_params = true;
+          while (parse_params) {
+            next();
+            switch (token.type) {
+              case "bracket":
+                if (token.eq(')')) {
+                  console.log('end parse params')
+                  parse_params = false;
+                }
+            }
+          }
 
-          // let params = [];
-
-          // switch (nextChar()) {
-          //   case "{":
-          //     this.Pattern('object')
-          //     break;
-          //   case "[":
-          //     this.Pattern('array')
-          // }
         },
 
         Pattern(type: "object" | 'array') {
@@ -264,74 +315,6 @@ export default (config: any) => {
               type: 'object',
               properties: []
             })
-
-            // console.log(char)
-            // next(true, /[:=,}]/, true)
-            // switch (nextChar()) {
-            //   case ":":
-            //     // alias | nested destructuring
-            //     console.log('alias')
-            //     break;
-            //   case "=":
-            //     // assignament
-            //     console.log('assignament')
-            //     break;
-            //   case ",":
-            //     // next
-            //     console.log('end prop')
-            //   case "}":
-            //     // end pattern
-            //     console.log('next')
-            // }
-            // console.log(char.curr)
-
-            // eachChar((ch) => {
-
-            //   if (!entry.key && /[a-zA-Z0-9\[\]:'"`$_=]/.test(ch)) {
-
-            //   }
-
-            //   if (!/[a-zA-Z0-9\[\]:'"`$_=]/.test(ch)) {
-            //     console.log(sequence)
-            //     entry.key = sequence;
-            //     sequence = '';
-            //     return;
-            //   }
-
-            //   if (entry.key && /[{\[]/.test(ch)) {
-            //     switch (ch) {
-            //       case "{":
-            //         nextChar()
-            //         entry.value = this.Object()
-            //         break;
-            //       case "[":
-            //         nextChar()
-            //         entry.value = this.Array()
-            //         break;
-            //     }
-            //     return;
-            //   }
-
-            //   if (/[,}]/.test(ch)) {
-            //     console.log(sequence, entry)
-            //     if (!entry.key) {
-            //       entry.key = sequence;
-            //     } else if (!entry.value) {
-            //       entry.value = sequence;
-            //     }
-            //     entries.push(entry)
-            //     entry = {}
-            //     sequence = ''
-            //     if (ch === '}') {
-            //       console.log('end pattern object')
-            //     }
-            //     return ch === '}'
-            //   }
-
-            //   sequence += ch;
-            //   return
-            // }, true)
-
           }
         },
 

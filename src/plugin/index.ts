@@ -1,4 +1,4 @@
-import { ParserRules } from "Parser";
+import { Token } from "parser/Parser";
 import Program from "parser/Progam";
 import { log } from "utils";
 
@@ -40,6 +40,7 @@ type ParserApi<T, A> = {
 
 type DefaultApi = {
   char: { curr: string, prev: string, next: string },
+  token: Token,
   next(debug?: boolean): { value: string, type: string, name: string };
   appendNode: Program['appendNode'];
   createNode: Program['createNode'];

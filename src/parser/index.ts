@@ -46,7 +46,6 @@ class ParserConfig {
   private extend_context = (context: any) => {
 
     const Parser = this.parser;
-    const start_context_map: { [key: string]: DefaultStartContext } = {};
 
     const program_ctx = new Set<string>(context?.Program || []);
     const invalid_ctx = new Set<string>(program_ctx);
@@ -69,7 +68,7 @@ class ParserConfig {
 
       if (key === 'keyword') {
 
-        const context_keyword: {[key: string]: string} = {}
+        const context_keyword: { [key: string]: string } = {}
 
         for (const [lexical] of Context.token) {
 
@@ -93,12 +92,12 @@ class ParserConfig {
       }
 
       // Function.has(sequence, { props: {}, eat: {}})
-      Context.has = function (sequence: string, updateContext?: boolean | any) {
+      Context.has = function (token: string, updateContext?: boolean | any) {
 
-        const check = this.token.has(sequence);
+        const check = this.token.has(token);
         if (check && updateContext !== undefined) {
 
-          let { props = {}, ...instruction } = this.token[sequence] || {};
+          let { props = {}, ...instruction } = this.token[token] || {};
 
           if (updateContext.constructor === Object) {
             let { props: props_override = {}, ...instruction_override } = updateContext || {};
@@ -113,10 +112,12 @@ class ParserConfig {
       }
 
       if (Context.default) {
-        Context.start = function(props: any = {}) {
+        Context.start = function (props: any = {}) {
           Parser.context.start(name, Object.assign(this.props || {}, props));
         }
       }
+
+      Parser.api[name] = Context;
 
       if (program_ctx.has(name)) {
         for (const [lexical] of Context.token) {

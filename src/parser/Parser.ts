@@ -1,11 +1,18 @@
 import { log } from "utils";
 import Context from "./Context";
 import History from "./History";
-import parser from './index'
 import Program from "./Progam";
 import { create_fast_get } from "./utils";
 
-type TokenType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number';
+export type TokenType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number';
+export type Token = {
+  value: string;
+  type: TokenType;
+  name?: string;
+  eq(comparator: string): boolean;
+} & {
+  [K in TokenType]?: boolean;
+}
 
 class Parser {
 
@@ -40,6 +47,7 @@ class Parser {
 
     this.api = {
       char: this.char,
+      token: this.Token,
       currentContext: this.context.current,
       eachChar: this.each_char,
       createNode: this.Program.createNode,
@@ -67,14 +75,14 @@ class Parser {
 
         if (this.is.alpha(token) || type === 'keyword') {
           this.keyword.set(token, t);
-          this.is.keyword = (_: string) => this.keyword.has(_);
+          // this.is.keyword = (_: string) => this.keyword.has(_);
           if (token.length > this.keyword_max_len) {
             this.keyword_max_len = token.length;
             this.get_keyword = create_fast_get('keyword', token.length);
           }
         } else {
           this.token.set(token, type);
-          this.is.token = (_: string) => this.token.has(_);
+          // this.is.token = (_: string) => this.token.has(_);
           if (token.length > this.token_max_len) {
             this.token_max_len = token.length;
             this.get_token = create_fast_get('token', token.length);
@@ -82,18 +90,18 @@ class Parser {
         }
 
         this[type].set(token, t);
-        this.is[type] = (_: string) => this[type].has(_);
+        // this.is[type] = (_: string) => this[type].has(_);
       }
     }
   }
 
 
   is = {
-    operator: (_: string) => false,
-    bracket: (_: string) => false,
-    separator: (_: string) => false,
-    token: (_: string) => false,
-    keyword: (_: string) => false,
+    // operator: (_: string) => false,
+    // bracket: (_: string) => false,
+    // separator: (_: string) => false,
+    // token: (_: string) => false,
+    // keyword: (_: string) => false,
     quote: (char: string) => /['|"|`]/.test(char),
     space: (char: string) => /[\s\t]/.test(char),
     nl: (char: string) => /[\r\n]/.test(char),
@@ -116,32 +124,31 @@ class Parser {
     prev: '',
     next: ''
   }
-  sequence = {
+
+  Token: Token = {
     value: '',
-    name: '',
     type: 'unknown' as TokenType,
-    prev: {
-      value: '',
-      name: '',
-      type: 'unknown' as TokenType,
+    eq(_: string) {
+      return this.value === _;
     }
   }
 
+  reset_token() {
+    this.Token = {
+      value: '',
+      name: '',
+      type: 'unknown',
+      eq(_: string) {
+        return this.value === _;
+      }
+    }
+  }
 
   maybe?: TokenType;
   expected?: TokenType | 'token' | 'comment' | 'comment multiline';
-
-  should_continue = false;
   blocking_error = false;
 
   parse: any = {};
-
-  expected_test: { is_testing?: boolean } & (() => boolean | undefined | void) = function () { };
-
-  increment() {
-    this.sequence.value += this.char.curr;
-    ++this.index, ++this.pos;
-  }
 
   check_new_line(debug = false) {
     if (/[\r\n]/.test(this.char.curr)) {
@@ -154,7 +161,7 @@ class Parser {
       if (this.expected === 'comment') {
         log(this.history.loc(), 'comment end;g');
         this.expected = undefined;
-        this.sequence.value = '';
+        this.Token.value = '';
       }
 
       this.pos = 1, ++this.line;
@@ -171,7 +178,7 @@ class Parser {
         log('unexpected number;r')
       }
     }
-    if (this.sequence.value === '' && (this.is.space(this.char.curr) || /[\n]/.test(this.char.curr))) {
+    if (this.Token.value === '' && (this.is.space(this.char.curr) || /[\n]/.test(this.char.curr))) {
       ++this.index, ++this.pos;
       return true;
     }
@@ -193,21 +200,24 @@ class Parser {
         break;
       }
       case this.is.quote(this.char.curr): {
-        this.sequence.type = 'literal';
+        this.Token.type = 'literal';
+        this.Token['literal'] = true;
         this.expected = 'literal';
         break;
       }
       case this.is.number(this.char.curr): {
-        this.sequence.type = 'number';
+        this.Token.type = 'number';
+        this.Token['number'] = true;
         this.expected = 'number';
         break;
       }
       case this.is.identifier(this.char.curr): {
         if (this.is.alpha(this.char.curr)) {
-          this.sequence.type = 'identifier';
+          this.Token.type = 'identifier';
           this.maybe = 'keyword';
         } else {
-          this.sequence.type = 'identifier';
+          this.Token.type = 'identifier';
+          this.Token['identifier'] = true;
           this.expected = 'identifier';
         }
         break;
@@ -230,7 +240,7 @@ class Parser {
         this.index += 2, this.pos += 2;
         log(this.history.loc(), 'comment multine end;g');
         this.expected = undefined;
-        this.sequence.value = '';
+        this.Token.value = '';
         return true;
       }
     }
@@ -243,7 +253,7 @@ class Parser {
 
       if (!this.end_quote) {
         this.end_quote = this.char.curr;
-        this.sequence.value += this.char.curr;
+        this.Token.value += this.char.curr;
         ++this.index, ++this.pos;
         return true;
       }
@@ -255,7 +265,7 @@ class Parser {
           // end parsing string
           this.end_quote = '';
           this.stop_immediate = true;
-          this.sequence.value += this.char.curr;
+          this.Token.value += this.char.curr;
           ++this.index, ++this.pos;
           return true;
         }
@@ -271,8 +281,8 @@ class Parser {
 
     if (this.expected === 'number') {
 
-      if (this.is.number(this.sequence.value + this.char.curr)) {
-        this.sequence.value += this.char.curr;
+      if (this.is.number(this.Token.value + this.char.curr)) {
+        this.Token.value += this.char.curr;
         ++this.index; ++this.pos;
         return true;
       } else {
@@ -303,7 +313,7 @@ class Parser {
           const next_token = this.next();
           if (next_token?.type === 'number') {
             if (token === '-') {
-              this.sequence.value = '-' + this.sequence.value;
+              this.Token.value = '-' + this.Token.value;
             }
             this.stop_immediate = true;
             return true;
@@ -320,9 +330,10 @@ class Parser {
           }
         }
 
-        this.sequence.value = token;
-        this.sequence.type = token_type;
-        this.sequence.name = this[token_type].get(token) || '';
+        this.Token.value = token;
+        this.Token.type = token_type;
+        this.Token[token_type] = true;
+        this.Token.name = this[token_type].get(token) || '';
         this.stop_immediate = true;
         return true;
       } else {
@@ -346,18 +357,20 @@ class Parser {
 
       this.index += keyword.length;
       this.pos += keyword.length;
-      this.sequence.value += keyword;
+      this.Token.value += keyword;
 
       const next_char = this.source[this.index];
       if (this.is.identifier(keyword + next_char)) {
-        this.sequence.type = 'identifier';
+        this.Token.type = 'identifier';
+        this.Token['identifier'] = true;
         this.expected = 'identifier';
         this.maybe = undefined;
         return true;
       }
 
-      this.sequence.type = 'keyword';
-      this.sequence.name = this.keyword.get(keyword) || '';
+      this.Token.type = 'keyword';
+      this.Token['keyword'] = true;
+      this.Token.name = this.keyword.get(keyword) || '';
       this.stop_immediate = true;
       return true;
     }
@@ -368,8 +381,8 @@ class Parser {
   parse_identifier = (debug = false) => {
     if (this.expected === 'identifier') {
 
-      if (this.is.identifier(this.sequence.value + this.char.curr)) {
-        this.sequence.value += this.char.curr;
+      if (this.is.identifier(this.Token.value + this.char.curr)) {
+        this.Token.value += this.char.curr;
         ++this.index, ++this.pos;
         return true;
       } else {
@@ -401,18 +414,16 @@ class Parser {
 
     this.history.push()
 
-    this.sequence.prev = this.sequence;
-
-    this.should_continue = true;
-    this.sequence.value = '';
-    this.sequence.type = 'unknown';
-    this.sequence.name = '';
+    this.Token.value = '';
+    delete this.Token.name;
+    delete this.Token[this.Token.type];
+    this.Token.type = 'unknown';
 
     this.maybe = undefined;
     this.expected = undefined;
 
     // @ts-ignore
-    var print = () => log(this.history.loc(), this.sequence.type.magenta() + (this.sequence.name ? ` ${this.sequence.name}`.green() : ''), this.sequence.value || this.char.curr)
+    var print = () => log(this.history.loc(), this.Token.type.magenta() + (this.Token.name ? ` ${this.Token.name}`.green() : ''), this.Token.value || this.char.curr)
 
     while (!this.blocking_error && this.index < this.source.length) {
 
@@ -429,7 +440,10 @@ class Parser {
           print()
         }
         this.stop_immediate = false;
-        return this.sequence;
+        if (this.Token.unknown) {
+          log('unexpected token;r')
+        }
+        return this.Token;
       }
 
       if (this.check_new_line(debug)) {
@@ -462,7 +476,7 @@ class Parser {
         continue;
       }
 
-      this.sequence.value += this.char.curr;
+      this.Token.value += this.char.curr;
 
       ++this.index, ++this.pos;
 
@@ -473,15 +487,20 @@ class Parser {
   parse_program() {
     log('start parse program;y');
 
-    let index = 40;
-
-    while (index > 0) {
-      this.next(true);
-      --index;
+    this.next();
+    const start_context = this.program.get(this.Token.value);
+    if (start_context) {
+      start_context()
+    } else {
+      console.log(this.Token)
+      this.context.default.start()
     }
 
-
-    // console.log(this.next())
+    // let index = 10;
+    // while (index > 0) {
+    //   this.next(true);
+    //   --index;
+    // }
 
     log('end parse program;g')
 
@@ -494,28 +513,28 @@ class Parser {
 
   each_char = (callback: (char: string, sequence: string) => boolean | undefined) => {
 
-    this.should_continue = true;
-    this.sequence.value = '';
+    //   this.should_continue = true;
+    //   this.sequence.value = '';
 
-    while (this.should_continue && this.index < this.source.length) {
+    //   while (this.should_continue && this.index < this.source.length) {
 
-      this.char.prev = this.source[this.index - 1];
-      this.char.curr = this.source[this.index];
-      this.char.next = this.source[this.index + 1];
+    //     this.char.prev = this.source[this.index - 1];
+    //     this.char.curr = this.source[this.index];
+    //     this.char.next = this.source[this.index + 1];
 
-      if (this.skip_whitespace()) {
-        continue;
-      }
+    //     if (this.skip_whitespace()) {
+    //       continue;
+    //     }
 
-      this.sequence.value += this.char.curr;
+    //     this.sequence.value += this.char.curr;
 
-      if (callback(this.char.curr, this.sequence.value)) {
-        this.should_continue = false;
-        return;
-      }
+    //     if (callback(this.char.curr, this.sequence.value)) {
+    //       this.should_continue = false;
+    //       return;
+    //     }
 
-      ++this.index, ++this.pos;
-    }
+    //     ++this.index, ++this.pos;
+    //   }
 
   }
 
