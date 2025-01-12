@@ -96,6 +96,7 @@ class Parser {
     keyword: (_: string) => false,
     quote: (char: string) => /['|"|`]/.test(char),
     space: (char: string) => /[\s\t]/.test(char),
+    nl: (char: string) => /[\r\n]/.test(char),
     identifier: (sequence: string) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(sequence),
     alpha: (sequence: string) => /^[a-z]*$/.test(sequence),
     number: (sequence: any) => !isNaN(sequence),
@@ -150,9 +151,15 @@ class Parser {
         return true;
       }
 
+      if (this.expected === 'comment') {
+        log(this.history.loc(), 'comment end;g');
+        this.expected = undefined;
+        this.sequence.value = '';
+      }
+
       this.pos = 1, ++this.line;
       this.history.push();
-      if (debug) log('line:;c', this.line);
+      if (debug) log('Ln:;c', this.line);
     }
   }
 
@@ -178,12 +185,13 @@ class Parser {
   check_token_type = (debug = false) => {
     if (this.expected || this.maybe) return;
     const is_comment = this.is.comment();
-    if (!!is_comment) {
-      log('comment start;g')
-      this.expected = is_comment;
-      return;
-    }
+
     switch (true) {
+      case !!is_comment: {
+        log(this.history.loc(), 'comment start;g')
+        this.expected = is_comment;
+        break;
+      }
       case this.is.quote(this.char.curr): {
         this.sequence.type = 'literal';
         this.expected = 'literal';
@@ -216,26 +224,15 @@ class Parser {
   }
 
   parse_comment() {
-    if (this.expected === 'comment') {
-      ++this.index, ++this.pos;
-      if (/[\n]/.test(this.char.curr)) {
-        this.expected = undefined;
-        log('comment single end;g')
-        return true;
-      }
-      return true;
-    }
 
     if (this.expected === 'comment multiline') {
-      ++this.index, ++this.pos;
       if (`${this.char.curr}${this.char.next}` === '*/') {
-        ++this.index, ++this.pos;
+        this.index += 2, this.pos += 2;
+        log(this.history.loc(), 'comment multine end;g');
         this.expected = undefined;
-        log('comment multine end;g')
-        this.next()
+        this.sequence.value = '';
         return true;
       }
-      return true;
     }
   }
 
