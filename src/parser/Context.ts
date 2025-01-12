@@ -31,8 +31,9 @@ class Context {
   }
 
   start = (name: string, props: any = {}, instruction: any = {}, start_offset = 0) => {
+    const prev_context_name = this.buffer.at(-1).name;
 
-    log('start context', `${name} at ${this.Parser.index - start_offset - 1};y`, props)
+    log('context', `${prev_context_name} -->;y`, name + ';g', props)
     this.buffer.push({ name, props })
     this.current = this.buffer.at(-1);
     // if (data.eat) {
@@ -41,8 +42,18 @@ class Context {
     this.Parser.parse[name](props)
   }
 
-  end() {
+  end = () => {
+    const prev_context_name = this.buffer.at(-1).name;
+    this.buffer.pop();
+    this.current = this.buffer.at(-1);
 
+    const ctx_name = this.current.name;
+    log('context', `${ctx_name};g`, `<-- ${prev_context_name};y`);
+    if (ctx_name === 'Program') {
+      this.Parser.parse_program();
+    } else {
+      this.Parser.parse[this.current.name](this.current.props || {});
+    }
   }
 
   load(context: ContextObject | ContextObjectDefault) {

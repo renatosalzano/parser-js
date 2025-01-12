@@ -12,7 +12,7 @@ const context = {
   },
   Variable: {
     keyword: {
-      'var': { hoisting: true, props: { kind: 'var' } },
+      'var': { props: { kind: 'var' } },
       'const': { props: { kind: 'const' } },
       'let': { props: { kind: 'let' } }
     }
@@ -22,9 +22,11 @@ const context = {
     props: {
       async: false,
       arrow: false,
+      method: false,
+      expression: false,
     },
     keyword: {
-      'function': { hoisting: true },
+      'function': null,
       'async': { eat: "function", props: { async: true } },
     }
   },
@@ -156,6 +158,11 @@ class ExpressionNode implements Node {
   expression: Node[] = [];
 }
 
+class LiteralNode implements Node {
+  tag = 'literal';
+  value = '';
+}
+
 export default (config: any) => {
 
   const identifiers = new Map<string, string>()
@@ -170,13 +177,13 @@ export default (config: any) => {
       char,
       token,
       next,
-      eachChar,
       eat,
       expected,
       appendNode,
       createNode,
       Function,
       Block,
+      endContext,
       currentContext,
     }: Api) => {
 
@@ -213,22 +220,27 @@ export default (config: any) => {
 
       return ({
 
-        Expression(expression: any[]) {
-          console.log(token)
-          next();
-          console.log(token)
-          next();
-          console.log(token)
-          // switch (token.type) {
-          //   case 'literal':
-          //     console.log(token)
-          //     break;
-          //   case 'bracket':
-          // }
+        Expression() {
+          switch (token.type) {
+            case 'literal':
+              const literalNode = createNode(LiteralNode);
+              literalNode.value = token.value;
+              appendNode(literalNode);
+              break;
+            case 'identifier':
+            case 'operator':
+            case 'bracket':
+              const node = createNode(ExpressionNode);
+              if (token.eq('(')) {
+
+              }
+              console.log(token)
+          }
+
+          endContext()
         },
 
         Group() {
-          const node = createNode(ExpressionNode);
           console.log('expression group');
           switch (next().type) {
             case "keyword":

@@ -62,6 +62,7 @@ class Parser {
 
   async Parse(source: string) {
     this.source = source;
+    log('start parse program;y');
     this.parse_program()
   }
 
@@ -266,6 +267,7 @@ class Parser {
           this.end_quote = '';
           this.stop_immediate = true;
           this.Token.value += this.char.curr;
+          this.Token.value = this.Token.value.slice(1, -1);
           ++this.index, ++this.pos;
           return true;
         }
@@ -485,14 +487,12 @@ class Parser {
   }
 
   parse_program() {
-    log('start parse program;y');
 
     this.next();
     const start_context = this.program.get(this.Token.value);
     if (start_context) {
       start_context()
     } else {
-      console.log(this.Token)
       this.context.default.start()
     }
 

@@ -24,6 +24,7 @@ class Program {
 
   appendNode = (node: Node) => {
     this.body.push(node);
+    console.log(this.body)
   }
 }
 
