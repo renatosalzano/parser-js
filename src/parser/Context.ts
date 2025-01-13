@@ -27,6 +27,12 @@ class Context {
   }
 
   start = (name: string, props: any = {}, instruction: any = {}, start_offset = 0) => {
+
+    if (this.Parser.end_program) {
+      log('unexpected start context;r')
+      return;
+    }
+
     const prev_context_name = this.buffer.at(-1).name;
 
     log('context', `${prev_context_name} -->;y`, name + ';g', props)
@@ -39,10 +45,12 @@ class Context {
   }
 
   end = () => {
-    if (this.buffer.length === 1) {
-      log('END PROGRAM?;r')
+
+    if (this.Parser.end_program || this.buffer.length === 1) {
+      log('unexpected end context;r')
       return;
     }
+
     const prev_context_name = this.buffer.at(-1).name;
     this.buffer.pop();
     this.current = this.buffer.at(-1);
@@ -50,7 +58,6 @@ class Context {
     const ctx_name = this.current.name;
     log('context', `${ctx_name};g`, `<-- ${prev_context_name};y`);
     if (ctx_name === 'Program') {
-      log('called Program;r')
       this.Parser.parse_program();
     } else {
       this.Parser.parse[this.current.name](this.current.props || {});

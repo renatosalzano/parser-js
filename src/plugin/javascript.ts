@@ -315,7 +315,7 @@ export default (config: any) => {
           }
         },
 
-        Variable({ kind }: Context['Variable']['props']) {
+        Variable({ kind }: Context['Variable']['props'], implicit = false) {
 
           const node = createNode(VarNode, { tag: kind });
           next();
@@ -350,14 +350,14 @@ export default (config: any) => {
           }
 
           appendNode(node)
-          console.log(node)
 
           if (token.eq(',')) {
-            Variable.start({ kind });
+            this.Variable({ kind }, true)
           }
 
-          endContext();
-
+          if (!implicit) {
+            endContext();
+          }
         },
 
         Function({ async, arrow }: Context['Function']['props']) {

@@ -76,7 +76,8 @@ class Parser {
   async Parse(source: string) {
     this.source = source;
     log('start parse program;y');
-    this.parse_program()
+    await this.parse_program()
+    log('end parse program;g')
   }
 
   extend = (type: "operator" | "bracket" | 'separator' | 'keyword', map: { [key: string]: string } = {}) => {
@@ -492,11 +493,14 @@ class Parser {
 
   }
 
+  end_program = false;
+
   parse_program() {
 
     this.next()
     if (this.Token.value === 'end') {
-      console.log('end source', this.index, this.source.length);
+      console.log('end source');
+      this.end_program = true;
       return;
     }
     const start_context = this.program.get(this.Token.value);
@@ -505,15 +509,6 @@ class Parser {
     } else {
       this.context.default.start()
     }
-
-    // let index = 30;
-    // while (index > 0) {
-    //   this.next(true);
-    //   --index;
-    // }
-
-    log('end parse program;y')
-
 
   }
 

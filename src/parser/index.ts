@@ -40,7 +40,7 @@ class ParserConfig {
     this.parser.extend('keyword', keyword);
     this.extend_context(context);
     Object.assign(this.parser.parse, parse(this.parser.api))
-
+    log('extended parser;y')
   }
 
   private extend_context = (context: any) => {
