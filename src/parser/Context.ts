@@ -6,16 +6,12 @@ export type ContextObject = {
   default?: boolean;
   token: Map<string, any>;
   has: (token: string, updateContext?: any) => boolean;
-}
-
-type ContextObjectDefault = ContextObject & {
-  defult: true;
-  start(): void;
+  start(props?: { [key: string]: any }): void;
 }
 
 class Context {
 
-  default = {} as ContextObjectDefault;
+  default = {} as ContextObject;
   context: any = {};
   buffer: any = [];
   current: { name: string, props: any };
@@ -43,6 +39,10 @@ class Context {
   }
 
   end = () => {
+    if (this.buffer.length === 1) {
+      log('END PROGRAM?;r')
+      return;
+    }
     const prev_context_name = this.buffer.at(-1).name;
     this.buffer.pop();
     this.current = this.buffer.at(-1);
@@ -50,19 +50,20 @@ class Context {
     const ctx_name = this.current.name;
     log('context', `${ctx_name};g`, `<-- ${prev_context_name};y`);
     if (ctx_name === 'Program') {
+      log('called Program;r')
       this.Parser.parse_program();
     } else {
       this.Parser.parse[this.current.name](this.current.props || {});
     }
   }
 
-  load(context: ContextObject | ContextObjectDefault) {
+  load(context: ContextObject) {
     if (context?.default) {
 
       if (this.default) {
         log(`default context is "${context.name}", was "${this.default.name}";y`)
       }
-      this.default = context as ContextObjectDefault;
+      this.default = context as ContextObject;
     }
     this.context[context.name] = context;
   }

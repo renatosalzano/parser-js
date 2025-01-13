@@ -44,6 +44,8 @@ type DefaultApi = {
   next(debug?: boolean): { value: string, type: string, name: string };
   appendNode: Program['appendNode'];
   createNode: Program['createNode'];
+  createRef: Program['createRef'];
+  logNode: Program['log'];
   eat(sequence: string, breakReg?: RegExp): void;
   expected(value: string, debug?: boolean): boolean;
   eachChar(callback: (char: string) => any, debug?: boolean): void;

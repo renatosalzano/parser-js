@@ -97,7 +97,7 @@ class ParserConfig {
         const check = this.token.has(token);
         if (check && updateContext !== undefined) {
 
-          let { props = {}, ...instruction } = this.token[token] || {};
+          let { props = {}, ...instruction } = this.token.get(token) || {};
 
           if (updateContext.constructor === Object) {
             let { props: props_override = {}, ...instruction_override } = updateContext || {};
@@ -111,10 +111,8 @@ class ParserConfig {
         return check;
       }
 
-      if (Context.default) {
-        Context.start = function (props: any = {}) {
-          Parser.context.start(name, Object.assign(this.props || {}, props));
-        }
+      Context.start = function (props: any = {}) {
+        Parser.context.start(name, Object.assign(this.props || {}, props));
       }
 
       Parser.api[name] = Context;

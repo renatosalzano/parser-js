@@ -14,12 +14,22 @@ export type Token = {
   [K in TokenType]?: boolean;
 }
 
+export type DebugNext = {
+  comment?: boolean;
+  newLine?: boolean;
+  token?: boolean;
+  number?: boolean;
+  keyword?: boolean;
+  literal?: boolean;
+  checkToken?: boolean;
+}
+
 class Parser {
 
-  Program = new Program();
+  context: Context;
+  Program: Program;
   source = '';
 
-  context: Context;
   history = new History(this);
 
   api: any = {};
@@ -43,6 +53,7 @@ class Parser {
 
   constructor() {
     this.context = new Context(this);
+    this.Program = new Program(this.context);
     // this.source = source;
 
     this.api = {
@@ -52,6 +63,8 @@ class Parser {
       eachChar: this.each_char,
       createNode: this.Program.createNode,
       appendNode: this.Program.appendNode,
+      createRef: this.Program.createRef,
+      logNode: this.Program.log,
       startContext: this.context.start,
       endContext: this.context.end,
       next: this.next,
@@ -134,24 +147,13 @@ class Parser {
     }
   }
 
-  reset_token() {
-    this.Token = {
-      value: '',
-      name: '',
-      type: 'unknown',
-      eq(_: string) {
-        return this.value === _;
-      }
-    }
-  }
-
   maybe?: TokenType;
   expected?: TokenType | 'token' | 'comment' | 'comment multiline';
   blocking_error = false;
 
   parse: any = {};
 
-  check_new_line(debug = false) {
+  check_new_line(debug: DebugNext = {}) {
     if (/[\r\n]/.test(this.char.curr)) {
       if (this.char.curr === '\r') {
         // if is windows eat \r and go to the next char
@@ -160,14 +162,14 @@ class Parser {
       }
 
       if (this.expected === 'comment') {
-        log(this.history.loc(), 'comment end;g');
+        if (debug.comment) log(this.history.loc(), 'comment end;g');
         this.expected = undefined;
         this.Token.value = '';
       }
 
       this.pos = 1, ++this.line;
       this.history.push();
-      if (debug) log('Ln:;c', this.line);
+      if (debug.newLine) log('Ln:;c', this.line);
     }
   }
 
@@ -190,13 +192,13 @@ class Parser {
     }
   }
 
-  check_token_type = (debug = false) => {
+  check_token_type = (debug: DebugNext = {}) => {
     if (this.expected || this.maybe) return;
     const is_comment = this.is.comment();
 
     switch (true) {
       case !!is_comment: {
-        log(this.history.loc(), 'comment start;g')
+        if (debug.comment) log(this.history.loc(), 'comment start;g')
         this.expected = is_comment;
         break;
       }
@@ -228,18 +230,18 @@ class Parser {
       }
     }
     if (this.expected) {
-      if (debug) log(this.history.loc(), this.char.curr, 'expected:;g', this.expected)
+      if (debug.checkToken) log(this.history.loc(), this.char.curr, 'expected:;g', this.expected)
     } else {
-      if (debug) log(this.history.loc(), this.char.curr, 'maybe:;y', 'keyword')
+      if (debug.checkToken) log(this.history.loc(), this.char.curr, 'maybe:;y', 'keyword')
     }
   }
 
-  parse_comment() {
+  parse_comment(debug: DebugNext = {}) {
 
     if (this.expected === 'comment multiline') {
       if (`${this.char.curr}${this.char.next}` === '*/') {
         this.index += 2, this.pos += 2;
-        log(this.history.loc(), 'comment multine end;g');
+        if (debug.comment) log(this.history.loc(), 'comment multine end;g');
         this.expected = undefined;
         this.Token.value = '';
         return true;
@@ -290,7 +292,6 @@ class Parser {
       } else {
         // expected end number;
         this.stop_immediate = true;
-        ++this.index; ++this.pos;
         return true;
       }
     }
@@ -412,7 +413,7 @@ class Parser {
 
   stop_immediate = false;
 
-  next = (debug = false) => {
+  next = (debug: DebugNext = {}) => {
 
     this.history.push()
 
@@ -438,7 +439,7 @@ class Parser {
       }
 
       if (this.stop_immediate) {
-        if (debug) {
+        if (debug.token) {
           print()
         }
         this.stop_immediate = false;
@@ -484,11 +485,20 @@ class Parser {
 
     }
 
+    if (this.index === this.source.length) {
+      this.Token.value = 'end'
+      return
+    }
+
   }
 
   parse_program() {
 
-    this.next();
+    this.next()
+    if (this.Token.value === 'end') {
+      console.log('end source', this.index, this.source.length);
+      return;
+    }
     const start_context = this.program.get(this.Token.value);
     if (start_context) {
       start_context()
@@ -496,13 +506,13 @@ class Parser {
       this.context.default.start()
     }
 
-    // let index = 10;
+    // let index = 30;
     // while (index > 0) {
     //   this.next(true);
     //   --index;
     // }
 
-    log('end parse program;g')
+    log('end parse program;y')
 
 
   }

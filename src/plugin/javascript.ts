@@ -1,16 +1,19 @@
 import Parser from 'parser/Parser'
-import { Node } from "parser/Progam";
+import { Node, BlockNode } from "parser/Progam";
 import type { DefaultApi } from "./";
 import { ContextObject } from 'parser/Context';
+import { log } from 'utils';
 
 const context = {
   Program: ['Variable', 'Function', 'Expression', 'Block', 'Statement', 'Class', 'Invalid'],
   Block: {
+    props: { node: null as Node | null },
     token: {
       "{": null,
     }
   },
   Variable: {
+    props: { kind: 'var' as 'var' | 'const' | 'let' },
     keyword: {
       'var': { props: { kind: 'var' } },
       'const': { props: { kind: 'const' } },
@@ -120,6 +123,7 @@ const separator = {
 const keyword = {
   'true': 'boolean',
   'false': 'boolean',
+  'null': 'null'
 }
 
 type Context = typeof context;
@@ -128,18 +132,20 @@ type Api = DefaultApi & {
   [K in keyof typeof context]: ContextObject;
 }
 
-class FuncNode implements Node {
+class VarNode implements Node {
+  tag = 'var';
+  id: Node | string = '';
+  init?: Node;
+}
+
+class FunctionNode implements Node {
   tag = 'function';
   id = ''
   async?: boolean;
   arrow?: boolean;
   params: Node[] = [];
-  body: Node[] = [];
+  body: Node | null = null;
   returnType = 'void';
-
-  appendNode(node: Node) {
-    this.body.push(node)
-  }
 
   toString() {
     const params = this.params.map(n => n.toString()).join(',');
@@ -156,12 +162,42 @@ class ExpressionNode implements Node {
   tag = 'expression';
   iife = false;
   expression: Node[] = [];
+  appendNode(node: Node) {
+    this.expression.push(node);
+  }
+}
+
+class ObjectNode implements Node {
+  tag = 'object';
+  properties = new Map<string, PropertyNode>();
+}
+
+class PropertyNode {
+  key = {} as Node;
+  value: Node | null = null;
+}
+
+class ArrayNode implements Node {
+  tag = 'array';
+  items: Node[] = [];
 }
 
 class LiteralNode implements Node {
   tag = 'literal';
   value = '';
 }
+
+class NumberNode implements Node {
+  tag = 'number';
+  value = '';
+}
+
+
+// const Test = new PropertyMap();
+
+// Test.set('test', {})
+
+// console.log(Test)
 
 export default (config: any) => {
 
@@ -181,7 +217,10 @@ export default (config: any) => {
       expected,
       appendNode,
       createNode,
+      createRef,
+      logNode,
       Function,
+      Variable,
       Block,
       endContext,
       currentContext,
@@ -218,23 +257,24 @@ export default (config: any) => {
 
       }
 
+      let expressionNode: ExpressionNode | null = null;
+
       return ({
 
         Expression() {
           switch (token.type) {
             case 'literal':
-              const literalNode = createNode(LiteralNode);
-              literalNode.value = token.value;
+              const literalNode = createNode(LiteralNode, { value: token.value });
               appendNode(literalNode);
               break;
             case 'identifier':
             case 'operator':
             case 'bracket':
               const node = createNode(ExpressionNode);
+              appendNode(node);
               if (token.eq('(')) {
-
+                this.Group();
               }
-              console.log(token)
           }
 
           endContext()
@@ -243,24 +283,87 @@ export default (config: any) => {
         Group() {
           console.log('expression group');
           switch (next().type) {
-            case "keyword":
-              if (token.eq('function')) {
-                Function.has(token.value, true)
+            case "keyword": {
+              console.log('group keyword')
+              if (Function.has(token.value, true)) {
+                console.log('end function')
+                // unexpected
               }
+            }
           }
         },
 
-        Block() {
-          const block = [];
-          next();
-          console.log(token)
+        Block({ node }: Context['Block']['props']) {
+          node ??= createNode(BlockNode);
+          let parsing_block = true;
+          while (parsing_block) {
+            next();
+            switch (true) {
+              case token.literal:
+                const literalNode = createNode(LiteralNode, { value: token.value });
+                appendNode(literalNode);
+                break;
+              case Function.has(token.value, true):
+                break;
+              case Variable.has(token.value, { props: { kind: token.value } }):
+                break;
+              case token.eq('}'):
+                parsing_block = false;
+                break;
+            }
+
+          }
         },
 
-        Variable() { },
+        Variable({ kind }: Context['Variable']['props']) {
+
+          const node = createNode(VarNode, { tag: kind });
+          next();
+
+          switch (token.type) {
+            case 'identifier':
+              node.id = token.value;
+              break;
+            case 'bracket':
+              node.id = this.Pattern(token.eq('{') ? 'object' : 'array');
+              break;
+            default:
+            // unexpected token
+          }
+
+          next();
+          if (token.eq('=')) {
+            // parse init
+            next();
+            switch (token.type) {
+              case 'identifier':
+                break;
+              case 'number':
+              case 'literal':
+                node.init = createNode(token.literal ? LiteralNode : NumberNode, { value: token.value })
+                break;
+              case 'bracket':
+                node.init = this.Object();
+                break;
+            }
+            next();
+          }
+
+          appendNode(node)
+          console.log(node)
+
+          if (token.eq(',')) {
+            Variable.start({ kind });
+          }
+
+          endContext();
+
+        },
 
         Function({ async, arrow }: Context['Function']['props']) {
 
-          const node = createNode(FuncNode);
+          const node = createNode(FunctionNode, { async });
+          appendNode(node)
           // node.async = async;
           next();
 
@@ -278,27 +381,14 @@ export default (config: any) => {
           }
 
           next();
-          if (!Block.has(token.value, true)) {
-            // throw error
+          if (token.eq('{')) {
+            // block
+            node.body = createNode(BlockNode);
+            Block.has(token.value, { props: { node: node.body } })
           }
-
-
-
-          // setRules({ skipWhitespace: true });
-
-          // if (expected("(")) {
-          //   // params
-          //   this.Params(node);
-          // } else {
-          //   // throw error
-          // }
-
-          // appendNode(node)
-
-          // // console.log(node)
         },
 
-        Params(node: FuncNode) {
+        Params(node: FunctionNode) {
           let parse_params = true;
           while (parse_params) {
             next();
@@ -315,78 +405,144 @@ export default (config: any) => {
 
         Pattern(type: "object" | 'array') {
 
-          const entries: { key?: string, value?: any }[] = [];
-          let entry: { key?: string, value?: any } = {}
+          return createNode(ObjectNode);
 
-          let sequence = '';
-
-          if (type === 'object') {
-
-            const node = recursiveObjectPattern({
-              tag: 'pattern',
-              type: 'object',
-              properties: []
-            })
-          }
         },
 
         Object() {
-          // key: value
-          // 'key-string': value
-          // [computed]: value
-          // const entries: { key?: string, value?: any }[] = [];
+          log('PARSING OBJECT;m');
 
-          // let entry: { key?: string, value?: any } = {}
+          const node = createNode(ObjectNode);
 
-          // let sequence = ''
-          // eachChar((ch) => {
 
-          //   if (/[:]/.test(ch)) {
-          //     entry.key = sequence;
-          //     // TODO check computed key reference
-          //     sequence = ''
-          //     return
-          //   }
 
-          //   if (entry.key && /[(\[{]/.test(ch)) {
-          //     switch (ch) {
-          //       case "(":
-          //         // TODO
-          //         break;
-          //       case "[":
-          //         this.Array()
-          //         break;
-          //       case "{":
-          //         nextChar()
-          //         console.log('nested object')
-          //         entry.value = this.Object()
-          //         break;
-          //     }
-          //     return
-          //   }
+          let property = new Map<string, { key: string, node: Node } | Node | undefined>()
 
-          //   if (/[,}]/.test(ch)) {
-          //     if (!entry.value) {
-          //       entry.value = sequence;
-          //     }
-          //     entries.push(entry)
-          //     entry = {}
-          //     sequence = ''
-          //     if (ch === '}') {
-          //       console.log('end object')
-          //     }
-          //     return ch === '}'
-          //   }
+          let parsing_object = true;
+          // return;
+          while (parsing_object) {
+            next();
 
-          //   sequence += ch;
-          //   return
-          // }, true)
-          // return entries;
+            if (!property.has('key')) {
+              switch (token.type) {
+                case "identifier":
+                case 'literal':
+                  const literalNode = createNode(LiteralNode, { value: token.value });
+                  property.set('key', { key: token.value, node: literalNode });
+                  log('KEY:;y', token.value);
+                  break;
+                case 'bracket': {
+
+                  break;
+                }
+              }
+            }
+
+            if (property.has('key')) {
+              switch (token.value) {
+                case ':':
+                  property.set('value', undefined);
+                  continue;
+                case ',':
+                  const propertyNode = createNode(PropertyNode, {
+                    key: property.get('key')?.node,
+                    value: property.get('value') || null,
+                  })
+                  node.properties.set(property.get('key')?.key, propertyNode)
+                  property.delete('key');
+                  property.delete('value');
+                  continue;
+              }
+            }
+
+            if (property.has('key') && property.has('value')) {
+              // { key: here
+              switch (token.type) {
+                case "literal":
+                  property.set('value', createNode(LiteralNode, { value: token.value }));
+                  continue;
+                case "number":
+                  property.set('value', createNode(NumberNode, { value: token.value }));
+                  continue;
+                case "identifier":
+                  property.set('value', createNode(LiteralNode, { value: token.value }));
+                  continue;
+                case "bracket": {
+                  switch (token.value) {
+                    case "[":
+                      property.set('value', this.Array());
+                      continue;
+                    case '{':
+                      property.set('value', this.Object());
+                      continue;
+                    case "(":
+                      property.set('value', undefined);
+                      continue;
+                    default:
+                    // unexpected token
+                  }
+                  break;
+                }
+              }
+
+            }
+
+            if (token.eq('}')) {
+
+              if (property.has('key')) {
+                const propertyNode = createNode(PropertyNode, {
+                  key: property.get('key')?.node,
+                  value: property.get('value') || null,
+                })
+                node.properties.set(property.get('key')?.key, propertyNode)
+              }
+
+              parsing_object = false;
+              return node;
+            }
+          }
+
+          return node;
+
+          // console.log(token)
 
         },
 
         Array() {
+          log('PARSING ARRAY;m');
+          const node = createNode(ArrayNode);
+          let parsing_array = true;
 
+          while (parsing_array) {
+            next();
+            if (token.eq(',')) { continue; }
+            switch (token.type) {
+              case 'literal':
+                node.items.push(createNode(LiteralNode, { value: token.value }))
+                continue;
+              case 'number':
+                node.items.push(createNode(NumberNode, { value: token.value }))
+                continue;
+              case 'identifier':
+                // TODO
+                continue;
+              case 'bracket':
+                switch (token.value) {
+                  case "{":
+                    log('item is object;y')
+                    node.items.push(this.Object());
+                    continue;
+                  case "[":
+                  case "(":
+                    continue;
+                  case "]":
+                    parsing_array = false;
+                    return node;
+                }
+            }
+
+          }
+          return node;
         }
       })
     }
