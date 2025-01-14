@@ -1,5 +1,5 @@
 import Parser from 'parser/Parser'
-import { Node, BlockNode } from "parser/Progam";
+import { Node, BlockNode, IdentifierNode } from "parser/Progam";
 import type { DefaultApi } from "./";
 import { ContextObject } from 'parser/Context';
 import { log } from 'utils';
@@ -162,9 +162,6 @@ class ExpressionNode implements Node {
   tag = 'expression';
   iife = false;
   expression: Node[] = [];
-  appendNode(node: Node) {
-    this.expression.push(node);
-  }
 }
 
 class ObjectNode implements Node {
@@ -174,12 +171,19 @@ class ObjectNode implements Node {
 
 class PropertyNode {
   key = {} as Node;
+  alias?: Node;
   value: Node | null = null;
 }
 
 class ArrayNode implements Node {
   tag = 'array';
   items: Node[] = [];
+}
+
+class PatternNode implements Node {
+  tag = 'objectPattern' as `${'object' | 'array'}Pattern`;
+  keys: string[] = [];
+  properties = new Map<string, PropertyNode>();
 }
 
 class LiteralNode implements Node {
@@ -201,7 +205,6 @@ class NumberNode implements Node {
 
 export default (config: any) => {
 
-  const identifiers = new Map<string, string>()
 
   return {
     context,
@@ -213,8 +216,9 @@ export default (config: any) => {
       char,
       token,
       next,
-      eat,
       expected,
+      eat,
+      isIdentifier,
       appendNode,
       createNode,
       createRef,
@@ -261,23 +265,56 @@ export default (config: any) => {
 
       return ({
 
-        Expression() {
-          switch (token.type) {
-            case 'literal':
-              const literalNode = createNode(LiteralNode, { value: token.value });
-              appendNode(literalNode);
-              break;
-            case 'identifier':
-            case 'operator':
-            case 'bracket':
-              const node = createNode(ExpressionNode);
-              appendNode(node);
-              if (token.eq('(')) {
-                this.Group();
-              }
+        Expression(node?: ExpressionNode): Node {
+          node ??= createNode(ExpressionNode);
+          const current = currentContext.name;
+          let return_expression = token.type === 'operator' || token.eq('(') || expected('operator');
+
+          if (return_expression) {
+
+          } else {
+            switch (token.type) {
+              case 'identifier':
+              case 'keyword':
+              case 'literal':
+              case 'number':
+
+                return
+            }
           }
 
-          endContext()
+          return node as Node;
+
+          switch (token.type) {
+            case 'number':
+            case 'literal':
+            case 'identifier': {
+              if ()
+            }
+            case 'operator':
+            case 'bracket':
+
+            case 'separator': {
+              switch (token.value) {
+                case ';':
+                  return node;
+                case ',':
+                  node = this.Expression(node);
+                  break;
+              }
+            }
+            // const node = createNode(ExpressionNode);
+            // appendNode(node);
+            // if (token.eq('(')) {
+            //   this.Group();
+            // }
+          }
+
+          if (current === 'Expression') {
+            endContext()
+          }
+
+          return node as Node;
         },
 
         Group() {
@@ -337,21 +374,35 @@ export default (config: any) => {
             next();
             switch (token.type) {
               case 'identifier':
-                break;
               case 'number':
               case 'literal':
-                node.init = createNode(token.literal ? LiteralNode : NumberNode, { value: token.value })
+                if (expected('operator')) {
+                  node.init = this.Expression();
+                  break;
+                }
+                if (token.identifier) {
+                  node.init = createNode(IdentifierNode, { name: token.value });
+                } else {
+                  node.init = createNode(token.literal ? LiteralNode : NumberNode, { value: token.value })
+                }
+                break;
+              case 'operator':
+                node.init = this.Expression();
                 break;
               case 'bracket':
+                switch (token.value) {
+                  case "{":
+                  case "[":
+                  case "(":
+                }
                 node.init = this.Object();
                 break;
             }
-            next();
           }
 
           appendNode(node)
 
-          if (token.eq(',')) {
+          if (expected(',')) {
             this.Variable({ kind }, true)
           }
 
@@ -404,8 +455,91 @@ export default (config: any) => {
         },
 
         Pattern(type: "object" | 'array') {
+          const node = createNode(PatternNode, { tag: `${type}Pattern` });
+          console.log('parsing pattern', type)
 
-          return createNode(ObjectNode);
+          let key: [string, Node] | undefined;
+          let value: Node | null = null;
+          let parsing_pattern = true;
+
+          if (type === 'object') {
+            let expected_alias = false;
+            let expected_value = false;
+
+            while (parsing_pattern) {
+              next();
+
+              if (!key) {
+
+                switch (token.type) {
+                  case 'literal':
+                    expected_alias = isIdentifier(token.value) ? false : true;
+                    key = [token.value, createNode(LiteralNode, { value: token.value })]
+                    break;
+                  case 'identifier':
+                    key = [token.value, createNode(IdentifierNode, { name: token.value })]
+                    break;
+                  case 'bracket':
+                    switch (token.value) {
+                      case '[': {
+                        expected_alias = true;
+                        console.log(token)
+                        const { items } = this.Array();
+                        if (items.length === 1) {
+                          const computed = items[0];
+                          switch (computed.constructor) {
+                            case IdentifierNode:
+                            case LiteralNode:
+                            case ExpressionNode:
+                          }
+                        }
+
+
+                        break;
+                      }
+                    }
+
+
+                }
+
+              }
+
+              if (expected_alias) {
+                if (token.eq(':')) {
+                  console.log('expected alias', token)
+                  next();
+                  if (token.identifier)
+                    console.log(token)
+                }
+              }
+
+              if (key) {
+                switch (token.value) {
+                  case '=':
+                    expected_value = true;
+                    continue;
+                  case ',':
+                    const propertyNode = createNode(PropertyNode, {
+                      key: key[1],
+                      value,
+                    })
+                    node.properties.set(key[0], propertyNode);
+                    key = undefined;
+                    value = null;
+                    continue;
+                }
+              }
+
+              if (token.eq('}')) {
+                parsing_pattern = false;
+              }
+
+            }
+
+          }
+
+
+          return node;
 
         },
 
@@ -413,8 +547,6 @@ export default (config: any) => {
           log('PARSING OBJECT;m');
 
           const node = createNode(ObjectNode);
-
-
 
           let property = new Map<string, { key: string, node: Node } | Node | undefined>()
 
@@ -513,19 +645,29 @@ export default (config: any) => {
           const node = createNode(ArrayNode);
           let parsing_array = true;
 
+          const node_map = {
+            'literal': LiteralNode,
+            'number': NumberNode
+          }
+
           while (parsing_array) {
             next();
             if (token.eq(',')) { continue; }
             switch (token.type) {
               case 'literal':
-                node.items.push(createNode(LiteralNode, { value: token.value }))
-                continue;
               case 'number':
-                node.items.push(createNode(NumberNode, { value: token.value }))
-                continue;
               case 'identifier':
-                // TODO
+                if (expected('operator')) {
+
+                }
+                if (token.type === 'identifier') {
+                  node.items.push(createNode(IdentifierNode, { name: token.value }))
+                } else {
+                  node.items.push(createNode(node_map[token.type], { value: token.value }))
+                }
                 continue;
+              case 'operator':
+                continue
               case 'bracket':
                 switch (token.value) {
                   case "{":
@@ -533,12 +675,17 @@ export default (config: any) => {
                     node.items.push(this.Object());
                     continue;
                   case "[":
+                    node.items.push(this.Array());
+                    continue;
                   case "(":
+                    // node.items.push(this.Expression())
                     continue;
                   case "]":
                     parsing_array = false;
                     return node;
                 }
+              default:
+                console.log('unexpected token')
             }
 
           }

@@ -53,13 +53,13 @@ class Parser {
 
   constructor() {
     this.context = new Context(this);
-    this.Program = new Program(this.context);
-    // this.source = source;
+    this.Program = new Program(this);
 
     this.api = {
       char: this.char,
       token: this.Token,
       currentContext: this.context.current,
+      isIdentifier: this.is.identifier,
       eachChar: this.each_char,
       createNode: this.Program.createNode,
       appendNode: this.Program.appendNode,
@@ -68,6 +68,7 @@ class Parser {
       startContext: this.context.start,
       endContext: this.context.end,
       next: this.next,
+      expected: this.expected_next,
       eat: this.eat,
       error: this.error
     }
@@ -143,7 +144,10 @@ class Parser {
   Token: Token = {
     value: '',
     type: 'unknown' as TokenType,
-    eq(_: string) {
+    eq(_: string | RegExp) {
+      if (_ instanceof RegExp) {
+        return _.test(this.value);
+      }
       return this.value === _;
     }
   }
@@ -174,7 +178,7 @@ class Parser {
     }
   }
 
-  skip_whitespace = (debug = false) => {
+  skip_whitespace = (debug: DebugNext = {}) => {
     // dont eat whitespace during parse string
     if (this.expected === 'literal') return false;
     if (this.expected === 'number') {
@@ -301,7 +305,7 @@ class Parser {
   }
 
 
-  parse_token = (debug = false) => {
+  parse_token = (debug: DebugNext = {}) => {
 
     if (this.expected === 'token') {
 
@@ -322,7 +326,7 @@ class Parser {
             this.stop_immediate = true;
             return true;
           } else {
-            this.history.prev();
+            this.history.back();
           }
         }
 
@@ -349,7 +353,7 @@ class Parser {
   }
 
 
-  parse_keyword = (debug = false) => {
+  parse_keyword = (debug: DebugNext = {}) => {
     if (this.maybe === 'keyword') {
 
       const keyword = this.get_keyword(this);
@@ -382,7 +386,7 @@ class Parser {
   }
 
 
-  parse_identifier = (debug = false) => {
+  parse_identifier = (debug: DebugNext = {}) => {
     if (this.expected === 'identifier') {
 
       if (this.is.identifier(this.Token.value + this.char.curr)) {
@@ -410,6 +414,16 @@ class Parser {
     // const len = this.sequence.length + 1;
     // this.index -= len;
     // this.pos -= len;
+  }
+
+
+  expected_next = (token: string) => {
+    const next_token = this.next();
+    if (next_token.value === token || next_token.type === token) {
+      return true;
+    }
+    this.history.back();
+    return false;
   }
 
   stop_immediate = false;
@@ -447,6 +461,7 @@ class Parser {
         if (this.Token.unknown) {
           log('unexpected token;r')
         }
+        this.history.set(this.Token);
         return this.Token;
       }
 
@@ -488,9 +503,10 @@ class Parser {
 
     if (this.index === this.source.length) {
       this.Token.value = 'end'
-      return
+      return this.Token;
     }
 
+    return this.Token;
   }
 
   end_program = false;

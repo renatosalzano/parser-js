@@ -42,16 +42,16 @@ type DefaultApi = {
   char: { curr: string, prev: string, next: string },
   token: Token,
   next(debug?: boolean): { value: string, type: string, name: string };
+  expected(token: string): boolean;
   appendNode: Program['appendNode'];
   createNode: Program['createNode'];
   createRef: Program['createRef'];
   logNode: Program['log'];
   eat(sequence: string, breakReg?: RegExp): void;
-  expected(value: string, debug?: boolean): boolean;
-  eachChar(callback: (char: string) => any, debug?: boolean): void;
   startContext(context: string): void;
   endContext(): void;
   error(message: string): void;
+  isIdentifier(value: string): boolean;
   currentContext: { name: string, props: { [key: string]: any } }
 }
 

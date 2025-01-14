@@ -12,6 +12,12 @@ type Node<T extends { [key: string]: any } = { [key: string]: any }> = {
   [K in keyof T]: T[K]
 }
 
+class IdentifierNode {
+  tag = 'identifier';
+  name = '';
+  reference?: Node;
+}
+
 class ReferenceTree {
 
   Program = new Map<string | number, Node | Map<string, Node>>();
@@ -24,6 +30,16 @@ class ReferenceTree {
         current_scope.set(node.id, node);
       } else {
         this.Program.set(node.id, node);
+      }
+    }
+  }
+
+  get = (node: IdentifierNode) => {
+    if (node.name) {
+      const scope = this.scope.at(-1) || this.Program;
+      const reference_node = scope.get(node.name);
+      if (reference_node) {
+        return reference_node as Node;
       }
     }
   }
@@ -42,7 +58,7 @@ class Program {
   private blocks: Node[] = []
   private reference = new ReferenceTree();
 
-  constructor(private Context: Context) {
+  constructor(private Parser: Parser) {
 
   }
 
@@ -56,6 +72,13 @@ class Program {
       Object.assign(node, init);
     }
 
+    if (node instanceof IdentifierNode) {
+      const ref = this.reference.get(node)
+      if (ref) {
+        node.reference = ref;
+      }
+    }
+
     return node as T;
   }
 
@@ -65,6 +88,10 @@ class Program {
 
   createRef = (node: Node) => {
     this.reference.set(node);
+  }
+
+  getReference = (node: IdentifierNode) => {
+    this.reference.get(node)
   }
 
   appendNode = (node: Node) => {
@@ -84,5 +111,5 @@ class Program {
   }
 }
 
-export { Node, BlockNode }
+export { Node, BlockNode, IdentifierNode }
 export default Program

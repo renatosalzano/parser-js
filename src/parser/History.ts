@@ -1,11 +1,19 @@
-import Parser from "./Parser";
+import Parser, { Token } from "./Parser";
 
 class History {
 
-  history: [number, number, number][] = []
+  history: [number, number, number][] = [];
+  token: { [key: number]: { [key: string]: string } } = {};
 
   constructor(public Parser: Parser) {
 
+  }
+
+  set = (token: Token) => {
+
+    this.token[this.Parser.index - token.value.length] = {
+      [token.type]: token.value
+    };
   }
 
   push = () => {
@@ -13,7 +21,7 @@ class History {
     this.history.push([index, line, pos])
   }
 
-  prev = () => {
+  back = () => {
     if (this.history.length !== 1) {
       this.history.pop()
     }
