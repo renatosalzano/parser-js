@@ -157,6 +157,7 @@ class Parser {
   blocking_error = false;
 
   parse: any = {};
+  debug: DebugNext = {};
 
   check_new_line(debug: DebugNext = {}) {
     if (/[\r\n]/.test(this.char.curr)) {
@@ -181,11 +182,7 @@ class Parser {
   skip_whitespace = (debug: DebugNext = {}) => {
     // dont eat whitespace during parse string
     if (this.expected === 'literal') return false;
-    if (this.expected === 'number') {
-      if (this.is.space(this.char.curr)) {
-        log('unexpected number;r')
-      }
-    }
+    if (this.expected === 'number') return false;
     if (this.Token.value === '' && (this.is.space(this.char.curr) || /[\n]/.test(this.char.curr))) {
       ++this.index, ++this.pos;
       return true;
@@ -317,18 +314,18 @@ class Parser {
         this.index += token.length;
         this.pos += token.length;
 
-        if (token === '-' || token === '+') {
-          const next_token = this.next();
-          if (next_token?.type === 'number') {
-            if (token === '-') {
-              this.Token.value = '-' + this.Token.value;
-            }
-            this.stop_immediate = true;
-            return true;
-          } else {
-            this.history.back();
-          }
-        }
+        // if (token === '-' || token === '+') {
+        //   const next_token = this.next();
+        //   if (next_token?.type === 'number') {
+        //     if (token === '-') {
+        //       this.Token.value = '-' + this.Token.value;
+        //     }
+        //     this.stop_immediate = true;
+        //     return true;
+        //   } else {
+        //     this.history.back();
+        //   }
+        // }
 
         if (token_type === 'operator') {
           const next_token = this.get_token(this);
@@ -417,13 +414,20 @@ class Parser {
   }
 
 
-  expected_next = (token: string) => {
+  expected_next = (token: string | ((token: Token) => boolean)) => {
+
+    this.history.push();
     const next_token = this.next();
-    if (next_token.value === token || next_token.type === token) {
-      return true;
+
+    let expected = false;
+    if (typeof token === 'function') {
+      expected = token(next_token);
+    } else {
+      expected = next_token.value === token || next_token.type === token;
     }
+    if (this.debug.token) log('expected;g', next_token.type, expected)
     this.history.back();
-    return false;
+    return expected;
   }
 
   stop_immediate = false;
@@ -454,14 +458,14 @@ class Parser {
       }
 
       if (this.stop_immediate) {
-        if (debug.token) {
+        if (debug.token || this.debug.token) {
           print()
         }
         this.stop_immediate = false;
         if (this.Token.unknown) {
           log('unexpected token;r')
         }
-        this.history.set(this.Token);
+        this.history.token();
         return this.Token;
       }
 
@@ -513,18 +517,36 @@ class Parser {
 
   parse_program() {
 
+    this.debug.token = true;
+
+    // let index = 10
+    // while (index > 0) {
+    //   this.next()
+    //   --index;
+    // }
     this.next()
-    if (this.Token.value === 'end') {
-      console.log('end source');
-      this.end_program = true;
-      return;
-    }
-    const start_context = this.program.get(this.Token.value);
-    if (start_context) {
-      start_context()
-    } else {
-      this.context.default.start()
-    }
+    this.next()
+    this.next()
+    this.next()
+    console.log('before expected', this.index, this.Token)
+    this.expected_next('operator');
+    console.log('after expected', this.index, this.Token)
+    this.next();
+    this.next();
+    console.log(this.history.Token)
+
+    // this.next()
+    // if (this.Token.value === 'end') {
+    //   console.log('end source');
+    //   this.end_program = true;
+    //   return;
+    // }
+    // const start_context = this.program.get(this.Token.value);
+    // if (start_context) {
+    //   start_context()
+    // } else {
+    //   this.context.default.start()
+    // }
 
   }
 

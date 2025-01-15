@@ -266,53 +266,68 @@ export default (config: any) => {
       return ({
 
         Expression(node?: ExpressionNode): Node {
+          log('Expression;m')
           node ??= createNode(ExpressionNode);
           const current = currentContext.name;
           let return_expression = token.type === 'operator' || token.eq('(') || expected('operator');
+          console.log(expected('operator'))
 
           if (return_expression) {
+            let parsing_expression = true;
+            // while (parsing_expression) {
 
-          } else {
-            switch (token.type) {
-              case 'identifier':
-              case 'keyword':
-              case 'literal':
-              case 'number':
+            //   switch (token.type) {
 
-                return
-            }
-          }
+            //   }
 
-          return node as Node;
-
-          switch (token.type) {
-            case 'number':
-            case 'literal':
-            case 'identifier': {
-              if ()
-            }
-            case 'operator':
-            case 'bracket':
-
-            case 'separator': {
-              switch (token.value) {
-                case ';':
-                  return node;
-                case ',':
-                  node = this.Expression(node);
-                  break;
-              }
-            }
-            // const node = createNode(ExpressionNode);
-            // appendNode(node);
-            // if (token.eq('(')) {
-            //   this.Group();
             // }
           }
 
-          if (current === 'Expression') {
-            endContext()
-          }
+          return node;
+
+          // if (return_expression) {
+          //   switch (token.type) {
+          //     case 'identifier':
+          //     case 'keyword':
+          //     case 'literal':
+          //     case 'number':
+
+          //       return
+          //   }
+
+          // } else {
+          // }
+
+          // return node as Node;
+
+          // switch (token.type) {
+          //   case 'number':
+          //   case 'literal':
+          //   case 'identifier': {
+          //     if ()
+          //   }
+          //   case 'operator':
+          //   case 'bracket':
+
+          //   case 'separator': {
+          //     switch (token.value) {
+          //       case ';':
+          //         return node;
+          //       case ',':
+          //         node = this.Expression(node);
+          //         break;
+          //     }
+          //   }
+          //   // const node = createNode(ExpressionNode);
+          //   // appendNode(node);
+          //   // if (token.eq('(')) {
+          //   //   this.Group();
+          //   // }
+          // }
+
+          // if (current === 'Expression') {
+          //   endContext()
+          // }
 
           return node as Node;
         },
@@ -377,6 +392,10 @@ export default (config: any) => {
               case 'number':
               case 'literal':
                 if (expected('operator')) {
+                  console.log(token)
+
+                  console.log(next())
+                  console.log(next())
                   node.init = this.Expression();
                   break;
                 }

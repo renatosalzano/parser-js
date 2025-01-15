@@ -42,7 +42,7 @@ type DefaultApi = {
   char: { curr: string, prev: string, next: string },
   token: Token,
   next(debug?: boolean): { value: string, type: string, name: string };
-  expected(token: string): boolean;
+  expected(token: string | ((token: Token) => boolean)): boolean;
   appendNode: Program['appendNode'];
   createNode: Program['createNode'];
   createRef: Program['createRef'];
