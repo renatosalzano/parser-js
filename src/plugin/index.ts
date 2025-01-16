@@ -1,4 +1,4 @@
-import { Token } from "parser/Parser";
+import { Token } from "parser/Tokenizer";
 import Program from "parser/Progam";
 import { log } from "utils";
 
@@ -39,8 +39,9 @@ type ParserApi<T, A> = {
 }
 
 type DefaultApi = {
-  char: { curr: string, prev: string, next: string },
-  token: Token,
+  ctx: { [key: string]: string };
+  char: { curr: string, prev: string, next: string };
+  token: Token;
   next(debug?: boolean): { value: string, type: string, name: string };
   expected(token: string | ((token: Token) => boolean)): boolean;
   appendNode: Program['appendNode'];
@@ -52,7 +53,7 @@ type DefaultApi = {
   endContext(): void;
   error(message: string): void;
   isIdentifier(value: string): boolean;
-  currentContext: { name: string, props: { [key: string]: any } }
+  currentContext(): string;
 }
 
 

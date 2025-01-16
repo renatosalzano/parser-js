@@ -1,4 +1,4 @@
-import Parser from "./Parser";
+import Parser from "./Tokenizer";
 
 type GetToken = ((parser: Parser) => string | undefined);
 
@@ -6,8 +6,8 @@ export function create_fast_get(type: 'keyword' | 'token', max_length: number): 
 
   const cases: string[] = [];
 
-  while(max_length > 0) {
-    const source_slice = Array.from({length: max_length}, (_,i) => `source[index+${i}]`).join('+')
+  while (max_length > 0) {
+    const source_slice = Array.from({ length: max_length }, (_, i) => `source[index+${i}]`).join('+')
     cases.push(`case ${type}.has(${source_slice}):\nreturn ${source_slice}`)
     --max_length;
   }

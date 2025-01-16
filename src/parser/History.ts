@@ -1,4 +1,4 @@
-import Parser, { Token } from "./Parser";
+import Parser, { Token } from "./Tokenizer";
 
 class History {
 

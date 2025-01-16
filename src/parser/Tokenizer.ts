@@ -9,7 +9,7 @@ export type Token = {
   value: string;
   type: TokenType;
   name?: string;
-  eq(comparator: string): boolean;
+  eq(comparator: string | RegExp): boolean;
 } & {
   [K in TokenType]?: boolean;
 }
@@ -24,18 +24,18 @@ export type DebugNext = {
   checkToken?: boolean;
 }
 
-class Parser {
+class Tokenizer {
 
-  context: Context;
-  Program: Program;
   source = '';
 
-  history = new History(this);
+  Context: Context;
+
+  Program: Program;
+  History = new History(this);
 
   api: any = {};
 
   program = new Map<string, Function>()
-
 
   token = new Map<string, 'operator' | 'bracket' | 'separator'>();
   token_max_len = 4;
@@ -52,21 +52,22 @@ class Parser {
   reference = new Map<string, string>();
 
   constructor() {
-    this.context = new Context(this);
+    this.Context = new Context(this);
     this.Program = new Program(this);
 
     this.api = {
+      ctx: this.Context.ctx,
       char: this.char,
       token: this.Token,
-      currentContext: this.context.current,
+      currentContext: this.Context.get_current,
       isIdentifier: this.is.identifier,
       eachChar: this.each_char,
       createNode: this.Program.createNode,
       appendNode: this.Program.appendNode,
       createRef: this.Program.createRef,
       logNode: this.Program.log,
-      startContext: this.context.start,
-      endContext: this.context.end,
+      startContext: this.Context.start,
+      endContext: this.Context.end,
       next: this.next,
       expected: this.expected_next,
       eat: this.eat,
@@ -168,13 +169,13 @@ class Parser {
       }
 
       if (this.expected === 'comment') {
-        if (debug.comment) log(this.history.loc(), 'comment end;g');
+        if (debug.comment) log(this.History.loc(), 'comment end;g');
         this.expected = undefined;
         this.Token.value = '';
       }
 
       this.pos = 1, ++this.line;
-      this.history.push();
+      this.History.push();
       if (debug.newLine) log('Ln:;c', this.line);
     }
   }
@@ -182,7 +183,7 @@ class Parser {
   skip_whitespace = (debug: DebugNext = {}) => {
     // dont eat whitespace during parse string
     if (this.expected === 'literal') return false;
-    if (this.expected === 'number') return false;
+
     if (this.Token.value === '' && (this.is.space(this.char.curr) || /[\n]/.test(this.char.curr))) {
       ++this.index, ++this.pos;
       return true;
@@ -200,7 +201,7 @@ class Parser {
 
     switch (true) {
       case !!is_comment: {
-        if (debug.comment) log(this.history.loc(), 'comment start;g')
+        if (debug.comment) log(this.History.loc(), 'comment start;g')
         this.expected = is_comment;
         break;
       }
@@ -232,9 +233,9 @@ class Parser {
       }
     }
     if (this.expected) {
-      if (debug.checkToken) log(this.history.loc(), this.char.curr, 'expected:;g', this.expected)
+      if (debug.checkToken) log(this.History.loc(), this.char.curr, 'expected:;g', this.expected)
     } else {
-      if (debug.checkToken) log(this.history.loc(), this.char.curr, 'maybe:;y', 'keyword')
+      if (debug.checkToken) log(this.History.loc(), this.char.curr, 'maybe:;y', 'keyword')
     }
   }
 
@@ -243,7 +244,7 @@ class Parser {
     if (this.expected === 'comment multiline') {
       if (`${this.char.curr}${this.char.next}` === '*/') {
         this.index += 2, this.pos += 2;
-        if (debug.comment) log(this.history.loc(), 'comment multine end;g');
+        if (debug.comment) log(this.History.loc(), 'comment multine end;g');
         this.expected = undefined;
         this.Token.value = '';
         return true;
@@ -287,7 +288,7 @@ class Parser {
 
     if (this.expected === 'number') {
 
-      if (this.is.number(this.Token.value + this.char.curr)) {
+      if (!this.is.space(this.char.curr) && this.is.number(this.Token.value + this.char.curr)) {
         this.Token.value += this.char.curr;
         ++this.index; ++this.pos;
         return true;
@@ -323,14 +324,14 @@ class Parser {
         //     this.stop_immediate = true;
         //     return true;
         //   } else {
-        //     this.history.back();
+        //     this.History.back();
         //   }
         // }
 
         if (token_type === 'operator') {
           const next_token = this.get_token(this);
           if (next_token && this.token.get(next_token) === 'operator') {
-            log(`unexpected operator: ${token + next_token} at ${this.history.loc(true)};r`)
+            log(`unexpected operator: ${token + next_token} at ${this.History.loc(true)};r`)
             // TODO BLOCKING ERROR
           }
         }
@@ -416,7 +417,7 @@ class Parser {
 
   expected_next = (token: string | ((token: Token) => boolean)) => {
 
-    this.history.push();
+    this.History.push();
     const next_token = this.next();
 
     let expected = false;
@@ -426,7 +427,7 @@ class Parser {
       expected = next_token.value === token || next_token.type === token;
     }
     if (this.debug.token) log('expected;g', next_token.type, expected)
-    this.history.back();
+    this.History.back();
     return expected;
   }
 
@@ -434,7 +435,7 @@ class Parser {
 
   next = (debug: DebugNext = {}) => {
 
-    this.history.push()
+    this.History.push()
 
     this.Token.value = '';
     delete this.Token.name;
@@ -445,7 +446,7 @@ class Parser {
     this.expected = undefined;
 
     // @ts-ignore
-    var print = () => log(this.history.loc(), this.Token.type.magenta() + (this.Token.name ? ` ${this.Token.name}`.green() : ''), this.Token.value || this.char.curr)
+    var print = () => log(this.History.loc(), this.Token.type.magenta() + (this.Token.name ? ` ${this.Token.name}`.green() : ''), this.Token.value || this.char.curr)
 
     while (!this.blocking_error && this.index < this.source.length) {
 
@@ -465,7 +466,7 @@ class Parser {
         if (this.Token.unknown) {
           log('unexpected token;r')
         }
-        this.history.token();
+        this.History.token();
         return this.Token;
       }
 
@@ -528,6 +529,7 @@ class Parser {
     this.next()
     if (this.Token.value === 'end') {
       console.log('end source');
+      console.log(this.Program.body)
       this.end_program = true;
       return;
     }
@@ -535,7 +537,7 @@ class Parser {
     if (start_context) {
       start_context()
     } else {
-      this.context.default.start()
+      this.Context.default.start()
     }
 
   }
@@ -573,4 +575,4 @@ class Parser {
 
 }
 
-export default Parser
+export default Tokenizer

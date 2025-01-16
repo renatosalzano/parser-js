@@ -1,5 +1,5 @@
 import { log } from "utils";
-import Parser from "./Parser";
+import Tokenizer from "./Tokenizer";
 
 export type ContextObject = {
   name: string;
@@ -12,11 +12,12 @@ export type ContextObject = {
 class Context {
 
   default = {} as ContextObject;
+  ctx: { [key: string]: string } = {};
   context: any = {};
   buffer: any = [];
   current: { name: string, props: any };
 
-  constructor(public Parser: Parser) {
+  constructor(public Tokenizer: Tokenizer) {
 
     this.buffer.push({
       name: 'Program',
@@ -26,9 +27,13 @@ class Context {
     this.current = this.buffer.at(-1);
   }
 
+  get_current = () => {
+    return this.current.name;
+  }
+
   start = (name: string, props: any = {}, instruction: any = {}, start_offset = 0) => {
 
-    if (this.Parser.end_program) {
+    if (this.Tokenizer.end_program) {
       log('unexpected start context;r')
       return;
     }
@@ -38,19 +43,16 @@ class Context {
     log('context', `${prev_context_name} -->;y`, name + ';g', props)
     this.buffer.push({ name, props });
 
-    this.current.name = name;
-    this.current.props = props;
-    this.Parser.api.currentContext.name = name;
-    this.Parser.api.currentContext.props = props;
+    this.current = { name, props };
     // if (data.eat) {
     //   this.Parser.eat(data.eat);
     // }
-    this.Parser.parse[name](props)
+    this.Tokenizer.parse[name](props)
   }
 
   end = () => {
 
-    if (this.Parser.end_program || this.buffer.length === 1) {
+    if (this.Tokenizer.end_program || this.buffer.length === 1) {
       log('unexpected end context;r')
       return;
     }
@@ -62,9 +64,9 @@ class Context {
     const ctx_name = this.current.name;
     log('context', `${ctx_name};g`, `<-- ${prev_context_name};y`);
     if (ctx_name === 'Program') {
-      this.Parser.parse_program();
+      this.Tokenizer.parse_program();
     } else {
-      this.Parser.parse[this.current.name](this.current.props || {});
+      this.Tokenizer.parse[this.current.name](this.current.props || {});
     }
   }
 
@@ -76,6 +78,8 @@ class Context {
       }
       this.default = context as ContextObject;
     }
+
+    this.ctx[context.name.toLowerCase()] = context.name;
     this.context[context.name] = context;
   }
 }

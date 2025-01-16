@@ -1,5 +1,5 @@
 import Context from "./Context";
-import Parser from "./Parser";
+import Parser from "./Tokenizer";
 
 interface Constructor<T> {
   new(...args: any): T

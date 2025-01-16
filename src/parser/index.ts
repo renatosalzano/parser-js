@@ -1,5 +1,5 @@
 import javascript from 'plugin/javascript';
-import Parser from './Parser';
+import Tokenizer from './Tokenizer';
 import { log } from 'utils';
 
 namespace ParserConfig {
@@ -20,7 +20,7 @@ let instance: ParserConfig | null = null;
 class ParserConfig {
 
   private allow_config = true;
-  private parser = new Parser();
+  private Tokenizer = new Tokenizer();
   private plugin: any
 
   private constructor(config = {}) {
@@ -34,18 +34,18 @@ class ParserConfig {
       ? plugin(this.plugin)
       : plugin;
 
-    this.parser.extend('separator', separator);
-    this.parser.extend('bracket', bracket);
-    this.parser.extend('operator', operator);
-    this.parser.extend('keyword', keyword);
+    this.Tokenizer.extend('separator', separator);
+    this.Tokenizer.extend('bracket', bracket);
+    this.Tokenizer.extend('operator', operator);
+    this.Tokenizer.extend('keyword', keyword);
     this.extend_context(context);
-    Object.assign(this.parser.parse, parse(this.parser.api))
+    Object.assign(this.Tokenizer.parse, parse(this.Tokenizer.api))
     log('extended parser;y')
   }
 
   private extend_context = (context: any) => {
 
-    const Parser = this.parser;
+    const Tokenizer = this.Tokenizer;
 
     const program_ctx = new Set<string>(context?.Program || []);
     const invalid_ctx = new Set<string>(program_ctx);
@@ -72,8 +72,8 @@ class ParserConfig {
 
         for (const [lexical] of Context.token) {
 
-          if (Parser.is.alpha(lexical)) {
-            if (!Parser.keyword.has(lexical)) {
+          if (Tokenizer.is.alpha(lexical)) {
+            if (!Tokenizer.keyword.has(lexical)) {
               // Parser.keyword.set(lexical, name);
               context_keyword[lexical] = name;
             } else {
@@ -86,7 +86,7 @@ class ParserConfig {
           }
         }
 
-        Parser.extend('keyword', context_keyword);
+        Tokenizer.extend('keyword', context_keyword);
       } else {
         delete Context.keyword;
       }
@@ -105,29 +105,29 @@ class ParserConfig {
             instruction = instruction_override;
           }
 
-          Parser.context.start(name, Object.assign(Context.props || {}, props), instruction);
+          Tokenizer.Context.start(name, Object.assign(Context.props || {}, props), instruction);
         }
 
         return check;
       }
 
       Context.start = function (props?: any, instruction?: any) {
-        const token = Parser.Token.value;
+        const token = Tokenizer.Token.value;
         props = props || this.token.get(token)?.props || {};
 
-        return Parser.context.start(name, Object.assign(this.props || {}, props), instruction);
+        return Tokenizer.Context.start(name, Object.assign(this.props || {}, props), instruction);
       }
 
-      Parser.api[name] = Context;
+      Tokenizer.api[name] = Context;
 
       if (program_ctx.has(name)) {
         for (const [lexical] of Context.token) {
-          Parser.program.set(lexical, () => Context.has(lexical, true))
+          Tokenizer.program.set(lexical, () => Context.has(lexical, true))
         }
         invalid_ctx.delete(name)
       }
 
-      Parser.context.load(Context);
+      Tokenizer.Context.load(Context);
     }
 
     for (const name of invalid_ctx) {
@@ -153,7 +153,7 @@ class ParserConfig {
 
   static parse = async (code: string) => {
     instance ??= new this() as ParserConfig;
-    await instance.parser.Parse(code)
+    await instance.Tokenizer.Parse(code)
   }
 }
 

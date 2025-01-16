@@ -1,4 +1,4 @@
-import Parser from 'parser/Parser'
+import Parser from 'parser/Tokenizer'
 import { Node, BlockNode, IdentifierNode } from "parser/Progam";
 import type { DefaultApi } from "./";
 import { ContextObject } from 'parser/Context';
@@ -218,7 +218,7 @@ export default (config: any) => {
     operator,
     separator,
     parse: ({
-      char,
+      ctx,
       token,
       next,
       expected,
@@ -271,6 +271,7 @@ export default (config: any) => {
       return ({
 
         check_is_expression() {
+          log('check is expression;g')
 
           switch (token.type) {
             case 'number':
@@ -315,12 +316,11 @@ export default (config: any) => {
           }
         },
 
-        Expression(group = false): Node {
+        Expression(is_group = false): Node {
           log('Expression;m')
           const node = createNode(ExpressionNode);
-          const context = currentContext.name;
+          const curr_ctx = currentContext();
 
-          console.log(context)
           let parsing_expression = true;
           let max = 10
 
@@ -354,7 +354,7 @@ export default (config: any) => {
                     node.expression.push(this.Expression(true));
                     break;
                   case ')':
-                    if (group) {
+                    if (is_group) {
                       parsing_expression = false;
                       return node;
                     }
@@ -373,22 +373,31 @@ export default (config: any) => {
                 // node.expression.push()
                 break;
               }
-              case 'separator': {
-                switch (token.value) {
-                  case ';':
-                    parsing_expression = false;
+            }
+
+            let next_token = '';
+            const is_separator = expected((token) => {
+              next_token = token.value;
+              return token.eq(/[,;]/);
+            })
+
+            if (is_separator) {
+              switch (next_token) {
+                case ';': {
+                  if (curr_ctx === ctx.expression) {
+                    appendNode(node);
+                  } else {
                     return node;
-                  case ',':
-                    if (group) {
-                      break;
-                    }
-                    parsing_expression = false;
+                  }
+                  return node;
+                }
+                case ',': {
+                  if (!is_group && curr_ctx !== ctx.expression) {
                     return node;
+                  }
                 }
               }
             }
-
-
 
             next()
             --max;
@@ -423,7 +432,7 @@ export default (config: any) => {
         },
 
         Variable({ kind }: Context['Variable']['props'], implicit = false) {
-          log('Variable;m')
+          log('Variable;m', kind + ";c", 'implicit:', implicit)
 
           const node = createNode(VarNode, { tag: kind });
           next();
@@ -440,45 +449,17 @@ export default (config: any) => {
           }
 
           next();
+
           if (token.eq('=')) {
             // parse init
             next();
             node.init = this.check_is_expression();
-            // switch (token.type) {
-            //   case 'identifier':
-            //   case 'number':
-            //   case 'literal':
-
-            //     if (expected('operator')) {
-            //       node.init = this.Expression();
-            //       break;
-            //     }
-
-            //     if (token.identifier) {
-            //       node.init = createNode(IdentifierNode, { name: token.value });
-            //     } else {
-            //       node.init = createNode(token.literal ? LiteralNode : NumberNode, { value: token.value })
-            //     }
-            //     break;
-            //   case 'operator':
-            //     node.init = this.Expression();
-            //     break;
-            //   case 'bracket':
-            //     switch (token.value) {
-            //       case "{":
-            //       case "[":
-            //       case "(":
-            //     }
-            //     node.init = this.Object();
-            //     break;
-            // }
           }
-
-          console.log(node.init.expression)
 
           appendNode(node)
 
           if (expected(',')) {
+            next();
             this.Variable({ kind }, true)
           }
 
