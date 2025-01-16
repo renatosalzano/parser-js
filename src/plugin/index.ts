@@ -1,4 +1,4 @@
-import { Token } from "parser/Tokenizer";
+import { Token, TokenType } from "parser/Tokenizer";
 import Program from "parser/Progam";
 import { log } from "utils";
 
@@ -42,8 +42,9 @@ type DefaultApi = {
   ctx: { [key: string]: string };
   char: { curr: string, prev: string, next: string };
   token: Token;
+  expectedToken: Token;
   next(debug?: boolean): { value: string, type: string, name: string };
-  expected(token: string | ((token: Token) => boolean)): boolean;
+  expected(comparator?: string | ((token: Token) => boolean)): boolean;
   appendNode: Program['appendNode'];
   createNode: Program['createNode'];
   createRef: Program['createRef'];

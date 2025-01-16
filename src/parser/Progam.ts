@@ -5,17 +5,30 @@ interface Constructor<T> {
   new(...args: any): T
 }
 
-type Node<T extends { [key: string]: any } = { [key: string]: any }> = {
-  toString(): string;
-  appendNode?: (node: Node) => any;
-} & {
-  [K in keyof T]: T[K]
+// type Node<T extends { [key: string]: any } = { [key: string]: any }> = {
+//   toString(): string;
+//   appendNode?: (node: Node) => any;
+// } & {
+//   [K in keyof T]: T[K]
+// }
+
+class Node {
+  tag: string = '';
+  id?: string | Node;
+
+  toString() {
+    return ''
+  }
 }
 
 class IdentifierNode {
   tag = 'identifier';
   name = '';
   reference?: Node;
+
+  toString() {
+    return this.name;
+  }
 }
 
 class ReferenceTree {
@@ -25,6 +38,9 @@ class ReferenceTree {
 
   set = (node: Node) => {
     if (node.id) {
+      if (node.id instanceof Node) {
+
+      }
       const current_scope = this.scope.at(-1);
       if (current_scope) {
         current_scope.set(node.id, node);
@@ -108,6 +124,10 @@ class Program {
 
   log = () => {
     return this.body;
+  }
+
+  toString() {
+    return this.body.map((node) => node.toString())
   }
 }
 

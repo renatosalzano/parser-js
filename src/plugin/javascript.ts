@@ -123,7 +123,9 @@ const separator = {
 const keyword = {
   'true': 'boolean',
   'false': 'boolean',
-  'null': 'null'
+  'null': 'null',
+  'typeof': 'type of',
+  'instanceof': 'instance of',
 }
 
 type Context = typeof context;
@@ -132,13 +134,23 @@ type Api = DefaultApi & {
   [K in keyof typeof context]: ContextObject;
 }
 
-class VarNode implements Node {
+class VarNode extends Node {
   tag = 'var';
+  kind = 'var' as 'var' | 'const' | 'let';
   id: Node | string = '';
   init?: Node;
+
+  toString(): string {
+    const id = typeof this.id === 'string' ? this.id : this.id.toString();
+    const init = this.init
+      ? '=' + this.init.toString()
+      : '';
+
+    return `${this.kind} ${id}${init};`;
+  }
 }
 
-class FunctionNode implements Node {
+class FunctionNode extends Node {
   tag = 'function';
   id = ''
   async?: boolean;
@@ -158,46 +170,78 @@ class FunctionNode implements Node {
   }
 }
 
-class ExpressionNode implements Node {
+class ExpressionNode extends Node {
   tag = 'expression';
   iife = false;
+  group = false;
   expression: (Node | string)[] = [];
+  toString() {
+    let expr: string[] = [];
+    for (const item of this.expression) {
+      if (typeof item === 'string') {
+        expr.push(item);
+      } else {
+        expr.push(item.toString());
+      }
+    }
+    if (this.group) {
+      return `(${expr.join('')})`;
+    }
+    return expr.join('');
+  }
 }
 
-class ObjectNode implements Node {
+class ObjectNode extends Node {
   tag = 'object';
   properties = new Map<string, PropertyNode>();
+  toString() {
+    const properties: string[] = [];
+    for (const prop of this.properties) {
+      properties.push(prop.toString())
+    }
+
+    return `{${properties.join(',\n')}};`;
+  }
 }
 
 class PropertyNode {
   key = {} as Node;
   alias?: Node;
   value: Node | null = null;
+  toString() {
+    return ''
+  }
 }
 
-class ArrayNode implements Node {
+class ArrayNode extends Node {
   tag = 'array';
   items: Node[] = [];
 }
 
-class PatternNode implements Node {
+class PatternNode extends Node {
   tag = 'objectPattern' as `${'object' | 'array'}Pattern`;
   keys: string[] = [];
   properties = new Map<string, PropertyNode>();
 }
 
-class LiteralNode implements Node {
+class LiteralNode extends Node {
   tag = 'literal';
   value = '';
+  toString(): string {
+    return `"${this.value}"`;
+  }
 }
 
-class NumberNode implements Node {
+class NumberNode extends Node {
   tag = 'number';
   value = '';
+  toString(): string {
+    return this.value;
+  }
 }
 
-function invalid_expression_keyword(keyword: string) {
-  return /var|let|const|if|else|switch/.test(keyword);
+function statement_keyword(keyword: string) {
+  return /var|let|const|function|async|if|else|switch/.test(keyword);
 }
 
 // const Test = new PropertyMap();
@@ -220,6 +264,7 @@ export default (config: any) => {
     parse: ({
       ctx,
       token,
+      expectedToken,
       next,
       expected,
       eat,
@@ -285,7 +330,7 @@ export default (config: any) => {
               if (token.type === 'identifier') {
                 if (expected('(')) {
                   // identifier()
-                  return this.Expression();
+                  return this.Expression(true);
                 }
                 return createNode(IdentifierNode, { name: token.value })
               } else {
@@ -318,13 +363,16 @@ export default (config: any) => {
 
         Expression(is_group = false): Node {
           log('Expression;m')
-          const node = createNode(ExpressionNode);
+          const node = createNode(ExpressionNode, { group: is_group });
           const curr_ctx = currentContext();
 
           let parsing_expression = true;
+
           let max = 10
 
           while (max > 0 && parsing_expression) {
+
+            console.log('current token', token.type, token.value)
 
             switch (token.type) {
               case 'number':
@@ -350,11 +398,13 @@ export default (config: any) => {
                     node.expression.push(this.Array());
                     break;
                   case '(':
+                    console.log('expression group start');
                     next();
                     node.expression.push(this.Expression(true));
                     break;
                   case ')':
                     if (is_group) {
+                      console.log('expression group end');
                       parsing_expression = false;
                       return node;
                     }
@@ -362,12 +412,17 @@ export default (config: any) => {
                 }
               }
               case 'keyword': {
-                if (Function.has(token.value)) {
-                  node.expression.push(Function.start());
-                  break;
-                }
-                if (invalid_expression_keyword(token.value)) {
-                  // TODO ERROR
+                if (is_group) {
+                  if (Function.has(token.value)) {
+                    node.expression.push(Function.start());
+                    break;
+                  }
+                  if (statement_keyword(token.value)) {
+                    // TODO ERROR
+                    log(`unexpected keyword "${token.value}";r`)
+                    break;
+                  }
+                  node.expression.push(token.value);
                   break;
                 }
                 // node.expression.push()
@@ -375,31 +430,37 @@ export default (config: any) => {
               }
             }
 
-            let next_token = '';
-            const is_separator = expected((token) => {
-              next_token = token.value;
-              return token.eq(/[,;]/);
-            })
+            expected();
 
-            if (is_separator) {
-              switch (next_token) {
-                case ';': {
-                  if (curr_ctx === ctx.expression) {
-                    appendNode(node);
-                  } else {
-                    return node;
-                  }
+            console.log('expected token', expectedToken.value)
+
+            switch (expectedToken.type) {
+              case 'keyword': {
+                if (!is_group && statement_keyword(expectedToken.value)) {
                   return node;
                 }
-                case ',': {
-                  if (!is_group && curr_ctx !== ctx.expression) {
+              }
+              case 'separator': {
+                switch (expectedToken.value) {
+                  case ';': {
+                    if (curr_ctx === ctx.expression) {
+                      appendNode(node);
+                    } else {
+                      return node;
+                    }
                     return node;
+                  }
+                  case ',': {
+                    if (!is_group && curr_ctx !== ctx.expression) {
+                      return node;
+                    }
                   }
                 }
               }
             }
 
-            next()
+            next();
+            console.log('next token', token.value)
             --max;
 
             // next();
@@ -434,7 +495,7 @@ export default (config: any) => {
         Variable({ kind }: Context['Variable']['props'], implicit = false) {
           log('Variable;m', kind + ";c", 'implicit:', implicit)
 
-          const node = createNode(VarNode, { tag: kind });
+          const node = createNode(VarNode, { tag: kind, kind });
           next();
 
           switch (token.type) {
@@ -454,6 +515,7 @@ export default (config: any) => {
             // parse init
             next();
             node.init = this.check_is_expression();
+            console.log(node.init)
           }
 
           appendNode(node)

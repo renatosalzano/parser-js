@@ -22,6 +22,7 @@ export type DebugNext = {
   keyword?: boolean;
   literal?: boolean;
   checkToken?: boolean;
+  expected?: boolean;
 }
 
 class Tokenizer {
@@ -59,6 +60,7 @@ class Tokenizer {
       ctx: this.Context.ctx,
       char: this.char,
       token: this.Token,
+      expectedToken: this.expected_token,
       currentContext: this.Context.get_current,
       isIdentifier: this.is.identifier,
       eachChar: this.each_char,
@@ -153,12 +155,15 @@ class Tokenizer {
     }
   }
 
+  expected_token = {} as Token;
+
   maybe?: TokenType;
   expected?: TokenType | 'token' | 'comment' | 'comment multiline';
   blocking_error = false;
 
   parse: any = {};
   debug: DebugNext = {};
+  command: 'next' | 'expected' = 'next';
 
   check_new_line(debug: DebugNext = {}) {
     if (/[\r\n]/.test(this.char.curr)) {
@@ -175,7 +180,6 @@ class Tokenizer {
       }
 
       this.pos = 1, ++this.line;
-      this.History.push();
       if (debug.newLine) log('Ln:;c', this.line);
     }
   }
@@ -414,28 +418,52 @@ class Tokenizer {
     // this.pos -= len;
   }
 
+  print_token = (debug: 'suppress' | boolean) => {
+    if ((debug || this.debug.token) && debug !== 'suppress') {
 
-  expected_next = (token: string | ((token: Token) => boolean)) => {
+    }
+  }
 
-    this.History.push();
-    const next_token = this.next();
+  expected_next = (comparator?: string | ((token: Token) => boolean), debug = false) => {
+
+    let next_token: Token;
+
+    if (this.History.stashed && this.History.compare(this.History.stashed)) {
+
+      next_token = this.expected_token;
+      if (this.debug.expected || debug) log(this.History.loc(), '(cached);c', this.expected_token.type + ';m', this.expected_token.value);
+    } else {
+
+      next_token = this.next("suppress");
+
+      this.expected_token.value = next_token.value;
+      this.expected_token.type = next_token.type;
+      this.expected_token[next_token.type] = true;
+      if (next_token.name) this.expected_token.name = next_token.name;
+      // cache position next token
+      this.History.stash();
+
+      if (this.debug.expected || debug) log(this.History.loc(), '(cached);c', this.expected_token.type + ';m', this.expected_token.value);
+    }
 
     let expected = false;
-    if (typeof token === 'function') {
-      expected = token(next_token);
-    } else {
-      expected = next_token.value === token || next_token.type === token;
+
+    if (comparator) {
+
+      if (typeof comparator === 'function') {
+        expected = comparator(next_token);
+      } else {
+        expected = next_token.value === comparator || next_token.type === comparator;
+      }
+      if (this.debug.expected || debug) log('expected;y', next_token.type, expected);
     }
-    if (this.debug.token) log('expected;g', next_token.type, expected)
-    this.History.back();
+
     return expected;
   }
 
   stop_immediate = false;
 
-  next = (debug: DebugNext = {}) => {
-
-    this.History.push()
+  next = (debug: boolean | 'suppress' = false) => {
 
     this.Token.value = '';
     delete this.Token.name;
@@ -446,7 +474,29 @@ class Tokenizer {
     this.expected = undefined;
 
     // @ts-ignore
-    var print = () => log(this.History.loc(), this.Token.type.magenta() + (this.Token.name ? ` ${this.Token.name}`.green() : ''), this.Token.value || this.char.curr)
+    var print = () => log(this.History.loc(), this.Token.type.magenta() + (this.Token.name ? ` ${this.Token.name}`.green() : ''), this.Token.value || this.char.curr);
+
+    if (this.History.stashed) {
+
+      try {
+
+        this.expected_token = {} as Token;
+
+        this.History.apply();
+
+        if (debug || this.debug.token) {
+          print()
+        }
+
+        this.History.push();
+
+        return this.Token;
+      } catch (error) {
+        // @ts-ignore
+        console.log(error.red());
+        this.next();
+      }
+    }
 
     while (!this.blocking_error && this.index < this.source.length) {
 
@@ -459,18 +509,18 @@ class Tokenizer {
       }
 
       if (this.stop_immediate) {
-        if (debug.token || this.debug.token) {
+        if ((debug || this.debug.token) && debug !== 'suppress') {
           print()
         }
         this.stop_immediate = false;
         if (this.Token.unknown) {
           log('unexpected token;r')
         }
-        this.History.token();
+        this.History.push();
         return this.Token;
       }
 
-      if (this.check_new_line(debug)) {
+      if (this.check_new_line()) {
         continue;
       }
 
@@ -507,7 +557,7 @@ class Tokenizer {
     }
 
     if (this.index === this.source.length) {
-      this.Token.value = 'end'
+      this.Token.value = 'end';
       return this.Token;
     }
 
@@ -525,20 +575,38 @@ class Tokenizer {
     //   this.next()
     //   --index;
     // }
+    this.debug.token = true;
+    this.debug.expected = true;
 
-    this.next()
-    if (this.Token.value === 'end') {
-      console.log('end source');
-      console.log(this.Program.body)
-      this.end_program = true;
-      return;
-    }
-    const start_context = this.program.get(this.Token.value);
-    if (start_context) {
-      start_context()
-    } else {
-      this.Context.default.start()
-    }
+    this.next();
+
+    this.expected_next();
+    this.expected_next();
+    this.expected_next();
+    this.expected_next();
+
+    console.log(this.expected_token);
+
+    this.next();
+    this.next();
+    this.next();
+    this.next();
+    console.log(this.expected_token);
+
+    // this.next()
+    // if (this.Token.value === 'end') {
+    //   console.log('end source');
+    //   console.log(this.Program.toString())
+    //   this.end_program = true;
+    //   return;
+    // }
+    // log('Program token:;g', this.Token.value);
+    // const start_context = this.program.get(this.Token.value);
+    // if (start_context) {
+    //   start_context()
+    // } else {
+    //   this.Context.default.start()
+    // }
 
   }
 
