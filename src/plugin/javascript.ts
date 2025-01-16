@@ -161,7 +161,7 @@ class FunctionNode implements Node {
 class ExpressionNode implements Node {
   tag = 'expression';
   iife = false;
-  expression: Node[] = [];
+  expression: (Node | string)[] = [];
 }
 
 class ObjectNode implements Node {
@@ -196,12 +196,17 @@ class NumberNode implements Node {
   value = '';
 }
 
+function invalid_expression_keyword(keyword: string) {
+  return /var|let|const|if|else|switch/.test(keyword);
+}
 
 // const Test = new PropertyMap();
 
 // Test.set('test', {})
 
 // console.log(Test)
+
+type ExpressionType = 'unary' | 'binary' | 'ternary' | 'access' | 'call'
 
 export default (config: any) => {
 
@@ -265,84 +270,134 @@ export default (config: any) => {
 
       return ({
 
-        Expression(node?: ExpressionNode): Node {
+        check_is_expression() {
+
+          switch (token.type) {
+            case 'number':
+            case 'literal':
+            case 'identifier': {
+              // current [operator]
+              if (expected('operator')) {
+                return this.Expression();
+              }
+
+              if (token.type === 'identifier') {
+                if (expected('(')) {
+                  // identifier()
+                  return this.Expression();
+                }
+                return createNode(IdentifierNode, { name: token.value })
+              } else {
+                const Node = token.literal ? LiteralNode : NumberNode;
+                return createNode(Node, { value: token.value });
+              }
+            }
+            case 'keyword': {
+              return this.Expression();
+            }
+            case 'operator': {
+              return this.Expression();
+            }
+            case 'bracket': {
+              switch (token.value) {
+                case '{':
+                  return this.Object();
+                case '[':
+                  return this.Array();
+                case '(':
+                  return this.Expression(true);
+              }
+            }
+            case 'separator': {
+              console.log(token)
+              return undefined;
+            }
+          }
+        },
+
+        Expression(group = false): Node {
           log('Expression;m')
-          node ??= createNode(ExpressionNode);
-          const current = currentContext.name;
-          let return_expression = token.type === 'operator' || token.eq('(') || expected('operator');
-          console.log(expected('operator'))
+          const node = createNode(ExpressionNode);
+          const context = currentContext.name;
 
-          if (return_expression) {
-            let parsing_expression = true;
-            // while (parsing_expression) {
+          console.log(context)
+          let parsing_expression = true;
+          let max = 10
 
-            //   switch (token.type) {
+          while (max > 0 && parsing_expression) {
 
-            //   }
+            switch (token.type) {
+              case 'number':
+              case 'literal': {
+                const Node = token.literal ? LiteralNode : NumberNode;
+                node.expression.push(createNode(Node, { value: token.value }));
+                break;
+              }
+              case 'identifier': {
+                node.expression.push(createNode(IdentifierNode, { name: token.value }));
+                break;
+              }
+              case 'operator': {
+                node.expression.push(token.value);
+                break;
+              }
+              case 'bracket': {
+                switch (token.value) {
+                  case '{':
+                    node.expression.push(this.Object());
+                    break;
+                  case '[':
+                    node.expression.push(this.Array());
+                    break;
+                  case '(':
+                    next();
+                    node.expression.push(this.Expression(true));
+                    break;
+                  case ')':
+                    if (group) {
+                      parsing_expression = false;
+                      return node;
+                    }
+                    break;
+                }
+              }
+              case 'keyword': {
+                if (Function.has(token.value)) {
+                  node.expression.push(Function.start());
+                  break;
+                }
+                if (invalid_expression_keyword(token.value)) {
+                  // TODO ERROR
+                  break;
+                }
+                // node.expression.push()
+                break;
+              }
+              case 'separator': {
+                switch (token.value) {
+                  case ';':
+                    parsing_expression = false;
+                    return node;
+                  case ',':
+                    if (group) {
+                      break;
+                    }
+                    parsing_expression = false;
+                    return node;
+                }
+              }
+            }
 
-            // }
+
+
+            next()
+            --max;
+
+            // next();
           }
 
           return node;
 
-          // if (return_expression) {
-          //   switch (token.type) {
-          //     case 'identifier':
-          //     case 'keyword':
-          //     case 'literal':
-          //     case 'number':
-
-          //       return
-          //   }
-
-          // } else {
-          // }
-
-          // return node as Node;
-
-          // switch (token.type) {
-          //   case 'number':
-          //   case 'literal':
-          //   case 'identifier': {
-          //     if ()
-          //   }
-          //   case 'operator':
-          //   case 'bracket':
-
-          //   case 'separator': {
-          //     switch (token.value) {
-          //       case ';':
-          //         return node;
-          //       case ',':
-          //         node = this.Expression(node);
-          //         break;
-          //     }
-          //   }
-          //   // const node = createNode(ExpressionNode);
-          //   // appendNode(node);
-          //   // if (token.eq('(')) {
-          //   //   this.Group();
-          //   // }
-          // }
-
-          // if (current === 'Expression') {
-          //   endContext()
-          // }
-
-          return node as Node;
-        },
-
-        Group() {
-          console.log('expression group');
-          switch (next().type) {
-            case "keyword": {
-              console.log('group keyword')
-              if (Function.has(token.value, true)) {
-                console.log('end function')
-                // unexpected
-              }
-            }
-          }
         },
 
         Block({ node }: Context['Block']['props']) {
@@ -368,6 +423,7 @@ export default (config: any) => {
         },
 
         Variable({ kind }: Context['Variable']['props'], implicit = false) {
+          log('Variable;m')
 
           const node = createNode(VarNode, { tag: kind });
           next();
@@ -387,37 +443,38 @@ export default (config: any) => {
           if (token.eq('=')) {
             // parse init
             next();
-            switch (token.type) {
-              case 'identifier':
-              case 'number':
-              case 'literal':
-                if (expected('operator')) {
-                  console.log(token)
+            node.init = this.check_is_expression();
+            // switch (token.type) {
+            //   case 'identifier':
+            //   case 'number':
+            //   case 'literal':
 
-                  console.log(next())
-                  console.log(next())
-                  node.init = this.Expression();
-                  break;
-                }
-                if (token.identifier) {
-                  node.init = createNode(IdentifierNode, { name: token.value });
-                } else {
-                  node.init = createNode(token.literal ? LiteralNode : NumberNode, { value: token.value })
-                }
-                break;
-              case 'operator':
-                node.init = this.Expression();
-                break;
-              case 'bracket':
-                switch (token.value) {
-                  case "{":
-                  case "[":
-                  case "(":
-                }
-                node.init = this.Object();
-                break;
-            }
+            //     if (expected('operator')) {
+            //       node.init = this.Expression();
+            //       break;
+            //     }
+
+            //     if (token.identifier) {
+            //       node.init = createNode(IdentifierNode, { name: token.value });
+            //     } else {
+            //       node.init = createNode(token.literal ? LiteralNode : NumberNode, { value: token.value })
+            //     }
+            //     break;
+            //   case 'operator':
+            //     node.init = this.Expression();
+            //     break;
+            //   case 'bracket':
+            //     switch (token.value) {
+            //       case "{":
+            //       case "[":
+            //       case "(":
+            //     }
+            //     node.init = this.Object();
+            //     break;
+            // }
           }
+
+          console.log(node.init.expression)
 
           appendNode(node)
 

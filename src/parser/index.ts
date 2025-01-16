@@ -111,8 +111,11 @@ class ParserConfig {
         return check;
       }
 
-      Context.start = function (props: any = {}) {
-        Parser.context.start(name, Object.assign(this.props || {}, props));
+      Context.start = function (props?: any, instruction?: any) {
+        const token = Parser.Token.value;
+        props = props || this.token.get(token)?.props || {};
+
+        return Parser.context.start(name, Object.assign(this.props || {}, props), instruction);
       }
 
       Parser.api[name] = Context;

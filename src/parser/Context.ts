@@ -6,7 +6,7 @@ export type ContextObject = {
   default?: boolean;
   token: Map<string, any>;
   has: (token: string, updateContext?: any) => boolean;
-  start(props?: { [key: string]: any }): void;
+  start(props?: { [key: string]: any }, instruction?: { [key: string]: any }): any;
 }
 
 class Context {
@@ -36,8 +36,12 @@ class Context {
     const prev_context_name = this.buffer.at(-1).name;
 
     log('context', `${prev_context_name} -->;y`, name + ';g', props)
-    this.buffer.push({ name, props })
-    this.current = this.buffer.at(-1);
+    this.buffer.push({ name, props });
+
+    this.current.name = name;
+    this.current.props = props;
+    this.Parser.api.currentContext.name = name;
+    this.Parser.api.currentContext.props = props;
     // if (data.eat) {
     //   this.Parser.eat(data.eat);
     // }

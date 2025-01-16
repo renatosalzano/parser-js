@@ -517,36 +517,26 @@ class Parser {
 
   parse_program() {
 
-    this.debug.token = true;
+    // this.debug.token = true;
 
     // let index = 10
     // while (index > 0) {
     //   this.next()
     //   --index;
     // }
-    this.next()
-    this.next()
-    this.next()
-    this.next()
-    console.log('before expected', this.index, this.Token)
-    this.expected_next('operator');
-    console.log('after expected', this.index, this.Token)
-    this.next();
-    this.next();
-    console.log(this.history.Token)
 
-    // this.next()
-    // if (this.Token.value === 'end') {
-    //   console.log('end source');
-    //   this.end_program = true;
-    //   return;
-    // }
-    // const start_context = this.program.get(this.Token.value);
-    // if (start_context) {
-    //   start_context()
-    // } else {
-    //   this.context.default.start()
-    // }
+    this.next()
+    if (this.Token.value === 'end') {
+      console.log('end source');
+      this.end_program = true;
+      return;
+    }
+    const start_context = this.program.get(this.Token.value);
+    if (start_context) {
+      start_context()
+    } else {
+      this.context.default.start()
+    }
 
   }
 
