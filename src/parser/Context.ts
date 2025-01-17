@@ -2,6 +2,7 @@ import { log } from "utils";
 import Tokenizer from "./Tokenizer";
 
 export type ContextObject = {
+  id: string;
   name: string;
   default?: boolean;
   token: Map<string, any>;
@@ -40,7 +41,7 @@ class Context {
 
     const prev_context_name = this.buffer.at(-1).name;
 
-    log('context', `${prev_context_name} -->;y`, name + ';g', props)
+    log('context:;c', `${prev_context_name} -->`, name + ';g', props)
     this.buffer.push({ name, props });
 
     this.current = { name, props };
@@ -62,7 +63,7 @@ class Context {
     this.current = this.buffer.at(-1);
 
     const ctx_name = this.current.name;
-    log('context', `${ctx_name};g`, `<-- ${prev_context_name};y`);
+    log('context:;c', `${ctx_name};g`, `<-- ${prev_context_name};y`);
     if (ctx_name === 'Program') {
       this.Tokenizer.parse_program();
     } else {
@@ -79,7 +80,7 @@ class Context {
       this.default = context as ContextObject;
     }
 
-    this.ctx[context.name.toLowerCase()] = context.name;
+    this.ctx[context.id] = context.name;
     this.context[context.name] = context;
   }
 }

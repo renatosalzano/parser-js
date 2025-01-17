@@ -61,6 +61,11 @@ class ParserConfig {
         continue;
       }
 
+      if (!Context?.id) {
+        log(`invalid context ${name}: missing "id";r`);
+        continue;
+      }
+
       const key = Context.hasOwnProperty('keyword') ? 'keyword' : 'token';
 
       Context.token = new Map(Object.entries(Context[key]));

@@ -43,8 +43,9 @@ type DefaultApi = {
   char: { curr: string, prev: string, next: string };
   token: Token;
   expectedToken: Token;
-  next(debug?: boolean): { value: string, type: string, name: string };
+  next(debug?: boolean): Token;
   expected(comparator?: string | ((token: Token) => boolean)): boolean;
+  nextLiteral(endToken: string | string[]): Token;
   appendNode: Program['appendNode'];
   createNode: Program['createNode'];
   createRef: Program['createRef'];

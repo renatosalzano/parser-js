@@ -43,6 +43,7 @@ class Tokenizer {
   get_token = create_fast_get('token', 4);
 
   keyword = new Map<string, string>();
+  keyword_type = new Map<string, TokenType>();
   keyword_max_len = 8;
   get_keyword = create_fast_get('keyword', 8);
 
@@ -61,6 +62,7 @@ class Tokenizer {
       char: this.char,
       token: this.Token,
       expectedToken: this.expected_token,
+      nextLiteral: this.next_literal,
       currentContext: this.Context.get_current,
       isIdentifier: this.is.identifier,
       eachChar: this.each_char,
@@ -94,14 +96,15 @@ class Tokenizer {
 
         if (this.is.alpha(token) || type === 'keyword') {
           this.keyword.set(token, t);
-          // this.is.keyword = (_: string) => this.keyword.has(_);
+          this.keyword_type.set(token, type);
+
           if (token.length > this.keyword_max_len) {
             this.keyword_max_len = token.length;
             this.get_keyword = create_fast_get('keyword', token.length);
           }
         } else {
           this.token.set(token, type);
-          // this.is.token = (_: string) => this.token.has(_);
+
           if (token.length > this.token_max_len) {
             this.token_max_len = token.length;
             this.get_token = create_fast_get('token', token.length);
@@ -116,12 +119,7 @@ class Tokenizer {
 
 
   is = {
-    // operator: (_: string) => false,
-    // bracket: (_: string) => false,
-    // separator: (_: string) => false,
-    // token: (_: string) => false,
-    // keyword: (_: string) => false,
-    quote: (char: string) => /['|"|`]/.test(char),
+    quote: (char: string) => /['|"]/.test(char),
     space: (char: string) => /[\s\t]/.test(char),
     nl: (char: string) => /[\r\n]/.test(char),
     identifier: (sequence: string) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(sequence),
@@ -138,11 +136,7 @@ class Tokenizer {
   pos = 1;
 
   index = 0;
-  char = {
-    curr: '',
-    prev: '',
-    next: ''
-  }
+  char = { curr: '', prev: '', next: '' };
 
   Token: Token = {
     value: '',
@@ -155,10 +149,43 @@ class Tokenizer {
     }
   }
 
+  set_token_type = (type?: TokenType) => {
+    if (type) {
+      switch (type) {
+        case 'keyword': {
+          type = this.keyword_type.get(this.Token.value) || 'keyword';
+
+          this.Token.type = type;
+          this.Token[type] = true;
+          this.Token.name = this.keyword.get(this.Token.value) || '';
+
+          break;
+        }
+        case 'bracket':
+        case 'separator':
+        case 'operator': {
+          this.Token.type = type;
+          this.Token[type] = true;
+          this.Token.name = this[type].get(this.Token.value) || '';
+          break;
+        }
+        default: {
+          this.Token.type = type;
+          this.Token[type] = true;
+        }
+      }
+    } else {
+      delete this.Token.name;
+      delete this.Token[this.Token.type];
+      this.Token.type = 'unknown';
+    }
+  }
+
   expected_token = {} as Token;
 
   maybe?: TokenType;
   expected?: TokenType | 'token' | 'comment' | 'comment multiline';
+  forced_expected?: TokenType;
   blocking_error = false;
 
   parse: any = {};
@@ -210,24 +237,32 @@ class Tokenizer {
         break;
       }
       case this.is.quote(this.char.curr): {
-        this.Token.type = 'literal';
-        this.Token['literal'] = true;
+        this.set_token_type('literal');
         this.expected = 'literal';
         break;
       }
       case this.is.number(this.char.curr): {
-        this.Token.type = 'number';
-        this.Token['number'] = true;
+        this.set_token_type('number');
         this.expected = 'number';
         break;
       }
       case this.is.identifier(this.char.curr): {
+
+        if (/[_$]/.test(this.char.curr)) {
+          // when char is $ | '_'
+          const possibly_token = this.get_token(this);
+          if (possibly_token) {
+            if (!this.is.identifier(possibly_token)) {
+              this.expected = 'token';
+              break;
+            }
+          }
+        }
+
         if (this.is.alpha(this.char.curr)) {
-          this.Token.type = 'identifier';
           this.maybe = 'keyword';
         } else {
-          this.Token.type = 'identifier';
-          this.Token['identifier'] = true;
+          this.set_token_type('identifier');
           this.expected = 'identifier';
         }
         break;
@@ -256,24 +291,65 @@ class Tokenizer {
     }
   }
 
-  end_quote = '';
+  next_literal = (end_token: string | string[]) => {
+    if (end_token) {
+      this.set_token_type();
+      this.forced_expected = 'literal';
+      this.set_token_type('literal');
+
+      if (typeof end_token === 'string') {
+        this.end_token = [end_token];
+      } else {
+        this.end_token = end_token;
+      }
+
+      let token_len = 1;
+      for (const token of this.end_token) {
+        if (!this.token.has(token)) {
+          log(`invalid token "${token}";r`);
+        } else {
+          token_len = Math.max(token_len, token.length);
+        }
+      }
+      this.get_token_in_literal = create_fast_get('token', token_len);
+      const token = this.next();
+
+      this.forced_expected = undefined;
+      this.get_token_in_literal = undefined;
+      return token;
+    } else {
+      'Endtoken;r'
+    }
+  }
+
+  end_token?: string[];
+  get_token_in_literal?: Function;
   parse_literal() {
 
     if (this.expected === 'literal') {
 
-      if (!this.end_quote) {
-        this.end_quote = this.char.curr;
+      if (!this.end_token) {
+        // "regular string" '' | ""
+        this.end_token = [this.char.curr];
         this.Token.value += this.char.curr;
         ++this.index, ++this.pos;
         return true;
       }
 
+      const token = this.get_token_in_literal
+        ? this.get_token_in_literal(this)
+        : undefined;
+
       switch (true) {
-        case (this.char.curr !== this.end_quote):
+        case (token !== undefined): {
+          this.stop_immediate = true;
+          break;
+        }
+        case (this.char.curr !== this.end_token[0]):
           return false;
-        case (`${this.char.prev}${this.char.curr}` !== `\\${this.end_quote}`): {
-          // end parsing string
-          this.end_quote = '';
+        case (`${this.char.prev}${this.char.curr}` !== `\\${this.end_token[0]}`): {
+          // end parsing "regular string"
+          this.end_token = undefined;
           this.stop_immediate = true;
           this.Token.value += this.char.curr;
           this.Token.value = this.Token.value.slice(1, -1);
@@ -341,9 +417,8 @@ class Tokenizer {
         }
 
         this.Token.value = token;
-        this.Token.type = token_type;
-        this.Token[token_type] = true;
-        this.Token.name = this[token_type].get(token) || '';
+        this.set_token_type(token_type)
+
         this.stop_immediate = true;
         return true;
       } else {
@@ -371,16 +446,13 @@ class Tokenizer {
 
       const next_char = this.source[this.index];
       if (this.is.identifier(keyword + next_char)) {
-        this.Token.type = 'identifier';
-        this.Token['identifier'] = true;
+        this.set_token_type('identifier');
         this.expected = 'identifier';
         this.maybe = undefined;
         return true;
       }
 
-      this.Token.type = 'keyword';
-      this.Token['keyword'] = true;
-      this.Token.name = this.keyword.get(keyword) || '';
+      this.set_token_type('keyword');
       this.stop_immediate = true;
       return true;
     }
@@ -397,6 +469,7 @@ class Tokenizer {
         return true;
       } else {
         // end identifier
+        this.set_token_type('identifier');
         this.stop_immediate = true;
         return true
       }
@@ -405,7 +478,7 @@ class Tokenizer {
   }
 
 
-  eat = (sequence: string, breakReg?: RegExp) => {
+  eat = (from: string, to?: string, config?: any) => {
 
     // if (sequence !== this.next(breakReg)) {
     //   this.prev();
@@ -418,23 +491,21 @@ class Tokenizer {
     // this.pos -= len;
   }
 
-  print_token = (debug: 'suppress' | boolean) => {
-    if ((debug || this.debug.token) && debug !== 'suppress') {
-
-    }
-  }
-
   expected_next = (comparator?: string | ((token: Token) => boolean), debug = false) => {
 
-    let next_token: Token;
+    const print = () => {
+      if (this.debug.expected || debug) {
+        log(this.History.loc(), '(cached);c', this.expected_token.type + ';m', this.expected_token.value);
+      }
+    }
 
     if (this.History.stashed && this.History.compare(this.History.stashed)) {
 
-      next_token = this.expected_token;
-      if (this.debug.expected || debug) log(this.History.loc(), '(cached);c', this.expected_token.type + ';m', this.expected_token.value);
+      print();
+
     } else {
 
-      next_token = this.next("suppress");
+      const next_token = this.next("suppress");
 
       this.expected_token.value = next_token.value;
       this.expected_token.type = next_token.type;
@@ -443,7 +514,7 @@ class Tokenizer {
       // cache position next token
       this.History.stash();
 
-      if (this.debug.expected || debug) log(this.History.loc(), '(cached);c', this.expected_token.type + ';m', this.expected_token.value);
+      print();
     }
 
     let expected = false;
@@ -451,11 +522,18 @@ class Tokenizer {
     if (comparator) {
 
       if (typeof comparator === 'function') {
-        expected = comparator(next_token);
+        expected = comparator(this.expected_token);
+
+        if (this.debug.expected || debug) {
+          log('expected test:;c', this.expected_token.value, this.expected_token.type, '=>;m', expected);
+        }
       } else {
-        expected = next_token.value === comparator || next_token.type === comparator;
+        expected = this.expected_token.value === comparator || this.expected_token.type === comparator;
+
+        if (this.debug.expected || debug) {
+          log('expected test:;c', comparator, 'eq;m', this.expected_token.value, '|;m', this.expected_token.type, expected);
+        }
       }
-      if (this.debug.expected || debug) log('expected;y', next_token.type, expected);
     }
 
     return expected;
@@ -466,15 +544,24 @@ class Tokenizer {
   next = (debug: boolean | 'suppress' = false) => {
 
     this.Token.value = '';
-    delete this.Token.name;
-    delete this.Token[this.Token.type];
-    this.Token.type = 'unknown';
 
-    this.maybe = undefined;
-    this.expected = undefined;
+    if (!this.forced_expected) {
 
-    // @ts-ignore
-    var print = () => log(this.History.loc(), this.Token.type.magenta() + (this.Token.name ? ` ${this.Token.name}`.green() : ''), this.Token.value || this.char.curr);
+      this.set_token_type();
+      this.maybe = undefined;
+      this.expected = undefined;
+    } else {
+
+      this.expected = this.forced_expected;
+    }
+
+
+    const print = () => {
+      if (this.debug.token || debug) {
+        // @ts-ignore
+        log(this.History.loc(), this.Token.type.magenta() + (this.Token.name ? ` ${this.Token.name}`.green() : ''), this.Token.value || this.char.curr)
+      }
+    }
 
     if (this.History.stashed) {
 
@@ -484,9 +571,7 @@ class Tokenizer {
 
         this.History.apply();
 
-        if (debug || this.debug.token) {
-          print()
-        }
+        print();
 
         this.History.push();
 
@@ -509,14 +594,16 @@ class Tokenizer {
       }
 
       if (this.stop_immediate) {
-        if ((debug || this.debug.token) && debug !== 'suppress') {
-          print()
-        }
+
+        print();
+
         this.stop_immediate = false;
+
         if (this.Token.unknown) {
           log('unexpected token;r')
         }
         this.History.push();
+
         return this.Token;
       }
 
@@ -579,19 +666,20 @@ class Tokenizer {
     this.debug.expected = true;
 
     this.next();
+    this.next();
+    this.next();
+    this.next();
+    this.next();
+    this.next();
+    this.next();
+    this.next();
+    this.program.get(this.Token.value)();
+    this.next();
+    this.next();
+    this.next();
+    this.next();
+    this.program.get(this.Token.value)();
 
-    this.expected_next();
-    this.expected_next();
-    this.expected_next();
-    this.expected_next();
-
-    console.log(this.expected_token);
-
-    this.next();
-    this.next();
-    this.next();
-    this.next();
-    console.log(this.expected_token);
 
     // this.next()
     // if (this.Token.value === 'end') {
