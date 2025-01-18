@@ -4,7 +4,7 @@ import History from "./History";
 import Program from "./Progam";
 import { create_fast_get } from "./utils";
 
-export type TokenType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number';
+export type TokenType = 'unknown' | 'end' | 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number';
 export type Token = {
   value: string;
   type: TokenType;
@@ -57,10 +57,11 @@ class Tokenizer {
     this.Context = new Context(this);
     this.Program = new Program(this);
 
-    this.api = {
+    const Tokenizer = this;
+    this.api = new Proxy({
       char: this.char,
       token: this.Token,
-      expectedToken: this.expected_token,
+      expectedToken: this.next_token,
       nextLiteral: this.next_literal,
       currentContext: this.Context.get_current,
       isIdentifier: this.is.identifier,
@@ -75,7 +76,21 @@ class Tokenizer {
       expected: this.expected_next,
       eat: this.eat,
       error: this.error
-    }
+    }, {
+      get(api, p) {
+        if (p === 'expectedToken') {
+          log('getted', api[p])
+        }
+        return Reflect.get(api, p)
+      },
+      set(api, p, v) {
+        return Reflect.set(api, p, v)
+      }
+    })
+
+
+    this.api.char
+
   }
 
   async Parse(source: string) {
@@ -148,6 +163,8 @@ class Tokenizer {
     }
   }
 
+  next_token: Partial<Token> = {};
+
   set_token_type = (type?: TokenType) => {
     if (type) {
       switch (type) {
@@ -179,8 +196,6 @@ class Tokenizer {
       this.Token.type = 'unknown';
     }
   }
-
-  expected_token = {} as Token;
 
   maybe?: TokenType;
   expected?: TokenType | 'token' | 'comment' | 'comment multiline';
@@ -490,11 +505,11 @@ class Tokenizer {
     // this.pos -= len;
   }
 
-  expected_next = (comparator?: string | ((token: Token) => boolean), debug = false) => {
+  expected_next = (comparator?: string | ((token: Partial<Token>) => boolean), debug = false) => {
 
     const print = (message = '(cached);c') => {
       if (this.debug.expected || debug) {
-        log(this.History.loc(), message, this.expected_token.type + ';m', this.expected_token.value);
+        log(this.History.loc(), message, this.next_token.type + ';m', this.next_token.value);
       }
     }
 
@@ -506,14 +521,12 @@ class Tokenizer {
 
       const { value, type, name } = this.next("suppress");
 
-      this.expected_token.value = value;
-      this.expected_token.type = type;
-      this.expected_token[type] = true;
-      if (name) this.expected_token.name = name;
-      // cache position next token
+      this.next_token.value = value;
+      this.next_token.type = type;
+      this.next_token[type] = true;
+      if (name) this.next_token.name = name;
+      // cache next token
       this.History.stash();
-
-      console.log('after stash', this.expected_token)
 
       print('(cache);g',);
     }
@@ -523,16 +536,16 @@ class Tokenizer {
     if (comparator) {
 
       if (typeof comparator === 'function') {
-        expected = comparator(this.expected_token);
+        expected = comparator(this.next_token);
 
         if (this.debug.expected || debug) {
-          log('expected test:;c', this.expected_token.value, this.expected_token.type, '=>;m', expected);
+          log('expected test:;c', this.next_token.value, this.next_token.type, '=>;m', expected);
         }
       } else {
-        expected = this.expected_token.value === comparator || this.expected_token.type === comparator;
+        expected = this.next_token.value === comparator || this.next_token.type === comparator;
 
         if (this.debug.expected || debug) {
-          log('expected test:;c', comparator, 'eq;m', this.expected_token.value, '|;m', this.expected_token.type, expected);
+          log('expected test:;c', comparator, 'eq;m', this.next_token.value, '|;m', this.next_token.type, expected);
         }
       }
     }
@@ -567,8 +580,6 @@ class Tokenizer {
     if (this.History.stashed) {
 
       try {
-
-        this.expected_token = {} as Token;
 
         this.History.apply();
 
@@ -645,7 +656,10 @@ class Tokenizer {
     }
 
     if (this.index === this.source.length) {
-      this.Token.value = 'end';
+      this.Token.value = 'source end';
+      this.Token.type = 'end';
+      this.end_program = true;
+      log('END SOURCE;y')
       return this.Token;
     }
 
@@ -654,9 +668,10 @@ class Tokenizer {
 
   end_program = false;
 
-  parse_program() {
+  parse_program = () => {
 
-    this.debug.token = true;
+    // this.debug.expected = true
+
 
     // let index = 10
     // while (index > 0) {
@@ -666,13 +681,13 @@ class Tokenizer {
     // this.debug.token = true;
     // this.debug.expected = true;
 
-    this.next()
-    if (this.Token.value === 'end') {
-      console.log('end source');
+    if (this.end_program) {
+      log('PORCO DIO E FINITO;r')
       console.log(this.Program.toString())
-      this.end_program = true;
       return;
     }
+
+    this.next()
     log('Program token:;g', this.Token.value);
     const start_context = this.program.get(this.Token.value);
     if (start_context) {

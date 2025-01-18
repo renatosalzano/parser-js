@@ -86,13 +86,12 @@ class History {
     this.Parser.Token.type = type;
     this.Parser.Token[type] = true;
 
-    const _type = this.Parser.expected_token.type;
-    delete this.Parser.expected_token.name;
-    // @ts-ignore
-    delete this.Parser.expected_token.type;
-    delete this.Parser.expected_token[_type];
-    delete this.Parser.expected_token.name;
-    console.log('apply', this.Parser.expected_token)
+    // clean cached token
+    const Type = this.Parser.next_token.type!;
+    delete this.Parser.next_token.value;
+    delete this.Parser.next_token.type;
+    delete this.Parser.next_token[Type];
+    delete this.Parser.next_token.name;
 
     if (name) this.Parser.Token.name = name;
   }

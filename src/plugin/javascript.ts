@@ -203,12 +203,13 @@ class ObjectExpression extends Node {
   type: 'expression' | 'pattern' = 'expression';
   properties = new Map<string, PropertyNode>();
   toString() {
+
     const properties: string[] = [];
-    for (const prop of this.properties) {
+    for (const [, prop] of this.properties) {
       properties.push(prop.toString())
     }
 
-    return `{${properties.join(',\n')}};`;
+    return `{${properties.join(',\n')}}`;
   }
 }
 
@@ -217,7 +218,11 @@ class PropertyNode {
   alias?: Node;
   value: Node | null = null;
   toString() {
-    return ''
+    const key = this.key.toString();
+    if (this.value) {
+      return `${key}: ${this.value.toString()}`
+    }
+    return key
   }
 }
 
@@ -343,9 +348,6 @@ export default (config: any) => {
             case 'identifier': {
               // current [operator]
               if (expected('operator')) {
-                console.log('current token', token)
-                console.log('after expected', expectedToken);
-                expected((token) => (console.log('current expected', token), true))
                 return this.Expression();
               }
 
@@ -381,9 +383,10 @@ export default (config: any) => {
             case 'unknown':
             case 'separator': {
               // TODO
-              console.log(token)
               return createNode(Unexpected);
             }
+            case 'end':
+
           }
         },
 
@@ -400,7 +403,7 @@ export default (config: any) => {
 
           while (max > 0 && parsing_expression) {
 
-            console.log('current token', token.type, token.value)
+            log('current token;c', token.value)
 
             switch (token.type) {
               case 'number':
@@ -465,7 +468,7 @@ export default (config: any) => {
 
             expected();
 
-            console.log('expected token', expectedToken)
+            log('expected token;c', expectedToken.value)
 
             switch (expectedToken.type) {
               case 'keyword': {
@@ -486,6 +489,7 @@ export default (config: any) => {
                   }
                   case ',': {
                     if (!is_group && curr_ctx.name !== 'Expression') {
+                      log('Expression end;m')
                       return node;
                     }
                   }
@@ -494,7 +498,6 @@ export default (config: any) => {
             }
 
             next();
-            console.log('next token', token.value)
             --max;
 
             // next();
@@ -559,6 +562,7 @@ export default (config: any) => {
             next();
             next(); // over "="
             node.init = this.parse_expression();
+            log('parsed init;y')
           }
 
           if (expected((token) => /[,;]/.test(token.value))) {
@@ -571,7 +575,7 @@ export default (config: any) => {
 
           appendNode(node);
           endContext();
-
+          // log('Variable end;m')
         },
 
         VariableId() { },
@@ -736,6 +740,7 @@ export default (config: any) => {
           // return;
           while (parsing_object) {
             next();
+            log('current token:;c', token.value)
 
             if (!key) {
               switch (token.type) {
@@ -751,7 +756,12 @@ export default (config: any) => {
                   continue;
                 case 'bracket': {
                   // TODO COMPUTED KEY
-                  break;
+                  switch (token.value) {
+                    case '[':
+                      console.log('object end here')
+                      continue;
+                  }
+
                 }
                 default: {
                   // unexpected token here
@@ -779,6 +789,7 @@ export default (config: any) => {
                   continue;
                 }
                 case ',':
+                  log('new property:;y', key[0])
                   const propertyNode = createNode(PropertyNode, {
                     key: key[1],
                     value,
@@ -803,21 +814,24 @@ export default (config: any) => {
             if (key && expected_value) {
               log('expected value;y')
               // { key: here
-              value = this.parse_expression();
-              log(value)
+              value = this.parse_expression()!;
               continue;
             }
 
             if (token.eq('}')) {
 
               if (key) {
+                log('new property;y')
                 const propertyNode = createNode(PropertyNode, {
                   key: key[1],
                   value,
                 })
                 node.properties.set(key[0], propertyNode)
-
               }
+
+              next(); // over '{'
+
+              log('Object end;m', node.properties)
 
               parsing_object = false;
               return node;
@@ -903,7 +917,7 @@ export default (config: any) => {
 
             next() // over ${
 
-            node.expression.push(this.parse_expression());
+            node.expression.push(this.parse_expression()!);
 
             --loop;
           }

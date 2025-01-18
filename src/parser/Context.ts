@@ -57,8 +57,11 @@ class Context {
 
   end = () => {
 
-    if (this.Tokenizer.end_program || this.buffer.length === 1) {
-      log('unexpected end context;r')
+    log('end context')
+
+    if (this.Tokenizer.end_program) {
+      log('end program;r');
+      this.Tokenizer.parse_program();
       return;
     }
 
@@ -67,7 +70,9 @@ class Context {
     this.current = this.buffer.at(-1);
 
     const ctx_name = this.current.name;
+
     log('context:;c', `${ctx_name};g`, `<-- ${prev_context_name};y`);
+    console.log('end at this token', this.Tokenizer.Token.value)
     if (ctx_name === 'Program') {
       this.Tokenizer.parse_program();
     } else {
