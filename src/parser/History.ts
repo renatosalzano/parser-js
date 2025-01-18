@@ -85,6 +85,15 @@ class History {
     this.Parser.Token.value = value;
     this.Parser.Token.type = type;
     this.Parser.Token[type] = true;
+
+    const _type = this.Parser.expected_token.type;
+    delete this.Parser.expected_token.name;
+    // @ts-ignore
+    delete this.Parser.expected_token.type;
+    delete this.Parser.expected_token[_type];
+    delete this.Parser.expected_token.name;
+    console.log('apply', this.Parser.expected_token)
+
     if (name) this.Parser.Token.name = name;
   }
 
@@ -127,6 +136,18 @@ class History {
     this.Parser.Token[type] = true;
     if (name) this.Parser.Token.name = name;
 
+  }
+
+  Location = () => {
+    const [, , pos] = this.history.at(-1) || this.current;
+    const { line, Token, char } = this.Parser;
+    const offset = (Token.value || char.curr).length;
+
+    return {
+      Line: line,
+      start: pos,
+      end: pos + offset
+    }
   }
 
   loc = (error = false) => {

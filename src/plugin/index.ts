@@ -1,6 +1,7 @@
 import { Token, TokenType } from "parser/Tokenizer";
 import Program from "parser/Progam";
 import { log } from "utils";
+import { ContextObject } from "parser/Context";
 
 type Brackets =
   | 'L'
@@ -9,16 +10,6 @@ type Brackets =
   | 'squareR'
   | 'curlyL'
   | 'curlyR'
-
-type ContextObject = {
-  props?: { [key: string]: any };
-  token: {
-    [key: string]: { hoisting?: boolean, eat?: string, props?: { [key: string]: any } } | null;
-  },
-  keyword: {
-    [key: string]: { hoisting?: boolean, eat?: string, props?: { [key: string]: any } } | null;
-  }
-}
 
 // type Context<T extends { [key: string]: ContextObject<any> } = { [key: string]: ContextObject<any> }> = {
 //   [K in keyof T]: T[K] & ContextObject<T[K]>
@@ -39,7 +30,6 @@ type ParserApi<T, A> = {
 }
 
 type DefaultApi = {
-  ctx: { [key: string]: string };
   char: { curr: string, prev: string, next: string };
   token: Token;
   expectedToken: Token;
@@ -51,11 +41,11 @@ type DefaultApi = {
   createRef: Program['createRef'];
   logNode: Program['log'];
   eat(sequence: string, breakReg?: RegExp): void;
-  startContext(context: string): void;
+  startContext(context: string, props?: ContextObject['props'], instruction?: { [key: string]: any }): void;
   endContext(): void;
   error(message: string): void;
   isIdentifier(value: string): boolean;
-  currentContext(): string;
+  currentContext(): ContextObject;
 }
 
 

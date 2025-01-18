@@ -58,7 +58,6 @@ class Tokenizer {
     this.Program = new Program(this);
 
     this.api = {
-      ctx: this.Context.ctx,
       char: this.char,
       token: this.Token,
       expectedToken: this.expected_token,
@@ -493,9 +492,9 @@ class Tokenizer {
 
   expected_next = (comparator?: string | ((token: Token) => boolean), debug = false) => {
 
-    const print = () => {
+    const print = (message = '(cached);c') => {
       if (this.debug.expected || debug) {
-        log(this.History.loc(), '(cached);c', this.expected_token.type + ';m', this.expected_token.value);
+        log(this.History.loc(), message, this.expected_token.type + ';m', this.expected_token.value);
       }
     }
 
@@ -505,16 +504,18 @@ class Tokenizer {
 
     } else {
 
-      const next_token = this.next("suppress");
+      const { value, type, name } = this.next("suppress");
 
-      this.expected_token.value = next_token.value;
-      this.expected_token.type = next_token.type;
-      this.expected_token[next_token.type] = true;
-      if (next_token.name) this.expected_token.name = next_token.name;
+      this.expected_token.value = value;
+      this.expected_token.type = type;
+      this.expected_token[type] = true;
+      if (name) this.expected_token.name = name;
       // cache position next token
       this.History.stash();
 
-      print();
+      console.log('after stash', this.expected_token)
+
+      print('(cache);g',);
     }
 
     let expected = false;
@@ -557,7 +558,7 @@ class Tokenizer {
 
 
     const print = () => {
-      if (this.debug.token || debug) {
+      if ((this.debug.token || debug) && debug !== 'suppress') {
         // @ts-ignore
         log(this.History.loc(), this.Token.type.magenta() + (this.Token.name ? ` ${this.Token.name}`.green() : ''), this.Token.value || this.char.curr)
       }
@@ -655,46 +656,30 @@ class Tokenizer {
 
   parse_program() {
 
-    // this.debug.token = true;
+    this.debug.token = true;
 
     // let index = 10
     // while (index > 0) {
     //   this.next()
     //   --index;
     // }
-    this.debug.token = true;
-    this.debug.expected = true;
+    // this.debug.token = true;
+    // this.debug.expected = true;
 
-    this.next();
-    this.next();
-    this.next();
-    this.next();
-    this.next();
-    this.next();
-    this.next();
-    this.next();
-    this.program.get(this.Token.value)();
-    this.next();
-    this.next();
-    this.next();
-    this.next();
-    this.program.get(this.Token.value)();
-
-
-    // this.next()
-    // if (this.Token.value === 'end') {
-    //   console.log('end source');
-    //   console.log(this.Program.toString())
-    //   this.end_program = true;
-    //   return;
-    // }
-    // log('Program token:;g', this.Token.value);
-    // const start_context = this.program.get(this.Token.value);
-    // if (start_context) {
-    //   start_context()
-    // } else {
-    //   this.Context.default.start()
-    // }
+    this.next()
+    if (this.Token.value === 'end') {
+      console.log('end source');
+      console.log(this.Program.toString())
+      this.end_program = true;
+      return;
+    }
+    log('Program token:;g', this.Token.value);
+    const start_context = this.program.get(this.Token.value);
+    if (start_context) {
+      start_context()
+    } else {
+      this.Context.default.start()
+    }
 
   }
 
