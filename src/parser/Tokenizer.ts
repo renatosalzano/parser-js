@@ -4,7 +4,7 @@ import History from "./History";
 import Program from "./Progam";
 import { create_fast_get } from "./utils";
 
-export type TokenType = 'unknown' | 'end' | 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number';
+export type TokenType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number';
 export type Token = {
   value: string;
   type: TokenType;
@@ -25,6 +25,11 @@ export type DebugNext = {
   expected?: boolean;
 }
 
+export type Error = {
+  message: string;
+  type: 'error' | 'warn' | 'info'
+}
+
 class Tokenizer {
 
   source = '';
@@ -34,7 +39,7 @@ class Tokenizer {
   Program: Program;
   History = new History(this);
 
-  api: any = {};
+  api: any = {}
 
   program = new Map<string, Function>()
 
@@ -57,8 +62,8 @@ class Tokenizer {
     this.Context = new Context(this);
     this.Program = new Program(this);
 
-    const Tokenizer = this;
     this.api = new Proxy({
+      ctx: this.Context.context,
       char: this.char,
       token: this.Token,
       expectedToken: this.next_token,
@@ -209,7 +214,7 @@ class Tokenizer {
   check_new_line(debug: DebugNext = {}) {
     if (/[\r\n]/.test(this.char.curr)) {
       if (this.char.curr === '\r') {
-        // if is windows eat \r and go to the next char
+        // eat \r and go to the next char
         this.index += 1
         return true;
       }
@@ -656,11 +661,7 @@ class Tokenizer {
     }
 
     if (this.index === this.source.length) {
-      this.Token.value = 'source end';
-      this.Token.type = 'end';
-      this.end_program = true;
-      log('END SOURCE;y')
-      return this.Token;
+      throw { message: 'end source', type: 'warn' };
     }
 
     return this.Token;
@@ -669,6 +670,35 @@ class Tokenizer {
   end_program = false;
 
   parse_program = () => {
+
+    try {
+
+      this.next()
+      log('Program token:;g', this.Token.value);
+      const start_context = this.program.get(this.Token.value);
+      if (start_context) {
+        start_context()
+      } else {
+        this.Context.default.start()
+      }
+
+    } catch (error: any) {
+
+      if (error.type && error.message) {
+        switch (error.type) {
+          case 'error':
+            log(`Error: ${error.message}\n    at ${this.line}:${this.pos};r`)
+            break;
+          case 'warn':
+            log(`Warning: ${error.message}\n    at ${this.line}:${this.pos};y`)
+            break;
+          case 'info':
+            console.log(`${error.message}\n    at ${this.line}:${this.pos}`)
+            break;
+        }
+      }
+
+    }
 
     // this.debug.expected = true
 
@@ -681,25 +711,12 @@ class Tokenizer {
     // this.debug.token = true;
     // this.debug.expected = true;
 
-    if (this.end_program) {
-      log('PORCO DIO E FINITO;r')
-      console.log(this.Program.toString())
-      return;
-    }
 
-    this.next()
-    log('Program token:;g', this.Token.value);
-    const start_context = this.program.get(this.Token.value);
-    if (start_context) {
-      start_context()
-    } else {
-      this.Context.default.start()
-    }
 
   }
 
-  error = (message: string) => {
-    log('ERROR;R', `${message} at ${this.line}:${this.pos}`);
+  error = (message: string, type: 'error' | 'warn' | 'info' = 'error') => {
+    throw { message, type };
   }
 
   each_char = (callback: (char: string, sequence: string) => boolean | undefined) => {

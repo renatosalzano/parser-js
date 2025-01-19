@@ -154,7 +154,7 @@ class Context {
             instruction = instruction_override;
           }
 
-          Tokenizer.Context.start(name, Object.assign(Context.props || {}, props), instruction);
+          Tokenizer.Context.start(name, Object.assign(this.props || {}, props), instruction);
         }
 
         return check;
@@ -190,8 +190,6 @@ class Context {
           }
         }
       }
-
-      Tokenizer.api[name] = Context;
 
       if (program_ctx.has(name)) {
         for (const [lexical] of Context.token) {

@@ -1,5 +1,6 @@
+import { log } from "utils";
 import Context from "./Context";
-import Parser from "./Tokenizer";
+import Tokenizer from "./Tokenizer";
 
 interface Constructor<T> {
   new(...args: any): T
@@ -13,7 +14,6 @@ interface Constructor<T> {
 // }
 
 class Node {
-  tag: string = '';
   id?: string | Node;
 
   toString() {
@@ -21,8 +21,7 @@ class Node {
   }
 }
 
-class IdentifierNode {
-  tag = 'identifier';
+class Identifier {
   name = '';
   reference?: Node;
 
@@ -50,7 +49,7 @@ class ReferenceTree {
     }
   }
 
-  get = (node: IdentifierNode) => {
+  get = (node: Identifier) => {
     if (node.name) {
       const scope = this.scope.at(-1) || this.Program;
       const reference_node = scope.get(node.name);
@@ -61,12 +60,17 @@ class ReferenceTree {
   }
 }
 
-class BlockNode {
+class Block extends Node {
   tag = 'block';
+  functionBody = false;
   body: Node[] = [];
   appendNode(node: Node) {
     this.body.push(node);
   }
+}
+
+class Unexpected extends Node {
+
 }
 
 class Program {
@@ -74,21 +78,21 @@ class Program {
   private blocks: Node[] = []
   private reference = new ReferenceTree();
 
-  constructor(private Parser: Parser) {
-
+  constructor(private Tokenizer: Tokenizer) {
   }
 
   createNode = <T>(NodeConstructor: Constructor<T>, init = {} as { [K in keyof T]?: T[K] }) => {
+
     const node = new NodeConstructor() as Node;
 
-    if (node instanceof BlockNode) {
+    if (node instanceof Block) {
       this.reference.scope.push(new Map());
       this.blocks.push(node);
     } else {
       Object.assign(node, init);
     }
 
-    if (node instanceof IdentifierNode) {
+    if (node instanceof Identifier) {
       const ref = this.reference.get(node)
       if (ref) {
         node.reference = ref;
@@ -106,7 +110,7 @@ class Program {
     this.reference.set(node);
   }
 
-  getReference = (node: IdentifierNode) => {
+  getReference = (node: Identifier) => {
     this.reference.get(node)
   }
 
@@ -131,5 +135,5 @@ class Program {
   }
 }
 
-export { Node, BlockNode, IdentifierNode }
+export { Node, Block, Identifier }
 export default Program

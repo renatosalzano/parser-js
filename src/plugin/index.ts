@@ -1,4 +1,4 @@
-import { Token, TokenType } from "parser/Tokenizer";
+import { Error, Token, TokenType } from "parser/Tokenizer";
 import Program from "parser/Progam";
 import { log } from "utils";
 import { ContextObject } from "parser/Context";
@@ -30,6 +30,7 @@ type ParserApi<T, A> = {
 }
 
 type DefaultApi = {
+  ctx: { [key: string]: ContextObject };
   char: { curr: string, prev: string, next: string };
   token: Token;
   expectedToken: Token;
@@ -43,7 +44,7 @@ type DefaultApi = {
   eat(sequence: string, breakReg?: RegExp): void;
   startContext(context: string, props?: ContextObject['props'], instruction?: { [key: string]: any }): void;
   endContext(): void;
-  error(message: string): void;
+  error(message: string, type?: 'error' | 'warn' | 'info'): void;
   isIdentifier(value: string): boolean;
   currentContext(): ContextObject;
 }
