@@ -435,7 +435,6 @@ export default (config: any) => {
             if (!expected('=')) {
 
               error(errors.variable.expected_init);
-              // blocking error
             }
           }
 
@@ -450,6 +449,8 @@ export default (config: any) => {
             this.VariableInit(node);
           }
 
+          appendNode(node);
+
           if (expected((token) => /[,;]/.test(token.value))) {
 
             next();
@@ -463,9 +464,9 @@ export default (config: any) => {
             }
           }
 
-          appendNode(node);
+
           endContext();
-          log('Variable end;m')
+          log('Variable end;m', node.toString())
         },
 
         VariableId(node: Variable) {
@@ -484,7 +485,7 @@ export default (config: any) => {
                   node.id = this.Array();
                   break;
                 default:
-                  error(`Unexpected token: '${token.value}'`);
+                  error(`unexpected token '${token.value}'`);
                   break;
               }
               break;
@@ -569,6 +570,7 @@ export default (config: any) => {
 
           let parsing_object = true;
           // return;
+          // TODO SPLIT OBJECT PARSER
           while (parsing_object) {
             next();
             log('current token:;c', token.value)
@@ -662,7 +664,7 @@ export default (config: any) => {
 
               next(); // over '{'
 
-              log('Object end;m', node.properties)
+              log('Object end;m')
 
               parsing_object = false;
               return node;

@@ -77,6 +77,7 @@ class Program {
   body: Node[] = [];
   private blocks: Node[] = []
   private reference = new ReferenceTree();
+  private current_node?: Node;
 
   constructor(private Tokenizer: Tokenizer) {
   }
@@ -99,6 +100,7 @@ class Program {
       }
     }
 
+    this.current_node = node;
     return node as T;
   }
 
@@ -115,7 +117,7 @@ class Program {
   }
 
   appendNode = (node: Node) => {
-    const last_node = this.blocks.at(-1) as BlockNode | undefined;
+    const last_node = this.blocks.at(-1) as Block | undefined;
     if (last_node) {
       last_node.appendNode(node);
     } else {
@@ -124,6 +126,10 @@ class Program {
     if (node.id) {
       this.reference.set(node);
     }
+  }
+
+  check_pending_node = () => {
+    console.log(this.current_node);
   }
 
   log = () => {

@@ -52,18 +52,10 @@ class Context {
     // if (data.eat) {
     //   this.Parser.eat(data.eat);
     // }
-    this.Tokenizer.parse[name](props)
+    return this.Tokenizer.parse[name](props);
   }
 
   end = () => {
-
-    log('end context')
-
-    if (this.Tokenizer.end_program) {
-      log('end program;r');
-      this.Tokenizer.parse_program();
-      return;
-    }
 
     const prev_context_name = this.buffer.at(-1).name;
     this.buffer.pop();
@@ -71,12 +63,10 @@ class Context {
 
     const ctx_name = this.current.name;
 
-    log('context:;c', `${ctx_name};g`, `<-- ${prev_context_name};y`);
-    console.log('end at this token', this.Tokenizer.Token.value)
+    log('context:;c', `${ctx_name};g`, `<-- ${prev_context_name}`);
+    // console.log('end at this token', this.Tokenizer.Token.value)
     if (ctx_name === 'Program') {
       this.Tokenizer.parse_program();
-    } else {
-      this.Tokenizer.parse[this.current.name](this.current.props || {});
     }
   }
 

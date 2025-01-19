@@ -538,6 +538,10 @@ class Tokenizer {
 
     let expected = false;
 
+    if (this.end_program) {
+      console.log('expected end program')
+    }
+
     if (comparator) {
 
       if (typeof comparator === 'function') {
@@ -661,7 +665,14 @@ class Tokenizer {
     }
 
     if (this.index === this.source.length) {
-      throw { message: 'end source', type: 'warn' };
+      this.end_program = true;
+    }
+
+    if (this.end_program) {
+      // await closing current context
+      if (this.Context.current.name === 'Program') {
+        throw { message: 'end source', type: 'warn' };
+      }
     }
 
     return this.Token;
@@ -671,7 +682,13 @@ class Tokenizer {
 
   parse_program = () => {
 
+
+
     try {
+
+      if (this.end_program) {
+        throw { message: 'end program', type: 'warn' };
+      }
 
       this.next()
       log('Program token:;g', this.Token.value);
@@ -690,13 +707,15 @@ class Tokenizer {
             log(`Error: ${error.message}\n    at ${this.line}:${this.pos};r`)
             break;
           case 'warn':
-            log(`Warning: ${error.message}\n    at ${this.line}:${this.pos};y`)
+            log(`${error.message};y`)
             break;
           case 'info':
             console.log(`${error.message}\n    at ${this.line}:${this.pos}`)
             break;
         }
       }
+
+      console.log(this.Program.toString());
 
     }
 
