@@ -547,7 +547,7 @@ class Tokenizer {
       then: (callback: (token: Token, next: () => Token, error: (error: Error) => void) => any) => {
 
         this.TokenBuffer.start();
-        callback(this.Token, this.next, this.error);
+        callback(this.TokenBuffer.token, this.next, this.error);
         this.TokenBuffer.stop();
 
         return ({ eat })
@@ -606,12 +606,16 @@ class Tokenizer {
       this.expected = this.forced_expected;
     }
 
-
     const print = () => {
       if ((this.debug.token || debug) && debug !== 'suppress') {
         // @ts-ignore
         log(this.History.loc(), this.Token.type.magenta() + (this.Token.name ? ` ${this.Token.name}`.green() : ''), this.Token.value || this.char.curr)
       }
+    }
+
+    if (this.TokenBuffer.get()) {
+      log('cached;c', this.Token.value, this.Token.type);
+      return this.Token;
     }
 
     if (this.History.stashed) {
@@ -730,6 +734,9 @@ class Tokenizer {
         })
 
       console.log(this.Token)
+      this.next()
+      console.log(this.Token)
+      this.next()
 
       if (this.end_program) {
         throw { message: 'end program', type: 'warn' };
@@ -821,6 +828,7 @@ type TempToken = [Token, [number, number, number]];
 class TokenBuffer {
 
   current_token?: TempToken = undefined;
+  token = {} as Token;
   buffer: TempToken[] = [];
   record = false;
 
@@ -830,31 +838,69 @@ class TokenBuffer {
 
     if (!this.record) return;
     if (!this.current_token) {
+
       this.current_token = this.ref();
+    } else {
+
+      this.buffer.push(this.ref());
     }
 
-    this.buffer.push(this.ref());
   }
 
   clean = () => { }
 
-  get = () => { }
+  get = () => {
+    if (this.record) return false;
+
+    const first_tt = this.buffer.shift();
+    if (first_tt) {
+      this.set_token(first_tt);
+      return true;
+    }
+  }
 
   start = () => {
-    const { type } = this.Tokenizer.Token;
-    if (type !== 'unknown') {
-      this.current_token = this.ref();
+    const last_tt = this.buffer.at(-1);
+    if (last_tt) {
+
+      this.set_token(last_tt);
+
+    } else {
+      const { type } = this.Tokenizer.Token;
+      if (type !== 'unknown') {
+        this.current_token = this.ref();
+      }
     }
     this.record = true;
   }
 
   stop = () => {
     this.record = false;
-    this.Tokenizer.Token
+
+    if (this.current_token) {
+
+      this.set_token(this.current_token);
+    }
+  }
+
+  private set_token = (tt: TempToken) => {
+    const [{ value, type }, [index, line, pos]] = tt;
+
+    delete this.Tokenizer.Token[this.Tokenizer.Token.type];
+    this.Tokenizer.Token.value = value;
+    this.Tokenizer.Token.type = type;
+    this.Tokenizer.Token[type] = true;
+
+    this.Tokenizer.index = index;
+    this.Tokenizer.line = line;
+    this.Tokenizer.pos = pos;
   }
 
   private ref() {
     const { type, value, ...r } = this.Tokenizer.Token;
+    this.token.value = value;
+    this.token.type = type;
+    this.token[type] = true;
     return [{ type, value, ...r }, this.Tokenizer.History.location()] as TempToken;
   }
 
