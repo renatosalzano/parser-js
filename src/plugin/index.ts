@@ -44,7 +44,7 @@ type DefaultApi = {
   eat(sequence: string, breakReg?: RegExp): void;
   startContext(context: string, props?: ContextObject['props'], instruction?: { [key: string]: any }): void;
   endContext(): void;
-  error(message: string, type?: 'error' | 'warn' | 'info'): void;
+  error(error: Error): void;
   isIdentifier(value: string): boolean;
   currentContext(): ContextObject;
 }

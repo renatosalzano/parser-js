@@ -10,6 +10,7 @@ namespace ParserConfig {
     bracket?: { [key: string]: string };
     keyword?: { [key: string]: string };
     separator?: { [key: string]: string };
+    specialToken?: { [key: string]: string };
     parse: (api: any) => {}
   }
 }
@@ -30,7 +31,7 @@ class ParserConfig {
 
   private extend_parser = (plugin: ParserConfig.Plugin | ParserConfig.ParserStructure) => {
 
-    const { context = {}, keyword = {}, operator = {}, bracket = {}, separator = {}, parse } = typeof plugin === "function"
+    const { context = {}, keyword = {}, operator = {}, bracket = {}, separator = {}, specialToken = {}, parse } = typeof plugin === "function"
       ? plugin(this.plugin)
       : plugin;
 
@@ -38,6 +39,7 @@ class ParserConfig {
     this.Tokenizer.extend('bracket', bracket);
     this.Tokenizer.extend('operator', operator);
     this.Tokenizer.extend('keyword', keyword);
+    this.Tokenizer.extend('special', specialToken);
     this.Tokenizer.Context.extend(context);
     Object.assign(this.Tokenizer.parse, parse(this.Tokenizer.api))
     log('extended parser;y')

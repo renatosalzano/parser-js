@@ -41,11 +41,11 @@ class ReferenceTree {
 
       }
       const current_scope = this.scope.at(-1);
-      if (current_scope) {
-        current_scope.set(node.id, node);
-      } else {
-        this.Program.set(node.id, node);
-      }
+      // if (current_scope) {
+      //   current_scope.set(node.id, node);
+      // } else {
+      //   this.Program.set(node.id, node);
+      // }
     }
   }
 

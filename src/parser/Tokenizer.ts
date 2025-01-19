@@ -4,7 +4,7 @@ import History from "./History";
 import Program from "./Progam";
 import { create_fast_get } from "./utils";
 
-export type TokenType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number';
+export type TokenType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number' | 'special';
 export type Token = {
   value: string;
   type: TokenType;
@@ -26,8 +26,10 @@ export type DebugNext = {
 }
 
 export type Error = {
+  title?: string;
   message: string;
-  type: 'error' | 'warn' | 'info'
+  type?: 'error' | 'warn' | 'info';
+  at?: string;
 }
 
 class Tokenizer {
@@ -43,7 +45,7 @@ class Tokenizer {
 
   program = new Map<string, Function>()
 
-  token = new Map<string, 'operator' | 'bracket' | 'separator'>();
+  token = new Map<string, 'operator' | 'bracket' | 'separator' | 'special'>();
   token_max_len = 4;
   get_token = create_fast_get('token', 4);
 
@@ -55,6 +57,7 @@ class Tokenizer {
   operator = new Map<string, string>();
   bracket = new Map<string, string>();
   separator = new Map<string, string>();
+  special = new Map<string, string>();
 
   reference = new Map<string, string>();
 
@@ -105,15 +108,15 @@ class Tokenizer {
     log('end parse program;g')
   }
 
-  extend = (type: "operator" | "bracket" | 'separator' | 'keyword', map: { [key: string]: string } = {}) => {
+  extend = (type: "operator" | "bracket" | 'separator' | 'keyword' | 'special', map: { [key: string]: string } = {}) => {
 
     for (const [token, t] of Object.entries(map)) {
 
       if (this.token.has(token)) {
-        log(`warn: duplicate "${token}" found in ${type};y`)
+        log(`warn: duplicate "${token}" found in ${type};y`);
       } else {
 
-        if (this.is.alpha(token) || type === 'keyword') {
+        if (this.is.alpha(token) || type === 'keyword' || type === 'special') {
           this.keyword.set(token, t);
           this.keyword_type.set(token, type);
 
@@ -210,6 +213,15 @@ class Tokenizer {
   parse: any = {};
   debug: DebugNext = {};
   command: 'next' | 'expected' = 'next';
+
+  clone_token(token: Token) {
+    const { value, type, ...rest } = token;
+    return ({
+      value,
+      type,
+      ...rest
+    })
+  }
 
   check_new_line(debug: DebugNext = {}) {
     if (/[\r\n]/.test(this.char.curr)) {
@@ -562,8 +574,42 @@ class Tokenizer {
     return expected;
   }
 
-  stop_immediate = false;
+  pairs_buffer: string[] = [];
+  pairs_end: string = '';
 
+  next_pairs = (token_pairs: [string, string]) => {
+    const [start_token, end_token] = token_pairs;
+    this.pairs_end = end_token;
+    return this.recursive_next(start_token, end_token);
+  }
+
+  recursive_next = (start_token: string, end_token: string, output: Token[] = []): Token[] => {
+
+    let end_recursion = false;
+
+    this.next();
+    if (this.Token.value === start_token) {
+      this.pairs_buffer.push(this.Token.value);
+    }
+
+    if (this.Token.value === end_token) {
+      this.pairs_buffer.pop();
+
+      if (this.pairs_buffer.length === 0) {
+        end_recursion = true;
+      }
+    }
+
+    output.push(this.clone_token(this.Token));
+    if (!end_recursion) {
+      return this.recursive_next(start_token, end_token, output);
+    }
+
+    this.next();
+    return output;
+  }
+
+  stop_immediate = false;
   next = (debug: boolean | 'suppress' = false) => {
 
     this.Token.value = '';
@@ -669,6 +715,15 @@ class Tokenizer {
     }
 
     if (this.end_program) {
+      console.log('end program', this.pairs_buffer.length > 0)
+      if (this.pairs_buffer.length > 0) {
+        throw {
+          title: 'Token not found',
+          message: `token '${this.pairs_end}' was not found before end of source'`,
+          at: 'Tokenizer.api.nextPairs',
+          type: 'error'
+        }
+      }
       // await closing current context
       if (this.Context.current.name === 'Program') {
         throw { message: 'end source', type: 'warn' };
@@ -681,8 +736,6 @@ class Tokenizer {
   end_program = false;
 
   parse_program = () => {
-
-
 
     try {
 
@@ -702,9 +755,11 @@ class Tokenizer {
     } catch (error: any) {
 
       if (error.type && error.message) {
+        const title = error.title || 'Error';
+        const at = " at " + (error.at || this.History.loc(true));
         switch (error.type) {
           case 'error':
-            log(`Error: ${error.message}\n    at ${this.line}:${this.pos};r`)
+            log(` ${title} ;R`, `\n  ${error.message}${at};r`);
             break;
           case 'warn':
             log(`${error.message};y`)
@@ -734,8 +789,8 @@ class Tokenizer {
 
   }
 
-  error = (message: string, type: 'error' | 'warn' | 'info' = 'error') => {
-    throw { message, type };
+  error = (error: Error) => {
+    throw { type: 'error', ...error };
   }
 
   each_char = (callback: (char: string, sequence: string) => boolean | undefined) => {

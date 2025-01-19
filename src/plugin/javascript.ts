@@ -3,7 +3,7 @@ import type { DefaultApi } from "./";
 import { ContextObject } from 'parser/Context';
 import { log } from 'utils';
 import errors from './errors';
-import { Variable, Function, Identifier, Block, Number, Literal, TemplateLiteral, Expression, ObjectExpression, Property, Unexpected } from './node';
+import { Variable, Function, Identifier, Block, Number, Literal, TemplateLiteral, Expression, ObjectExpression, ArrayExpression, Property, Unexpected } from './node';
 import { Node } from 'parser/Progam';
 
 
@@ -78,7 +78,6 @@ const operator = {
   '^': 'bitwise XOR',
   '~': 'bitwise NOT',
   '?': 'ternary start',
-  '?.': 'optional chaining',
   '??': 'nullish coalescing',
   '??=': 'nullish coalescing assignment',
   '++': 'increment',
@@ -115,8 +114,6 @@ const bracket = {
   ']': 'square L',
   '{': 'curly R',
   '}': 'curly L',
-  '`': 'template literal',
-  '${': 'dollar curly R'
 }
 
 // const comment = {
@@ -139,6 +136,15 @@ const keyword = {
   'this': 'this',
   'super': 'super',
 }
+
+const specialToken = {
+  '=>': 'arrow function',
+  '...': 'spread',
+  '?.': 'optional chaining',
+  '`': 'template literal',
+  '${': 'template literal expression start'
+}
+
 
 type Context = typeof context;
 
@@ -171,6 +177,7 @@ export default (config: any) => {
     bracket,
     operator,
     separator,
+    specialToken,
     parse: ({
       ctx,
       token,
@@ -281,12 +288,11 @@ export default (config: any) => {
           }
         },
 
-        check_is_destructure() { },
-
         Expression(is_group = false): Node {
           log('Expression;m', token.value)
           const node = createNode(Expression, { group: is_group });
           const curr_ctx = currentContext();
+          const ctx_expression = curr_ctx.name === 'Expression';
 
           let parsing_expression = true;
 
@@ -317,6 +323,9 @@ export default (config: any) => {
                     node.expression.push(this.Object());
                     break;
                   case '[':
+                    if (ctx_expression) {
+                      error({ title: errors.syntax, message: `unexpected token '${token.value}'` });
+                    }
                     node.expression.push(this.Array());
                     break;
                   case '(':
@@ -398,6 +407,10 @@ export default (config: any) => {
 
         },
 
+        ExpressionGroup() {
+
+        },
+
         Block({ functionBody }: Context['Block']['props']) {
           const node = createNode(Block, { functionBody });
           let parsing_block = true;
@@ -434,7 +447,7 @@ export default (config: any) => {
           if (expected_init) {
             if (!expected('=')) {
 
-              error(errors.variable.expected_init);
+              error({ message: errors.variable.expected_init });
             }
           }
 
@@ -443,7 +456,7 @@ export default (config: any) => {
             next(); // over "="
 
             if (expected_init && /[,;]/.test(token.value)) {
-              error(errors.variable.expected_init);
+              error({ message: errors.variable.expected_init });
             }
 
             this.VariableInit(node);
@@ -485,13 +498,13 @@ export default (config: any) => {
                   node.id = this.Array();
                   break;
                 default:
-                  error(`unexpected token '${token.value}'`);
+                  error({ title: errors.syntax, message: `unexpected token '${token.value}'` });
                   break;
               }
               break;
             }
             default:
-              error(`Unexpected token: '${token.value}'`);
+              error({ title: errors.syntax, message: `unexpected token '${token.value}'` });
             // unexpected token
           }
         },
@@ -547,20 +560,6 @@ export default (config: any) => {
           log('Object Expression;m');
 
           const node = createNode(ObjectExpression);
-          const curr_ctx = currentContext();
-
-          if (curr_ctx.name === 'Variable') {
-            switch (curr_ctx.currentStep) {
-              case 'id':
-                expected = 'pattern';
-                node.type = expected;
-                break;
-              case 'init':
-                expected = 'expression';
-                node.type = expected;
-                break;
-            }
-          }
 
           let key: [string, Node & { alias?: Node }] | undefined;
           let alias: [string, Node] | undefined;
@@ -677,17 +676,21 @@ export default (config: any) => {
 
         },
 
-        Array() {
+        Array(expected: 'expression' | 'pattern' = 'expression') {
           log('PARSING ARRAY;m');
-          const node = createNode(Array);
+          const node = createNode(ArrayExpression);
+
+          let parsing_array = true;
+
+          while (parsing_array) {
+            next();
+            log('current token:;c', token.value);
+
+
+
+          }
 
           return node;
-          // let parsing_array = true;
-
-          // const node_map = {
-          //   'literal': LiteralNode,
-          //   'number': NumberNode
-          // }
 
           // while (parsing_array) {
           //   next();
