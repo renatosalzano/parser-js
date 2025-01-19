@@ -62,88 +62,23 @@ const context = {
   }
 }
 
-const operator = {
-  '+': 'addition',
-  '-': 'subtraction',
-  '*': 'multiplication',
-  '/': 'division',
-  '%': 'reminder',
-  '.': 'member access',
-  '>': 'greater than',
-  '<': 'less than',
-  '!': 'logical NOT',
-  '=': 'assignment',
-  '&': 'bitwise AND',
-  '|': 'bitwise OR',
-  '^': 'bitwise XOR',
-  '~': 'bitwise NOT',
-  '?': 'ternary start',
-  '??': 'nullish coalescing',
-  '??=': 'nullish coalescing assignment',
-  '++': 'increment',
-  '--': 'decrement',
-  '==': 'equality',
-  '!=': 'inequality',
-  '>=': 'greater than or equal to',
-  '<=': 'less than or equal to',
-  '&&': 'logical AND',
-  '&&=': 'logical AND assignment',
-  '||': 'logical OR',
-  '||=': 'logical OR assignment',
-  '+=': 'addition assignment',
-  '-=': 'subtraction assignment',
-  '*=': 'multiplication assignment',
-  '/=': 'division assignment',
-  '%=': 'modulus assignment',
-  '<<': 'left shift',
-  '>>': 'right shift',
-  '===': 'strict equality',
-  '!==': 'strict inequality',
-  '>>>': 'unsigned right shift',
-  '>>>=': 'unsigned right shift assignment',
-  '...': 'spread',
-  'new': 'create instance',
-  'typeof': 'type of',
-  'instanceof': 'instance of'
-}
+const operator = [
+  '+', '-', '*', '/', '%', '.', '>', '<', '!', '=', '&', '|', '^', '~', '?', '??', '??=', '++', '--', '==', '!=', '>=', '<=', '&&', '&&=', '||', '||=', '+=', '-=', '*=', '/=', '%=', '<<', '>>', '===', '!==', '>>>', '>>>=', '...', 'new', 'typeof', 'instanceof'
+];
 
-const bracket = {
-  '(': 'paren R',
-  ')': 'paren L',
-  '[': 'square R',
-  ']': 'square L',
-  '{': 'curly R',
-  '}': 'curly L',
-}
+const bracket = ['(', ')', '[', ']', '{', '}'];
+
+const separator = [',', ':', ';', '\n'];
+
+const keyword = ['true', 'false', 'null', 'this', 'super'];
+
+const specialToken = ['=>', '...', '?.', '`', '${'];
 
 // const comment = {
 //   '//': "comment",
 //   "/*": "comment multiline start",
 //   "*/": "comment multiline end"
 // }
-
-const separator = {
-  ',': 'comma',
-  ':': 'colon',
-  ';': 'semicolon',
-  '\n': 'line feed',
-}
-
-const keyword = {
-  'true': 'boolean',
-  'false': 'boolean',
-  'null': 'null',
-  'this': 'this',
-  'super': 'super',
-}
-
-const specialToken = {
-  '=>': 'arrow function',
-  '...': 'spread',
-  '?.': 'optional chaining',
-  '`': 'template literal',
-  '${': 'template literal expression start'
-}
 
 
 type Context = typeof context;
@@ -173,11 +108,13 @@ export default (config: any) => {
 
   return {
     context,
-    keyword,
-    bracket,
-    operator,
-    separator,
-    specialToken,
+    tokens: {
+      keyword,
+      bracket,
+      operator,
+      separator,
+      specialToken,
+    },
     parse: ({
       ctx,
       token,

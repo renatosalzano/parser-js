@@ -24,9 +24,8 @@ class History {
     this.stashed_token = undefined;
 
     // save token
-    const { value, type, name } = this.Parser.Token;
-    if (name) this.Token.push({ value, type, name });
-    else this.Token.push({ value, type });
+    const { value, type } = this.Parser.Token;
+    this.Token.push({ value, type });
   }
 
   stash = () => {
@@ -43,23 +42,20 @@ class History {
 
     {
       // stash token
-      const { value, type, name } = this.Token.at(-1)!;
+      const { value, type } = this.Token.at(-1)!;
       this.stashed_token = { value, type };
-      if (name) this.stashed_token.name = name;
     }
 
     if (this.Token.length !== 1) {
       this.Token.pop()
     }
 
-    const { value, type, name } = this.Token.at(-1)!;
+    const { value, type } = this.Token.at(-1)!;
 
-    delete this.Parser.Token.name;
     delete this.Parser.Token[this.Parser.Token.type];
     this.Parser.Token.value = value;
     this.Parser.Token.type = type;
     this.Parser.Token[type] = true;
-    if (name) this.Parser.Token.name = name;
   };
 
   apply = () => {
@@ -78,9 +74,8 @@ class History {
     this.Parser.char.curr = this.Parser.source[index];
     this.Parser.char.next = this.Parser.source[index + 1];
 
-    const { type, value, name } = this.stashed_token;
+    const { type, value } = this.stashed_token;
 
-    delete this.Parser.Token.name;
     delete this.Parser.Token[this.Parser.Token.type];
     this.Parser.Token.value = value;
     this.Parser.Token.type = type;
@@ -91,9 +86,6 @@ class History {
     delete this.Parser.next_token.value;
     delete this.Parser.next_token.type;
     delete this.Parser.next_token[Type];
-    delete this.Parser.next_token.name;
-
-    if (name) this.Parser.Token.name = name;
   }
 
   compare = (a: [number, number, number], b?: [number, number, number]) => {
@@ -126,27 +118,18 @@ class History {
       this.Token.pop()
     }
 
-    const { value, type, name } = this.Token.at(-1)!;
+    const { value, type } = this.Token.at(-1)!;
 
-    delete this.Parser.Token.name;
     delete this.Parser.Token[this.Parser.Token.type];
     this.Parser.Token.value = value;
     this.Parser.Token.type = type;
     this.Parser.Token[type] = true;
-    if (name) this.Parser.Token.name = name;
 
   }
 
-  Location = () => {
-    const [, , pos] = this.history.at(-1) || this.current;
-    const { line, Token, char } = this.Parser;
-    const offset = (Token.value || char.curr).length;
-
-    return {
-      Line: line,
-      start: pos,
-      end: pos + offset
-    }
+  location = () => {
+    const [i, l, p] = this.history.at(-1) || this.current;
+    return [i, l, p] as [number, number, number]
   }
 
   loc = (error = false) => {

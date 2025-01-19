@@ -6,11 +6,13 @@ namespace ParserConfig {
   export type Plugin = (prev: ParserStructure) => ParserStructure;
   export type ParserStructure = {
     context: any;
-    operator?: { [key: string]: string };
-    bracket?: { [key: string]: string };
-    keyword?: { [key: string]: string };
-    separator?: { [key: string]: string };
-    specialToken?: { [key: string]: string };
+    tokens?: {
+      operator?: string[];
+      bracket?: string[];
+      keyword?: string[];
+      separator?: string[];
+      specialToken?: string[];
+    }
     parse: (api: any) => {}
   }
 }
@@ -31,9 +33,11 @@ class ParserConfig {
 
   private extend_parser = (plugin: ParserConfig.Plugin | ParserConfig.ParserStructure) => {
 
-    const { context = {}, keyword = {}, operator = {}, bracket = {}, separator = {}, specialToken = {}, parse } = typeof plugin === "function"
+    const { context = {}, tokens = {}, parse } = typeof plugin === "function"
       ? plugin(this.plugin)
       : plugin;
+
+    const { keyword = [], operator = [], bracket = [], separator = [], specialToken = [] } = tokens;
 
     this.Tokenizer.extend('separator', separator);
     this.Tokenizer.extend('bracket', bracket);

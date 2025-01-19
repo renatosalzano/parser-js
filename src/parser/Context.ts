@@ -107,14 +107,14 @@ class Context {
 
       if (key === 'keyword') {
 
-        const context_keyword: { [key: string]: string } = {}
+        const context_keyword: string[] = []
 
         for (const [lexical] of Context.token) {
 
           if (Tokenizer.is.alpha(lexical)) {
             if (!Tokenizer.keyword.has(lexical)) {
               // Parser.keyword.set(lexical, name);
-              context_keyword[lexical] = name;
+              context_keyword.push(lexical)
             } else {
               Context.token.delete(lexical);
               log(`duplicate keyword "${lexical}", found in context: ${name};r`);

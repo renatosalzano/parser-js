@@ -8,7 +8,6 @@ export type TokenType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keywor
 export type Token = {
   value: string;
   type: TokenType;
-  name?: string;
   eq(comparator: string | RegExp): boolean;
 } & {
   [K in TokenType]?: boolean;
@@ -50,14 +49,8 @@ class Tokenizer {
   get_token = create_fast_get('token', 4);
 
   keyword = new Map<string, string>();
-  keyword_type = new Map<string, TokenType>();
   keyword_max_len = 8;
   get_keyword = create_fast_get('keyword', 8);
-
-  operator = new Map<string, string>();
-  bracket = new Map<string, string>();
-  separator = new Map<string, string>();
-  special = new Map<string, string>();
 
   reference = new Map<string, string>();
 
@@ -108,17 +101,16 @@ class Tokenizer {
     log('end parse program;g')
   }
 
-  extend = (type: "operator" | "bracket" | 'separator' | 'keyword' | 'special', map: { [key: string]: string } = {}) => {
+  extend = (type: "operator" | "bracket" | 'separator' | 'keyword' | 'special', tokens: string[] = []) => {
 
-    for (const [token, t] of Object.entries(map)) {
+    for (const token of tokens) {
 
       if (this.token.has(token)) {
         log(`warn: duplicate "${token}" found in ${type};y`);
       } else {
 
         if (this.is.alpha(token) || type === 'keyword' || type === 'special') {
-          this.keyword.set(token, t);
-          this.keyword_type.set(token, type);
+          this.keyword.set(token, type);
 
           if (token.length > this.keyword_max_len) {
             this.keyword_max_len = token.length;
@@ -132,9 +124,6 @@ class Tokenizer {
             this.get_token = create_fast_get('token', token.length);
           }
         }
-
-        this[type].set(token, t);
-        // this.is[type] = (_: string) => this[type].has(_);
       }
     }
   }
@@ -171,35 +160,15 @@ class Tokenizer {
     }
   }
 
+  TokenBuffer = new TokenBuffer(this);
+
   next_token: Partial<Token> = {};
 
   set_token_type = (type?: TokenType) => {
     if (type) {
-      switch (type) {
-        case 'keyword': {
-          type = this.keyword_type.get(this.Token.value) || 'keyword';
-
-          this.Token.type = type;
-          this.Token[type] = true;
-          this.Token.name = this.keyword.get(this.Token.value) || '';
-
-          break;
-        }
-        case 'bracket':
-        case 'separator':
-        case 'operator': {
-          this.Token.type = type;
-          this.Token[type] = true;
-          this.Token.name = this[type].get(this.Token.value) || '';
-          break;
-        }
-        default: {
-          this.Token.type = type;
-          this.Token[type] = true;
-        }
-      }
+      this.Token.type = type;
+      this.Token[type] = true;
     } else {
-      delete this.Token.name;
       delete this.Token[this.Token.type];
       this.Token.type = 'unknown';
     }
@@ -213,15 +182,6 @@ class Tokenizer {
   parse: any = {};
   debug: DebugNext = {};
   command: 'next' | 'expected' = 'next';
-
-  clone_token(token: Token) {
-    const { value, type, ...rest } = token;
-    return ({
-      value,
-      type,
-      ...rest
-    })
-  }
 
   check_new_line(debug: DebugNext = {}) {
     if (/[\r\n]/.test(this.char.curr)) {
@@ -536,12 +496,11 @@ class Tokenizer {
 
     } else {
 
-      const { value, type, name } = this.next("suppress");
+      const { value, type } = this.next("suppress");
 
       this.next_token.value = value;
       this.next_token.type = type;
       this.next_token[type] = true;
-      if (name) this.next_token.name = name;
       // cache next token
       this.History.stash();
 
@@ -574,6 +533,30 @@ class Tokenizer {
     return expected;
   }
 
+  traverse_tokens = (start_token: string, end_token: string) => {
+
+    this.TokenBuffer.start();
+
+    this.recursive_next(start_token, end_token);
+
+    this.TokenBuffer.stop();
+
+    const eat = () => { }
+
+    return ({
+      then: (callback: (token: Token, next: () => Token, error: (error: Error) => void) => any) => {
+
+        this.TokenBuffer.start();
+        callback(this.Token, this.next, this.error);
+        this.TokenBuffer.stop();
+
+        return ({ eat })
+      },
+      catch() { },
+      eat
+    })
+  }
+
   pairs_buffer: string[] = [];
   pairs_end: string = '';
 
@@ -600,9 +583,8 @@ class Tokenizer {
       }
     }
 
-    output.push(this.clone_token(this.Token));
     if (!end_recursion) {
-      return this.recursive_next(start_token, end_token, output);
+      return this.recursive_next(start_token, end_token);
     }
 
     this.next();
@@ -670,6 +652,7 @@ class Tokenizer {
           log('unexpected token;r')
         }
         this.History.push();
+        this.TokenBuffer.push()
 
         return this.Token;
       }
@@ -720,7 +703,7 @@ class Tokenizer {
         throw {
           title: 'Token not found',
           message: `token '${this.pairs_end}' was not found before end of source'`,
-          at: 'Tokenizer.api.nextPairs',
+          at: 'Tokenizer.api.traverseTokens',
           type: 'error'
         }
       }
@@ -739,9 +722,20 @@ class Tokenizer {
 
     try {
 
+      this.traverse_tokens('[', ']')
+        .then((token, next) => {
+          console.log(token)
+          next();
+          console.log(token)
+        })
+
+      console.log(this.Token)
+
       if (this.end_program) {
         throw { message: 'end program', type: 'warn' };
       }
+
+      return;
 
       this.next()
       log('Program token:;g', this.Token.value);
@@ -818,6 +812,50 @@ class Tokenizer {
     //     ++this.index, ++this.pos;
     //   }
 
+  }
+
+}
+
+type TempToken = [Token, [number, number, number]];
+
+class TokenBuffer {
+
+  current_token?: TempToken = undefined;
+  buffer: TempToken[] = [];
+  record = false;
+
+  constructor(public Tokenizer: Tokenizer) { }
+
+  push = () => {
+
+    if (!this.record) return;
+    if (!this.current_token) {
+      this.current_token = this.ref();
+    }
+
+    this.buffer.push(this.ref());
+  }
+
+  clean = () => { }
+
+  get = () => { }
+
+  start = () => {
+    const { type } = this.Tokenizer.Token;
+    if (type !== 'unknown') {
+      this.current_token = this.ref();
+    }
+    this.record = true;
+  }
+
+  stop = () => {
+    this.record = false;
+    this.Tokenizer.Token
+  }
+
+  private ref() {
+    const { type, value, ...r } = this.Tokenizer.Token;
+    return [{ type, value, ...r }, this.Tokenizer.History.location()] as TempToken;
   }
 
 }
