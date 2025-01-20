@@ -88,7 +88,7 @@ class Property {
 class ArrayExpression extends Node {
   tag = 'array'
   type: 'expression' | 'pattern' = 'expression';
-  items: Node[] = [];
+  items: (Node | undefined)[] = [];
 }
 
 class Literal extends Node {

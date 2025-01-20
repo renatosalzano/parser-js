@@ -30,10 +30,13 @@ class TokenBuffer {
   get = (set_tokenizer = true) => {
     if (this.record) return false;
 
+    if (!set_tokenizer) {
+      const next_token = this.buffer?.[0]?.[0];
+      return next_token;
+    };
+
     const first_tt = this.buffer.shift();
     this.debug('get', first_tt?.[0]);
-
-    if (!set_tokenizer && first_tt) return true;
 
     if (first_tt) {
       this.set_tokenizer(first_tt);
@@ -96,7 +99,6 @@ class TokenBuffer {
     this.Tokenizer.index = index;
     this.Tokenizer.line = line;
     this.Tokenizer.pos = pos;
-
     this.debug('set');
   }
 

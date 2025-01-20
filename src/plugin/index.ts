@@ -34,6 +34,7 @@ type DefaultApi = {
   char: { curr: string, prev: string, next: string };
   token: Token;
   nextToken: Token;
+  debug: Tokenizer['debug'];
   next(debug?: boolean): Token;
   nextLiteral(endToken: string | string[]): Token;
   traverseTokens: Tokenizer['traverse_tokens']

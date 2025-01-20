@@ -133,6 +133,7 @@ export default (config: any) => {
       currentContext,
       startContext,
       endContext,
+      debug,
     }: Api) => {
 
 
@@ -148,13 +149,14 @@ export default (config: any) => {
       return ({
 
         parse_expression() {
-          log('parse expression;m', 'at', token.value)
+          log('parse expression;m', token.value, token.type)
 
           switch (token.type) {
             case 'number':
             case 'literal':
             case 'identifier': {
               // current [operator]
+
               if (expected('operator')) {
                 return this.Expression();
               }
@@ -208,7 +210,7 @@ export default (config: any) => {
 
           while (max > 0 && parsing_expression) {
 
-            log('current token;c', token.value)
+            log('current token;c', token.value, max)
 
             switch (token.type) {
               case 'number':
@@ -232,7 +234,7 @@ export default (config: any) => {
                     break;
                   case '[':
                     node.expression.push(this.ArrayExpression());
-                    break;
+                    continue;
                   case '(':
                     console.log('expression group start');
                     next();
@@ -269,11 +271,17 @@ export default (config: any) => {
                 // node.expression.push()
                 break;
               }
+              case 'separator': {
+                switch (token.value) {
+                  case ';':
+
+                }
+              }
             }
 
             expected();
 
-            log('expected token;c', nextToken.value)
+            log('next token;y', nextToken.value)
 
             switch (nextToken.type) {
               case 'keyword': {
@@ -285,9 +293,11 @@ export default (config: any) => {
               case 'separator': {
                 switch (nextToken.value) {
                   case ';': {
+                    next();
+                    console.log('current end token', token)
                     if (curr_ctx.name === 'Expression') {
                       appendNode(node);
-                    } else {
+                      endContext();
                       return node;
                     }
                     return node;
@@ -599,36 +609,49 @@ export default (config: any) => {
         },
 
         ArrayExpression() {
-          log('Array Expression;m');
-          let expected: 'expression' | 'pattern' = 'expression';
+          let type: 'expression' | 'pattern' = 'expression';
 
           traverseTokens('[', ']')
             .then((token) => {
-              console.log('then', token)
               if (token.eq('=')) {
-                console.log('array is pattern')
-                expected = 'pattern'
+                type = 'pattern'
               }
             })
 
-          error({ title: 'SEI UN MAESTRO', message: 'riscrivi sto cazzo di codice porco dio' })
-
-          return this.Array(expected);
+          return this.Array(type);
         },
 
-        Array(expected: 'expression' | 'pattern' = 'expression') {
-          log('PARSING ARRAY;m');
-          const node = createNode(ArrayExpression);
+        Array(type: 'expression' | 'pattern' = 'expression') {
+          log('Array;m');
+          const node = createNode(ArrayExpression, { type });
 
           let parsing_array = true;
+          let item: Node | undefined = undefined;
+          let comma_count = 0;
+          let max = 10
 
-          throw ({ title: "DIO", message: 'PORCO' })
-
-          while (parsing_array) {
+          while (max > 0 && parsing_array) {
             next();
             log('current token:;c', token.value);
 
-
+            switch (token.value) {
+              case ',':
+                ++comma_count;
+                node.items.push(item);
+                break;
+              case ']':
+                parsing_array = false;
+                if (comma_count === node.items.length) {
+                  node.items.push(item);
+                }
+                next() // over [
+                log('Array end;m')
+                return node;
+              default: {
+                item = this.parse_expression();
+              }
+            }
+            --max
 
           }
 

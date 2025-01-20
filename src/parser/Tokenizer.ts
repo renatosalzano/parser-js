@@ -64,7 +64,8 @@ class Tokenizer {
       ctx: this.Context.context,
       char: this.char,
       token: this.Token,
-      expectedToken: this.next_token,
+      nextToken: this.next_token,
+      debug: this.debug,
       next: this.next,
       nextLiteral: this.next_literal,
       expected: this.expected_next,
@@ -82,9 +83,6 @@ class Tokenizer {
       error: this.error
     }, {
       get(api, p) {
-        if (p === 'expectedToken') {
-          log('getted', api[p])
-        }
         return Reflect.get(api, p)
       },
       set(api, p, v) {
@@ -487,13 +485,19 @@ class Tokenizer {
 
   expected_next = (comparator?: string | ((token: Partial<Token>) => boolean), debug = false) => {
 
-    const print = (message = '(cached);c') => {
+    const print = (message = 'get cached;y') => {
       if (this.debug.expected || debug) {
         log(this.History.loc(), message, this.next_token.type + ';m', this.next_token.value);
       }
     }
 
-    if (this.TokenBuffer.get(false)) {
+    const next_token_cached = this.TokenBuffer.get(false);
+
+    if (next_token_cached) {
+
+      if (Object.values(this.next_token).length === 0) {
+        Object.assign(this.next_token, next_token_cached);
+      }
 
       print();
 
@@ -508,6 +512,7 @@ class Tokenizer {
       this.next_token.type = type;
       this.next_token[type] = true;
 
+      print('cache next token;y');
     }
 
     let expected = false;
@@ -570,6 +575,7 @@ class Tokenizer {
         TokenBuffer.start(callback);
         recursive_next(startToken, endToken);
         TokenBuffer.stop();
+
 
         return ({
           eat,
@@ -643,6 +649,7 @@ class Tokenizer {
       delete this.next_token[this.next_token.type];
       delete this.next_token.type;
       delete this.next_token.value;
+      delete this.next_token.eq;
     }
 
     if (this.TokenBuffer.get()) {
@@ -771,9 +778,10 @@ class Tokenizer {
         }
       }
 
-      console.log(this.Program.toString());
-
+      console.log(error);
     }
+
+    console.log(this.Program.body)
 
     // this.debug.expected = true
 
