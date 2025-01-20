@@ -63,7 +63,7 @@ const context = {
 }
 
 const operator = [
-  '+', '-', '*', '/', '%', '.', '>', '<', '!', '=', '&', '|', '^', '~', '?', '??', '??=', '++', '--', '==', '!=', '>=', '<=', '&&', '&&=', '||', '||=', '+=', '-=', '*=', '/=', '%=', '<<', '>>', '===', '!==', '>>>', '>>>=', '...', 'new', 'typeof', 'instanceof'
+  '+', '-', '*', '/', '%', '.', '>', '<', '!', '=', '&', '|', '^', '~', '?', '??', '??=', '++', '--', '==', '!=', '>=', '<=', '&&', '&&=', '||', '||=', '+=', '-=', '*=', '/=', '%=', '<<', '>>', '===', '!==', '>>>', '>>>=', 'new', 'typeof', 'instanceof'
 ];
 
 const bracket = ['(', ')', '[', ']', '{', '}'];
@@ -135,36 +135,6 @@ export default (config: any) => {
       endContext,
     }: Api) => {
 
-      function recursiveObjectPattern(node: any) {
-
-        // const id = next(true, /[:=,}]/, true);
-
-        // switch (nextChar()) {
-        //   case ":":
-        //     // alias | nested destructuring
-        //     console.log('alias|destructuring', id)
-        //     if (expected('{')) {
-        //       console.log('nested pattern')
-        //     } else {
-        //       console.log('alias')
-        //     }
-        //     break;
-        //   case "=":
-        //     // assignament
-        //     console.log('assignament')
-        //     break;
-        //   case ",":
-        //     // next
-        //     node.properties.push({ tag: 'identifier', id })
-        //     recursiveObjectPattern(node)
-        //     console.log('end prop')
-        //     break;
-        //   case "}":
-        //     // end pattern
-        //     console.log('next')
-        // }
-
-      }
 
       function skip_multiple_token(token: string) {
 
@@ -258,13 +228,10 @@ export default (config: any) => {
               case 'bracket': {
                 switch (token.value) {
                   case '{':
-                    node.expression.push(this.Object());
+                    node.expression.push(this.ObjectExpression());
                     break;
                   case '[':
-                    if (ctx_expression) {
-                      error({ title: errors.syntax, message: `unexpected token '${token.value}'` });
-                    }
-                    node.expression.push(this.Array());
+                    node.expression.push(this.ArrayExpression());
                     break;
                   case '(':
                     console.log('expression group start');
@@ -494,6 +461,23 @@ export default (config: any) => {
 
         },
 
+        ObjectExpression() {
+
+          log('Object Expression;m');
+          let expected: 'expression' | 'pattern' = 'expression';
+
+          traverseTokens('{', '}')
+            .then((token) => {
+              if (token.eq('=')) {
+                console.log('object is pattern')
+                expected = 'pattern'
+              }
+            })
+
+          return this.Object(expected);
+
+        },
+
         Object(expected: 'expression' | 'pattern' = 'expression') {
           log('Object Expression;m');
 
@@ -614,11 +598,31 @@ export default (config: any) => {
 
         },
 
+        ArrayExpression() {
+          log('Array Expression;m');
+          let expected: 'expression' | 'pattern' = 'expression';
+
+          traverseTokens('[', ']')
+            .then((token) => {
+              console.log('then', token)
+              if (token.eq('=')) {
+                console.log('array is pattern')
+                expected = 'pattern'
+              }
+            })
+
+          error({ title: 'SEI UN MAESTRO', message: 'riscrivi sto cazzo di codice porco dio' })
+
+          return this.Array(expected);
+        },
+
         Array(expected: 'expression' | 'pattern' = 'expression') {
           log('PARSING ARRAY;m');
           const node = createNode(ArrayExpression);
 
           let parsing_array = true;
+
+          throw ({ title: "DIO", message: 'PORCO' })
 
           while (parsing_array) {
             next();

@@ -1,4 +1,4 @@
-import { Error, Token, TokenType } from "parser/Tokenizer";
+import Tokenizer, { Error, Token, TokenType } from "parser/Tokenizer";
 import Program from "parser/Progam";
 import { log } from "utils";
 import { ContextObject } from "parser/Context";
@@ -33,10 +33,11 @@ type DefaultApi = {
   ctx: { [key: string]: ContextObject };
   char: { curr: string, prev: string, next: string };
   token: Token;
-  expectedToken: Token;
+  nextToken: Token;
   next(debug?: boolean): Token;
-  expected(comparator?: string | ((token: Token) => boolean)): boolean;
   nextLiteral(endToken: string | string[]): Token;
+  traverseTokens: Tokenizer['traverse_tokens']
+  expected(comparator?: string | ((token: Token) => boolean)): boolean;
   appendNode: Program['appendNode'];
   createNode: Program['createNode'];
   createRef: Program['createRef'];
