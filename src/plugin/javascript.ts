@@ -118,9 +118,10 @@ export default (config: any) => {
     parse: ({
       ctx,
       token,
-      expectedToken,
+      nextToken,
       next,
       nextLiteral,
+      traverseTokens,
       expected,
       eat,
       isIdentifier,
@@ -305,17 +306,17 @@ export default (config: any) => {
 
             expected();
 
-            log('expected token;c', expectedToken.value)
+            log('expected token;c', nextToken.value)
 
-            switch (expectedToken.type) {
+            switch (nextToken.type) {
               case 'keyword': {
-                if (!is_group && statement_keyword(expectedToken.value)) {
+                if (!is_group && statement_keyword(nextToken.value)) {
                   log('Expression end;m')
                   return node;
                 }
               }
               case 'separator': {
-                switch (expectedToken.value) {
+                switch (nextToken.value) {
                   case ';': {
                     if (curr_ctx.name === 'Expression') {
                       appendNode(node);

@@ -22,6 +22,7 @@ export type DebugNext = {
   literal?: boolean;
   checkToken?: boolean;
   expected?: boolean;
+  TokenBuffer?: boolean;
 }
 
 export type Error = {
@@ -63,7 +64,10 @@ class Tokenizer {
       char: this.char,
       token: this.Token,
       expectedToken: this.next_token,
+      next: this.next,
       nextLiteral: this.next_literal,
+      expected: this.expected_next,
+      traverseTokens: this.traverse_tokens,
       currentContext: this.Context.get_current,
       isIdentifier: this.is.identifier,
       eachChar: this.each_char,
@@ -73,8 +77,6 @@ class Tokenizer {
       logNode: this.Program.log,
       startContext: this.Context.start,
       endContext: this.Context.end,
-      next: this.next,
-      expected: this.expected_next,
       eat: this.eat,
       error: this.error
     }, {
@@ -490,28 +492,23 @@ class Tokenizer {
       }
     }
 
-    if (this.History.stashed && this.History.compare(this.History.stashed)) {
+    if (this.TokenBuffer.get(false)) {
 
       print();
 
     } else {
 
+      this.TokenBuffer.start();
       const { value, type } = this.next("suppress");
+      this.TokenBuffer.stop();
 
       this.next_token.value = value;
       this.next_token.type = type;
       this.next_token[type] = true;
-      // cache next token
-      this.History.stash();
 
-      print('(cache);g',);
     }
 
     let expected = false;
-
-    if (this.end_program) {
-      console.log('expected end program')
-    }
 
     if (comparator) {
 
@@ -533,27 +530,55 @@ class Tokenizer {
     return expected;
   }
 
-  traverse_tokens = (start_token: string, end_token: string) => {
+  traverse_tokens = (startToken: string, endToken: string) => {
 
-    this.TokenBuffer.start();
+    const { TokenBuffer, next, recursive_next } = this;
+    let then_pipe = false;
 
-    this.recursive_next(start_token, end_token);
+    function then(callback: (token: Token) => any) {
 
-    this.TokenBuffer.stop();
+      TokenBuffer.start();
+      if (then_pipe) {
+        recursive_next(startToken, endToken);
+        next();
+      }
+      callback(TokenBuffer.token);
+      TokenBuffer.stop();
 
-    const eat = () => { }
+      return ({ eat })
+    }
+
+    function eat(this: Tokenizer) {
+      TokenBuffer.eat();
+      return ({ then })
+    };
+
 
     return ({
-      then: (callback: (token: Token, next: () => Token, error: (error: Error) => void) => any) => {
+      eat: () => {
+        TokenBuffer.start();
+        recursive_next(startToken, endToken);
+        TokenBuffer.stop();
+        TokenBuffer.eat();
 
-        this.TokenBuffer.start();
-        callback(this.TokenBuffer.token, this.next, this.error);
-        this.TokenBuffer.stop();
-
-        return ({ eat })
+        return ({ then })
       },
-      catch() { },
-      eat
+      each: (callback: (token: Token) => void) => {
+
+        TokenBuffer.start(callback);
+        recursive_next(startToken, endToken);
+        TokenBuffer.stop();
+
+        return ({
+          eat,
+          then
+        })
+      },
+      then: (callback: (token: Token) => any) => {
+        then_pipe = true;
+        return then(callback);
+      },
+      catch() { }
     })
   }
 
@@ -587,7 +612,6 @@ class Tokenizer {
       return this.recursive_next(start_token, end_token);
     }
 
-    this.next();
     return output;
   }
 
@@ -608,32 +632,20 @@ class Tokenizer {
 
     const print = () => {
       if ((this.debug.token || debug) && debug !== 'suppress') {
-        // @ts-ignore
-        log(this.History.loc(), this.Token.type.magenta() + (this.Token.name ? ` ${this.Token.name}`.green() : ''), this.Token.value || this.char.curr)
+        log(this.History.loc(), this.Token.type + ';m', this.Token.value || this.char.curr)
       }
+    }
+
+    if (this.next_token.type) {
+      // clean next token
+      delete this.next_token[this.next_token.type];
+      delete this.next_token.type;
+      delete this.next_token.value;
     }
 
     if (this.TokenBuffer.get()) {
-      log('cached;c', this.Token.value, this.Token.type);
+      // if cached return it
       return this.Token;
-    }
-
-    if (this.History.stashed) {
-
-      try {
-
-        this.History.apply();
-
-        print();
-
-        this.History.push();
-
-        return this.Token;
-      } catch (error) {
-        // @ts-ignore
-        console.log(error.red());
-        this.next();
-      }
     }
 
     while (!this.blocking_error && this.index < this.source.length) {
@@ -643,6 +655,7 @@ class Tokenizer {
       this.char.next = this.source[this.index + 1];
 
       if (this.parse_comment()) {
+        // IT WILL BE IMPROVED, PROMISE
         continue;
       }
 
@@ -702,7 +715,6 @@ class Tokenizer {
     }
 
     if (this.end_program) {
-      console.log('end program', this.pairs_buffer.length > 0)
       if (this.pairs_buffer.length > 0) {
         throw {
           title: 'Token not found',
@@ -726,23 +738,9 @@ class Tokenizer {
 
     try {
 
-      this.traverse_tokens('[', ']')
-        .then((token, next) => {
-          console.log(token)
-          next();
-          console.log(token)
-        })
-
-      console.log(this.Token)
-      this.next()
-      console.log(this.Token)
-      this.next()
-
       if (this.end_program) {
         throw { message: 'end program', type: 'warn' };
       }
-
-      return;
 
       this.next()
       log('Program token:;g', this.Token.value);
@@ -827,10 +825,13 @@ type TempToken = [Token, [number, number, number]];
 
 class TokenBuffer {
 
+  record = false;
+
   current_token?: TempToken = undefined;
   token = {} as Token;
   buffer: TempToken[] = [];
-  record = false;
+
+  each_callback?: (token: Token) => void;
 
   constructor(public Tokenizer: Tokenizer) { }
 
@@ -838,7 +839,6 @@ class TokenBuffer {
 
     if (!this.record) return;
     if (!this.current_token) {
-
       this.current_token = this.ref();
     } else {
 
@@ -847,43 +847,65 @@ class TokenBuffer {
 
   }
 
-  clean = () => { }
-
-  get = () => {
+  get = (set_tokenizer = true) => {
     if (this.record) return false;
 
     const first_tt = this.buffer.shift();
+    this.debug('get', first_tt?.[0]);
+
+    if (!set_tokenizer && first_tt) return true;
+
     if (first_tt) {
-      this.set_token(first_tt);
+      this.set_tokenizer(first_tt);
       return true;
     }
   }
 
-  start = () => {
+  start = (each_callback?: (token: Token) => void) => {
+    this.debug('start');
+    this.record = true;
+    this.each_callback = each_callback;
+
     const last_tt = this.buffer.at(-1);
     if (last_tt) {
-
-      this.set_token(last_tt);
-
+      this.debug('current')
+      this.set_tokenizer(last_tt);
     } else {
+
       const { type } = this.Tokenizer.Token;
+
       if (type !== 'unknown') {
+
         this.current_token = this.ref();
       }
     }
-    this.record = true;
   }
 
   stop = () => {
+    this.debug('stop');
     this.record = false;
+    this.each_callback = undefined;
 
     if (this.current_token) {
-
-      this.set_token(this.current_token);
+      this.set_tokenizer(this.current_token);
     }
   }
 
-  private set_token = (tt: TempToken) => {
+  eat = () => {
+    const last_tt = this.buffer.at(-1);
+
+    if (last_tt) {
+      this.debug('eat');
+      this.set_tokenizer(last_tt);
+      this.current_token = undefined;
+      this.buffer = [];
+      this.token = {} as Token;
+    }
+
+    this.Tokenizer.next();
+  }
+
+  private set_tokenizer = (tt: TempToken) => {
     const [{ value, type }, [index, line, pos]] = tt;
 
     delete this.Tokenizer.Token[this.Tokenizer.Token.type];
@@ -894,6 +916,8 @@ class TokenBuffer {
     this.Tokenizer.index = index;
     this.Tokenizer.line = line;
     this.Tokenizer.pos = pos;
+
+    this.debug('set');
   }
 
   private ref() {
@@ -901,7 +925,44 @@ class TokenBuffer {
     this.token.value = value;
     this.token.type = type;
     this.token[type] = true;
+
+    if (!this.current_token) {
+      this.debug('current')
+    } else {
+      this.debug('cache');
+    }
+
+    if (this.each_callback) this.each_callback(this.token);
     return [{ type, value, ...r }, this.Tokenizer.History.location()] as TempToken;
+  }
+
+  private debug(type: 'start' | 'stop' | 'cache' | 'current' | 'get' | 'set' | 'eat', token?: Token) {
+    if (this.Tokenizer.debug.TokenBuffer) {
+      const location = this.Tokenizer.History.location();
+      switch (type) {
+        case "start":
+          log('TokenBuffer;c', 'start;g');
+          break;
+        case "stop":
+          log('TokenBuffer;c', 'stop;r');
+          break;
+        case "cache":
+          log('TokenBuffer;c', 'cache next token;y', this.token.value);
+          break;
+        case "current":
+          log('TokenBuffer;c', 'cache current token;y', this.token.value);
+          break;
+        case "get":
+          log('TokenBuffer;c', 'get cached token;y', token?.value || 'null');
+          break;
+        case "set":
+          log('TokenBuffer;c', 'set current token;y', this.Tokenizer.Token.value);
+          break;
+        case "eat":
+          log('TokenBuffer;c', 'eated;y', this.buffer.length, 'tokens;g');
+          break;
+      }
+    }
   }
 
 }
