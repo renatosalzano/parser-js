@@ -42,6 +42,7 @@ const context = {
     }
   },
   Expression: {
+    props: { group: false },
     default: true,
     token: {
       '(': null
@@ -164,7 +165,7 @@ export default (config: any) => {
               if (token.type === 'identifier') {
                 if (expected('(')) {
                   // identifier()
-                  return this.Expression(true);
+                  return this.Expression({ group: true });
                 }
                 return createNode(Identifier, { name: token.value })
               } else {
@@ -185,7 +186,7 @@ export default (config: any) => {
                 case '[':
                   return this.Array();
                 case '(':
-                  return this.Expression(true);
+                  return this.Expression({ group: true });
                 case '`':
                   return this.TemplateLiteral();
               }
@@ -198,11 +199,20 @@ export default (config: any) => {
           }
         },
 
-        Expression(is_group = false): Node {
+        Expression({ group } = { group: false } as Context['Expression']['props']): Node {
           log('Expression;m', token.value)
-          const node = createNode(Expression, { group: is_group });
+          const node = createNode(Expression, { group });
           const curr_ctx = currentContext();
           const ctx_expression = curr_ctx.name === 'Expression';
+
+          function end_context() {
+            if (ctx_expression) {
+              log('Expression end;m');
+              appendNode(node);
+              endContext();
+              return node;
+            }
+          }
 
           let parsing_expression = true;
 
@@ -231,17 +241,17 @@ export default (config: any) => {
                 switch (token.value) {
                   case '{':
                     node.expression.push(this.ObjectExpression());
-                    break;
+                    continue;
                   case '[':
                     node.expression.push(this.ArrayExpression());
                     continue;
                   case '(':
                     console.log('expression group start');
                     next();
-                    node.expression.push(this.Expression(true));
+                    node.expression.push(this.Expression({ group: true }));
                     break;
                   case ')':
-                    if (is_group) {
+                    if (group) {
                       console.log('expression group end');
                       parsing_expression = false;
                       return node;
@@ -249,13 +259,12 @@ export default (config: any) => {
                     break;
                   case '}': {
                     log('Expression end;m')
-                    console.log('current tok', token.value)
                     return node;
                   }
                 }
               }
               case 'keyword': {
-                if (is_group) {
+                if (group) {
                   if (ctx.Function.has(token.value)) {
                     node.expression.push(ctx.Function.start());
                     break;
@@ -273,8 +282,11 @@ export default (config: any) => {
               }
               case 'separator': {
                 switch (token.value) {
-                  case ';':
-
+                  case ';': {
+                    next();
+                    end_context();
+                    return node;
+                  }
                 }
               }
             }
@@ -285,7 +297,7 @@ export default (config: any) => {
 
             switch (nextToken.type) {
               case 'keyword': {
-                if (!is_group && statement_keyword(nextToken.value)) {
+                if (!group && statement_keyword(nextToken.value)) {
                   log('Expression end;m')
                   return node;
                 }
@@ -294,7 +306,6 @@ export default (config: any) => {
                 switch (nextToken.value) {
                   case ';': {
                     next();
-                    console.log('current end token', token)
                     if (curr_ctx.name === 'Expression') {
                       appendNode(node);
                       endContext();
@@ -303,7 +314,7 @@ export default (config: any) => {
                     return node;
                   }
                   case ',': {
-                    if (!is_group && curr_ctx.name !== 'Expression') {
+                    if (!group && curr_ctx.name !== 'Expression') {
                       log('Expression end;m')
                       return node;
                     }
@@ -352,22 +363,17 @@ export default (config: any) => {
           log('Variable;m', kind + ";c", 'implicit:', implicit)
 
           const node = createNode(Variable, { tag: kind, kind });
-          const curr_ctx = currentContext();
           const expected_init = kind === 'const';
 
           this.VariableId(node); // parse id
+          log('Variable;m', 'ID done;g');
+          console.log(token)
 
-          curr_ctx.next(); // id done
-
-          if (expected_init) {
-            if (!expected('=')) {
-
-              error({ message: errors.variable.expected_init });
-            }
+          if (expected_init && !token.eq('=')) {
+            error({ message: errors.variable.expected_init });
           }
 
-          if (expected('=')) {
-            next();
+          if (token.eq('=')) {
             next(); // over "="
 
             if (expected_init && /[,;]/.test(token.value)) {
@@ -375,13 +381,13 @@ export default (config: any) => {
             }
 
             this.VariableInit(node);
+            log('Variable;m', 'init done;g');
+            console.log(token)
           }
 
           appendNode(node);
 
-          if (expected((token) => /[,;]/.test(token.value))) {
-
-            next();
+          if (token.eq(/[,;]/)) {
 
             if (token.eq(';')) {
               skip_multiple_token(token.value);
@@ -392,8 +398,8 @@ export default (config: any) => {
             }
           }
 
-
           endContext();
+          console.log(token)
           log('Variable end;m', node.toString())
         },
 
@@ -403,6 +409,7 @@ export default (config: any) => {
           switch (token.type) {
             case 'identifier':
               node.id = token.value;
+              next();
               break;
             case 'bracket': {
               switch (token.value) {
@@ -410,7 +417,7 @@ export default (config: any) => {
                   node.id = this.Object('pattern');
                   break;
                 case '[':
-                  node.id = this.Array();
+                  node.id = this.Array('pattern');
                   break;
                 default:
                   error({ title: errors.syntax, message: `unexpected token '${token.value}'` });
@@ -632,14 +639,15 @@ export default (config: any) => {
 
           while (max > 0 && parsing_array) {
             next();
-            log('current token:;c', token.value);
+            // log('current token:;c', token.value);
 
             switch (token.value) {
-              case ',':
+              case ',': {
                 ++comma_count;
                 node.items.push(item);
                 break;
-              case ']':
+              }
+              case ']': {
                 parsing_array = false;
                 if (comma_count === node.items.length) {
                   node.items.push(item);
@@ -647,6 +655,16 @@ export default (config: any) => {
                 next() // over [
                 log('Array end;m')
                 return node;
+              }
+              case '...': {
+                if (expected('identifier')) {
+                  next();
+                  node.items.push(createNode(Identifier, { name: token.value, rest: true }))
+                  break;
+                } else {
+                  error({ message: 'array porco dio' })
+                }
+              }
               default: {
                 item = this.parse_expression();
               }
@@ -657,46 +675,6 @@ export default (config: any) => {
 
           return node;
 
-          // while (parsing_array) {
-          //   next();
-          //   if (token.eq(',')) { continue; }
-          //   switch (token.type) {
-          //     case 'literal':
-          //     case 'number':
-          //     case 'identifier':
-          //       if (expected('operator')) {
-
-          //       }
-          //       if (token.type === 'identifier') {
-          //         node.items.push(createNode(IdentifierNode, { name: token.value }))
-          //       } else {
-          //         node.items.push(createNode(node_map[token.type], { value: token.value }))
-          //       }
-          //       continue;
-          //     case 'operator':
-          //       continue
-          //     case 'bracket':
-          //       switch (token.value) {
-          //         case "{":
-          //           log('item is object;y')
-          //           node.items.push(this.Object());
-          //           continue;
-          //         case "[":
-          //           node.items.push(this.Array());
-          //           continue;
-          //         case "(":
-          //           // node.items.push(this.Expression())
-          //           continue;
-          //         case "]":
-          //           parsing_array = false;
-          //           return node;
-          //       }
-          //     default:
-          //       console.log('unexpected token')
-          //   }
-
-          // }
-          // return node;
         },
 
         TemplateLiteral() {

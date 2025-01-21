@@ -45,7 +45,7 @@ class ParserConfig {
     this.Tokenizer.extend('keyword', keyword);
     this.Tokenizer.extend('special', specialToken);
     this.Tokenizer.Context.extend(context);
-    Object.assign(this.Tokenizer.parse, parse(this.Tokenizer.api))
+    Object.assign(this.Tokenizer.parse, parse(this.Tokenizer.api));
     log('extended parser;y')
   }
 

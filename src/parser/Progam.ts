@@ -21,6 +21,12 @@ class Node {
   }
 }
 
+interface Identifier {
+  name: string;
+  spread?: boolean;
+  rest?: boolean;
+}
+
 class Identifier {
   name = '';
   reference?: Node;
@@ -69,9 +75,6 @@ class Block extends Node {
   }
 }
 
-class Unexpected extends Node {
-
-}
 
 class Program {
   body: Node[] = [];
@@ -82,7 +85,7 @@ class Program {
   constructor(private Tokenizer: Tokenizer) {
   }
 
-  createNode = <T>(NodeConstructor: Constructor<T>, init = {} as { [K in keyof T]?: T[K] }) => {
+  createNode = <T>(NodeConstructor: Constructor<T>, init?: { [K in keyof T]?: T[K] }) => {
 
     const node = new NodeConstructor() as Node;
 
@@ -90,7 +93,10 @@ class Program {
       this.reference.scope.push(new Map());
       this.blocks.push(node);
     } else {
-      Object.assign(node, init);
+      if (init) {
+        console.log(init)
+        Object.assign(node, init)
+      }
     }
 
     if (node instanceof Identifier) {

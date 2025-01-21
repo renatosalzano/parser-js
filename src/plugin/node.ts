@@ -37,8 +37,7 @@ class Function extends Node {
 }
 
 class Expression extends Node {
-  tag = 'expression'
-  iife = false;
+  tag = 'expression';
   group = false;
   expression: (Node | string)[] = [];
   toString() {
@@ -89,6 +88,17 @@ class ArrayExpression extends Node {
   tag = 'array'
   type: 'expression' | 'pattern' = 'expression';
   items: (Node | undefined)[] = [];
+  toString(): string {
+    const output: string[] = [];
+    for (const item of this.items) {
+      if (item) {
+        output.push(item.toString())
+      } else {
+        output.push('undefined');
+      }
+    }
+    return `[${output.join(',')}]`;
+  }
 }
 
 class Literal extends Node {

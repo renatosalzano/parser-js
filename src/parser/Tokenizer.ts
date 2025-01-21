@@ -110,13 +110,15 @@ class Tokenizer {
         log(`warn: duplicate "${token}" found in ${type};y`);
       } else {
 
-        if (this.is.alpha(token) || type === 'keyword' || type === 'special') {
+        if (this.is.alpha(token) || type === 'keyword') {
+
           this.keyword.set(token, type);
 
           if (token.length > this.keyword_max_len) {
             this.keyword_max_len = token.length;
             this.get_keyword = create_fast_get('keyword', token.length);
           }
+
         } else {
           this.token.set(token, type);
 
@@ -734,7 +736,7 @@ class Tokenizer {
       }
       // await closing current context
       if (this.Context.current.name === 'Program') {
-        throw { message: 'end source', type: 'warn' };
+        throw { message: 'end source', type: 'end' };
       }
     }
 
@@ -748,10 +750,10 @@ class Tokenizer {
     try {
 
       if (this.end_program) {
-        throw { message: 'end program', type: 'warn' };
+        throw { message: 'end program', type: 'end' };
       }
 
-      this.next()
+      if (this.index === 0) this.next()
       log('Program token:;g', this.Token.value);
       const start_context = this.program.get(this.Token.value);
       if (start_context) {
@@ -775,13 +777,16 @@ class Tokenizer {
           case 'info':
             console.log(`${error.message}\n    at ${this.line}:${this.pos}`)
             break;
+          case 'end': {
+            console.log(this.Program.toString())
+            return;
+          }
         }
       }
 
       console.log(error);
     }
 
-    console.log(this.Program.body)
 
     // this.debug.expected = true
 
