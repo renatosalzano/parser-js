@@ -9,10 +9,8 @@ export type TokenType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keywor
 export type Token = {
   value: string;
   type: TokenType;
-  location?: { line: number; pos: number };
+  location?: { line: number; start: number; end: number };
   eq(comparator: string | RegExp): boolean;
-} & {
-  [K in TokenType]?: boolean;
 }
 
 export type DebugNext = {
@@ -155,6 +153,7 @@ class Tokenizer {
   Token: Token = {
     value: '',
     type: 'unknown' as TokenType,
+    location: {} as Token['location'],
     eq(_: string | RegExp) {
       if (_ instanceof RegExp) {
         return _.test(this.value);
@@ -512,7 +511,6 @@ class Tokenizer {
       Object.assign(this.next_token, t);
       this.next_token.value = value;
       this.next_token.type = type;
-      this.next_token[type] = true;
 
       print('cache next token;y');
     }
@@ -648,7 +646,6 @@ class Tokenizer {
 
     if (this.next_token.type) {
       // clean next token
-      delete this.next_token[this.next_token.type];
       delete this.next_token.type;
       delete this.next_token.value;
       delete this.next_token.eq;
@@ -676,11 +673,8 @@ class Tokenizer {
 
         this.stop_immediate = false;
 
-        if (this.Token.unknown) {
-          log('unexpected token;r')
-        }
         this.History.push();
-        this.TokenBuffer.push()
+        // this.TokenBuffer.push()
 
         return this.Token;
       }
@@ -753,6 +747,18 @@ class Tokenizer {
         throw { message: 'end program', type: 'end' };
       }
 
+      this.debug.token;
+
+      while (true) {
+
+        if (this.end_program) {
+          throw { message: 'end program', type: 'end' };
+        }
+
+        this.next();
+
+      }
+
       if (this.index === 0) this.next()
       log('Program token:;g', this.Token.value);
       const start_context = this.program.get(this.Token.value);
@@ -779,7 +785,7 @@ class Tokenizer {
             break;
           case 'end': {
             this.Program.check_references();
-            console.log(this.Program.body)
+            // console.log(this.Program.body)
             return;
           }
         }

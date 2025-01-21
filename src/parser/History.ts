@@ -1,12 +1,18 @@
 import { log } from "utils";
 import Tokenizer, { Token } from "./Tokenizer";
 
+type token = Omit<Token, 'eq'>;
+
 class History {
 
   history: [number, number, number][] = [];
   Token: Omit<Token, 'eq'>[] = [];
   current: [number, number, number];
 
+  tokens: token[] = [];
+  tokens_buffer: number[] = [];
+
+  record = false;
 
   constructor(public Tokenizer: Tokenizer) {
     this.current = [0, 1, 1];
@@ -19,8 +25,18 @@ class History {
 
     // save token
     const { value, type } = this.Tokenizer.Token;
-    this.Token.push({ value, type });
-    this.Tokenizer.Token.location = { line, pos };
+    const location = {
+      line,
+      start: pos - value.length,
+      end: pos,
+    }
+
+    this.Tokenizer.Token.location = location;
+
+    const cache_index = this.tokens.push({ value, type, location }) - 1;
+    if (this.record) {
+      this.tokens_buffer.push(cache_index);
+    }
   }
 
   compare = (a: [number, number, number], b?: [number, number, number]) => {
@@ -74,6 +90,14 @@ class History {
     if (error) return `${line}:${pos}`
     // @ts-ignore
     return `${line}`.cyan() + `:${pos},${pos + offset}`;
+  }
+
+  start() {
+    this.record = true;
+  }
+
+  end() {
+    this.record = false;
   }
 
 }
