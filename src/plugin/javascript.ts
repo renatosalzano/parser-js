@@ -75,12 +75,10 @@ const keyword = ['true', 'false', 'null', 'this', 'super'];
 
 const specialToken = ['=>', '...', '?.', '`', '${'];
 
-// const comment = {
-//   '//': "comment",
-//   "/*": "comment multiline start",
-//   "*/": "comment multiline end"
-// }
-
+const comment = [
+  ['//'],
+  ['/*', '*/']
+]
 
 type Context = typeof context;
 type VariableProps = Context['Variable']['props'] & Context['Variable']['keyword']['var']['props']
@@ -113,6 +111,7 @@ export default (config: any) => {
     tokens: {
       keyword,
       bracket,
+      comment,
       operator,
       separator,
       specialToken,
@@ -175,7 +174,7 @@ export default (config: any) => {
 
                 return create_id();
               } else {
-                const Node = token.literal ? Literal : Number;
+                const Node = token.type === 'literal' ? Literal : Number;
                 return createNode(Node, { value: token.value });
               }
             }

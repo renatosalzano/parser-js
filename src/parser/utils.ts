@@ -2,7 +2,7 @@ import Parser from "./Tokenizer";
 
 type GetToken = ((parser: Parser) => string | undefined);
 
-export function create_fast_get(type: 'keyword' | 'token', max_length: number): GetToken {
+export function create_fast_get(type: 'keyword' | 'token' | 'comment_token', max_length: number): GetToken {
 
   const cases: string[] = [];
 

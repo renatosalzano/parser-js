@@ -18,24 +18,56 @@ class History {
     this.current = [0, 1, 1];
   }
 
+  get_next = () => {
+    return this.tokens[this.tokens_buffer[0]];
+  }
+
+  shift = () => {
+
+    if (this.record) return false;
+
+    const token_index = this.tokens_buffer.shift();
+
+    if (token_index !== undefined) {
+      const { value, type, location } = this.tokens[token_index];
+      const { line, start, end } = location || {};
+
+      if (line === undefined || start === undefined || end === undefined) {
+        throw { title: 'Unexpected Error', message: '', at: 'History.ts' }
+      }
+
+      this.Tokenizer.index = end;
+      this.Tokenizer.line = line;
+      this.Tokenizer.pos = end;
+
+      this.Tokenizer.Token.value = value;
+      this.Tokenizer.Token.type = type;
+      this.Tokenizer.Token.location.start = start;
+      this.Tokenizer.Token.location.end = end;
+      this.Tokenizer.Token.location.line = line;
+      return true;
+    }
+
+  }
+
   push = () => {
     const { index, line, pos } = this.Tokenizer;
     this.history.push([index, line, pos]);
     this.current = [index, line, pos];
 
-    // save token
     const { value, type } = this.Tokenizer.Token;
-    const location = {
-      line,
-      start: pos - value.length,
-      end: pos,
-    }
 
-    this.Tokenizer.Token.location = location;
+    // add location
+    const start = pos - value.length;
+    this.Tokenizer.Token.location.start = start;
+    this.Tokenizer.Token.location.end = pos;
+    this.Tokenizer.Token.location.line = line;
 
-    const cache_index = this.tokens.push({ value, type, location }) - 1;
+    const location = { line, start, end: pos };
+
+    const token_index = this.tokens.push({ value, type, location }) - 1;
     if (this.record) {
-      this.tokens_buffer.push(cache_index);
+      this.tokens_buffer.push(token_index);
     }
   }
 
@@ -48,35 +80,6 @@ class History {
     }
   }
 
-  back = () => {
-
-    if (this.history.length !== 1) {
-      this.history.pop()
-    }
-
-    const [index, line, pos] = this.history.at(-1) as [number, number, number];
-    this.Tokenizer.index = index;
-    this.Tokenizer.line = line;
-    this.Tokenizer.pos = pos;
-
-    this.Tokenizer.char.prev = this.Tokenizer.source[index - 1];
-    this.Tokenizer.char.curr = this.Tokenizer.source[index];
-    this.Tokenizer.char.next = this.Tokenizer.source[index + 1];
-
-    // restore prev token
-
-    if (this.Token.length !== 1) {
-      this.Token.pop()
-    }
-
-    const { value, type } = this.Token.at(-1)!;
-
-    delete this.Tokenizer.Token[this.Tokenizer.Token.type];
-    this.Tokenizer.Token.value = value;
-    this.Tokenizer.Token.type = type;
-    this.Tokenizer.Token[type] = true;
-
-  }
 
   location = () => {
     const [i, l, p] = this.history.at(-1) || this.current;
@@ -84,12 +87,14 @@ class History {
   }
 
   loc = (error = false) => {
-    const [, , pos] = this.history.at(-1) || this.current;
-    const { line, index, Token, char } = this.Tokenizer;
-    const offset = (Token.value || char.curr).length;
-    if (error) return `${line}:${pos}`
+    const { location } = this.tokens.at(-1) || {};
+
+    if (!location) return;
+
+    const { line, start, end } = location;
+    if (error) return `${line}:${start}`
     // @ts-ignore
-    return `${line}`.cyan() + `:${pos},${pos + offset}`;
+    return `${line}`.cyan() + `:${start},${end}`;
   }
 
   start() {
