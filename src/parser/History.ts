@@ -1,5 +1,5 @@
 import { log } from "utils";
-import Parser, { Token } from "./Tokenizer";
+import Tokenizer, { Token } from "./Tokenizer";
 
 class History {
 
@@ -7,85 +7,20 @@ class History {
   Token: Omit<Token, 'eq'>[] = [];
   current: [number, number, number];
 
-  stashed?: [number, number, number];
-  stashed_token?: Omit<Token, 'eq'>;
 
-  constructor(public Parser: Parser) {
+  constructor(public Tokenizer: Tokenizer) {
     this.current = [0, 1, 1];
   }
 
   push = () => {
-    const { index, line, pos } = this.Parser;
+    const { index, line, pos } = this.Tokenizer;
     this.history.push([index, line, pos]);
     this.current = [index, line, pos];
 
-    // clean stash
-    this.stashed = undefined;
-    this.stashed_token = undefined;
-
     // save token
-    const { value, type } = this.Parser.Token;
+    const { value, type } = this.Tokenizer.Token;
     this.Token.push({ value, type });
-  }
-
-  stash = () => {
-    if (this.Token.length === 0) {
-      log('cannot stash with empty history;r');
-    }
-
-    if (this.history.length !== 1) {
-      this.history.pop()
-    }
-
-    const { index, line, pos } = this.Parser;
-    this.stashed = [index, line, pos];
-
-    {
-      // stash token
-      const { value, type } = this.Token.at(-1)!;
-      this.stashed_token = { value, type };
-    }
-
-    if (this.Token.length !== 1) {
-      this.Token.pop()
-    }
-
-    const { value, type } = this.Token.at(-1)!;
-
-    delete this.Parser.Token[this.Parser.Token.type];
-    this.Parser.Token.value = value;
-    this.Parser.Token.type = type;
-    this.Parser.Token[type] = true;
-  };
-
-  apply = () => {
-
-    if (!this.stashed || !this.stashed_token) throw 'unexpected error: can not apply stash';
-
-    const [index, line, pos] = this.stashed;
-
-    this.current = [index, line, pos];
-
-    this.Parser.index = index;
-    this.Parser.line = line;
-    this.Parser.pos = pos;
-
-    this.Parser.char.prev = this.Parser.source[index - 1];
-    this.Parser.char.curr = this.Parser.source[index];
-    this.Parser.char.next = this.Parser.source[index + 1];
-
-    const { type, value } = this.stashed_token;
-
-    delete this.Parser.Token[this.Parser.Token.type];
-    this.Parser.Token.value = value;
-    this.Parser.Token.type = type;
-    this.Parser.Token[type] = true;
-
-    // clean cached token
-    const Type = this.Parser.next_token.type!;
-    delete this.Parser.next_token.value;
-    delete this.Parser.next_token.type;
-    delete this.Parser.next_token[Type];
+    this.Tokenizer.Token.location = { line, pos };
   }
 
   compare = (a: [number, number, number], b?: [number, number, number]) => {
@@ -104,13 +39,13 @@ class History {
     }
 
     const [index, line, pos] = this.history.at(-1) as [number, number, number];
-    this.Parser.index = index;
-    this.Parser.line = line;
-    this.Parser.pos = pos;
+    this.Tokenizer.index = index;
+    this.Tokenizer.line = line;
+    this.Tokenizer.pos = pos;
 
-    this.Parser.char.prev = this.Parser.source[index - 1];
-    this.Parser.char.curr = this.Parser.source[index];
-    this.Parser.char.next = this.Parser.source[index + 1];
+    this.Tokenizer.char.prev = this.Tokenizer.source[index - 1];
+    this.Tokenizer.char.curr = this.Tokenizer.source[index];
+    this.Tokenizer.char.next = this.Tokenizer.source[index + 1];
 
     // restore prev token
 
@@ -120,10 +55,10 @@ class History {
 
     const { value, type } = this.Token.at(-1)!;
 
-    delete this.Parser.Token[this.Parser.Token.type];
-    this.Parser.Token.value = value;
-    this.Parser.Token.type = type;
-    this.Parser.Token[type] = true;
+    delete this.Tokenizer.Token[this.Tokenizer.Token.type];
+    this.Tokenizer.Token.value = value;
+    this.Tokenizer.Token.type = type;
+    this.Tokenizer.Token[type] = true;
 
   }
 
@@ -134,7 +69,7 @@ class History {
 
   loc = (error = false) => {
     const [, , pos] = this.history.at(-1) || this.current;
-    const { line, index, Token, char } = this.Parser;
+    const { line, index, Token, char } = this.Tokenizer;
     const offset = (Token.value || char.curr).length;
     if (error) return `${line}:${pos}`
     // @ts-ignore

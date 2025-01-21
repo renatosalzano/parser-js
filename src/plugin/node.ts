@@ -3,8 +3,10 @@ import { Block, Identifier, Node } from "parser/Progam";
 class Variable extends Node {
   tag = 'variable'
   kind = 'var' as 'var' | 'const' | 'let';
-  id: Node | string = '';
+  id = {} as Node;
   init?: Node;
+
+  declarator = true;
 
   toString(): string {
     const id = typeof this.id === 'string' ? this.id : this.id.toString();
@@ -18,7 +20,8 @@ class Variable extends Node {
 
 class Function extends Node {
   tag = 'function';
-  id = ''
+  id = '';
+  declarator = true;
   async?: boolean;
   arrow?: boolean;
   params: Node[] = [];
@@ -40,6 +43,28 @@ class Expression extends Node {
   tag = 'expression';
   group = false;
   expression: (Node | string)[] = [];
+  id: Identifier[] = []
+
+  add(node: Node | string) {
+
+    if (node instanceof Node && node.id) {
+      switch (node.id.constructor) {
+        case Array:
+          this.id = this.id.concat(node.id as Array<Identifier>);
+          break;
+        case Identifier:
+          this.id.push(node.id as Identifier);
+          break;
+      }
+    }
+
+    if (node instanceof Identifier) {
+      this.id.push(node);
+    }
+
+    this.expression.push(node);
+  }
+
   toString() {
     let expr: string[] = [];
     for (const item of this.expression) {
@@ -87,7 +112,17 @@ class Property {
 class ArrayExpression extends Node {
   tag = 'array'
   type: 'expression' | 'pattern' = 'expression';
+  id: Node[] = [];
   items: (Node | undefined)[] = [];
+  add(node?: Node) {
+    if (node instanceof Identifier) {
+      this.id.push(node);
+    }
+    if (node?.id) {
+      console.log(node)
+    }
+    this.items.push(node);
+  }
   toString(): string {
     const output: string[] = [];
     for (const item of this.items) {

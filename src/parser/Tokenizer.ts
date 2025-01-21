@@ -9,6 +9,7 @@ export type TokenType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keywor
 export type Token = {
   value: string;
   type: TokenType;
+  location?: { line: number; pos: number };
   eq(comparator: string | RegExp): boolean;
 } & {
   [K in TokenType]?: boolean;
@@ -75,7 +76,6 @@ class Tokenizer {
       eachChar: this.each_char,
       createNode: this.Program.createNode,
       appendNode: this.Program.appendNode,
-      createRef: this.Program.createRef,
       logNode: this.Program.log,
       startContext: this.Context.start,
       endContext: this.Context.end,
@@ -778,7 +778,8 @@ class Tokenizer {
             console.log(`${error.message}\n    at ${this.line}:${this.pos}`)
             break;
           case 'end': {
-            console.log(this.Program.toString())
+            this.Program.check_references();
+            console.log(this.Program.body)
             return;
           }
         }

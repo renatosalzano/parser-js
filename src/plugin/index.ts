@@ -41,7 +41,6 @@ type DefaultApi = {
   expected(comparator?: string | ((token: Token) => boolean)): boolean;
   appendNode: Program['appendNode'];
   createNode: Program['createNode'];
-  createRef: Program['createRef'];
   logNode: Program['log'];
   eat(sequence: string, breakReg?: RegExp): void;
   startContext(context: string, props?: ContextObject['props'], instruction?: { [key: string]: any }): void;
