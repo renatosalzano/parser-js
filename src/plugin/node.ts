@@ -20,7 +20,7 @@ class Variable extends Node {
 
 class Function extends Node {
   tag = 'function';
-  id = '';
+  id?: Identifier;
   declarator = true;
   async?: boolean;
   arrow?: boolean;
@@ -37,6 +37,10 @@ class Function extends Node {
     }
     return `function ${this.id}(${params}){}`
   }
+}
+
+class Param extends Node {
+
 }
 
 class Expression extends Node {

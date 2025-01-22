@@ -153,9 +153,9 @@ class Context {
       Context.start = function (props?: any, instruction?: any) {
         const token = Tokenizer.Token.value;
         props = props || this.token.get(token)?.props || {};
-        console.log('start props', props)
+        props = { ...this.props, ...props };
 
-        return Tokenizer.Context.start(name, Object.assign(this.props || {}, props), instruction);
+        return Tokenizer.Context.start(name, props, instruction);
       }
 
 

@@ -28,6 +28,7 @@ interface Identifier {
   name: string;
   rest?: boolean;
   spread?: boolean;
+  param?: boolean;
   location?: { line: number, start: number, end: number };
 }
 

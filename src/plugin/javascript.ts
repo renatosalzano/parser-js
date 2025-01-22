@@ -167,6 +167,9 @@ export default (config: any) => {
               if (token.type === 'identifier') {
                 if (expected('(')) {
                   // identifier()
+                  if (this.check_is_arrow_fn()) {
+                    return ctx.Function.start({ arrow: true });
+                  }
                   return this.Expression({ group: true });
                 }
 
@@ -189,6 +192,9 @@ export default (config: any) => {
                 case '[':
                   return this.Array();
                 case '(':
+                  if (this.check_is_arrow_fn()) {
+                    return ctx.Function.start({ arrow: true });
+                  }
                   return this.Expression({ group: true });
                 case '`':
                   return this.TemplateLiteral();
@@ -282,6 +288,7 @@ export default (config: any) => {
                   node.add(token.value);
                   break;
                 }
+                node.add(token.value);
                 // node.expression.push()
                 break;
               }
@@ -338,8 +345,15 @@ export default (config: any) => {
 
         },
 
-        ExpressionGroup() {
+        check_is_arrow_fn() {
+          let is_arrow_fn = false;
+          traverseTokens('(', ')')
+            .then(() => {
+              console.log('TEST ', token.value)
+              is_arrow_fn = token.eq('=>')
+            })
 
+          return is_arrow_fn;
         },
 
         Block({ functionBody }: Context['Block']['props']) {
@@ -455,44 +469,80 @@ export default (config: any) => {
 
         Function({ async, arrow }: Context['Function']['props']) {
 
-          const node = createNode(Function, { async });
+          const node = createNode(Function, { async, arrow });
           appendNode(node)
-          // node.async = async;
-          next();
 
-          if (!arrow && token.type === 'identifier') {
-            // check if have identifier
-            node.id = token.value;
+          if (token.eq('function')) {
             next();
           }
 
+          if (arrow) {
+
+            switch (true) {
+              case (token.eq('(')):
+                node.params = this.Params();
+                break;
+              case (token.eq('identifier')): {
+                node.params = [createNode(Identifier, { param: true })]
+                break;
+              }
+              default:
+                error({ title: errors.unexpected, message: 'TODO' })
+            }
+
+            if (token.eq('=>')) {
+              next();
+              if (token.eq('{')) {
+                node.body = ctx.Block.start({ functionBody: true });
+              } else {
+                node.body = this.parse_expression()
+                node.returnType = node.body?.tag || 'void';
+
+                console.log(node)
+              }
+            }
+
+            log('Arrow Function end;m')
+            endContext();
+            return node;
+          }
+
+          log('Function;m');
+
+          if (token.eq('identifier')) {
+            node.id = createNode(Identifier, { name: token.value });
+            next();
+          }
+
+
           if (token.eq('(')) {
             console.log('params')
-            this.Params(node);
-          } else {
-            // throw error
+            node.params = this.Params();
           }
 
           next();
           if (token.eq('{')) {
             // block
-            node.body = createNode(Block);
-            ctx.Block.start({ functionBody: true });
+            node.body = ctx.Block.start({ functionBody: true });
           }
         },
 
-        Params(node: Function) {
+        Params() {
+          const params: Node[] = [];
           let parse_params = true;
+
           while (parse_params) {
             next();
-            switch (token.type) {
-              case "bracket":
-                if (token.eq(')')) {
-                  console.log('end parse params')
-                  parse_params = false;
-                }
+
+            if (token.eq(')')) {
+              next();
+              return params;
             }
+
+            params.push(this.parse_expression());
           }
+
+          return params;
 
         },
 
