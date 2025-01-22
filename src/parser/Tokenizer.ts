@@ -38,6 +38,8 @@ type Extend = (
   token: string[] | string[][]
 ) => void;
 
+type Tokenize = { [key: string]: () => "next" | "continue" | void }
+
 class Tokenizer {
 
   source = '';
@@ -178,7 +180,7 @@ class Tokenizer {
   pos = 1;
 
   index = 0;
-  char = { curr: '', prev: '', next: '' };
+  char = { curr: '', next: '' };
 
   Token: Token = {
     value: '',
@@ -212,11 +214,35 @@ class Tokenizer {
   debug: DebugNext = {};
 
 
+  skip_whitespace = () => {
+
+    const skip_reg = this.skip_newline
+      ? /\s/
+      : / /;
+
+    while (this.index < this.source.length) {
+      this.char.curr = this.source[this.index];
+
+      if (skip_reg.test(this.char.curr)) {
+
+        if (this.skip_newline && this.char.curr === '\n') {
+          ++this.index, ++this.line, this.pos = 1;
+          if (this.debug.newline) log('Ln:;c', this.line);
+        } else {
+          ++this.index, ++this.pos;
+        }
+
+      } else { break };
+
+    };
+
+  }
+
   check_new_line() {
     if (/[\r\n]/.test(this.char.curr)) {
 
       if (this.char.curr === '\r') {
-        return true;
+        return "next";
       }
 
       this.pos = 1, ++this.line;
@@ -268,12 +294,15 @@ class Tokenizer {
     if (this.debug.checkToken) log('expected:;g', this.expected_token);
   }
 
-  skip_comment = { multiline: false, end_token: '' };
+  comment_type = { multiline: false, end_token: '' };
 
-  tokenize = {
+  end_token = '';
+  get_end_token?: Function;
+
+  tokenize: Tokenize = {
     number: () => {
       if (!this.is.space(this.char.curr) && this.is.number(this.Token.value + this.char.curr)) {
-        return true;
+        return "next";
       }
     },
     keyword: () => {
@@ -283,7 +312,7 @@ class Tokenizer {
       if (!keyword) {
         this.Token.type = 'identifier';
         this.expected_token = 'identifier';
-        return true;
+        return "next";
       }
 
       this.index += keyword.length;
@@ -294,47 +323,50 @@ class Tokenizer {
       if (this.is.identifier(keyword + next_char)) {
         this.Token.type = 'identifier';
         this.expected_token = 'identifier';
-        return true;
+        return "next";
       }
 
       this.Token.type = 'keyword';
     },
     literal: () => {
 
+      this.Token.type = 'literal';
+
       if (!this.end_token) {
-        // "regular string" '' | ""
-        this.end_token = [this.char.curr];
-        this.Token.value += this.char.curr;
-        ++this.index, ++this.pos;
-        return true;
+        // "literal" '' | ""
+        this.end_token = this.char.curr;
+
+        this.Token.value = '';
+        ++this.index, ++this.pos; // over quote
+        return "continue";
       }
 
-      const token = this.get_token_in_literal
-        ? this.get_token_in_literal(this)
+      const end_token = this.get_end_token
+        ? this.get_end_token(this)
         : undefined;
 
       switch (true) {
-        case (token !== undefined): {
-          this.stop_immediate = true;
-          break;
+        case (end_token !== undefined): {
+          return;
         }
-        case (this.char.curr !== this.end_token[0]):
-          return false;
-        case (`${this.char.prev}${this.char.curr}` !== `\\${this.end_token[0]}`): {
-          // end parsing "regular string"
-          this.end_token = undefined;
-          this.stop_immediate = true;
-          this.Token.value += this.char.curr;
-          this.Token.value = this.Token.value.slice(1, -1);
-          ++this.index, ++this.pos;
-          return true;
+        case (this.char.curr + this.char.next === `\\${this.end_token}`):
+          ++this.index, ++this.pos; // over escaped quote
+          return "next"
+        case (this.char.curr !== this.end_token):
+          return "next";
+        default: {
+          // end "literal"
+          this.end_token = '';
+          this.Token.value = this.Token.value;
+          ++this.index, ++this.pos; // over quote
+          return;
         }
       }
 
     },
     identifier: () => {
       if (this.is.identifier(this.Token.value + this.char.curr)) {
-        return true;
+        return "next";
       }
     },
     token: () => {
@@ -356,9 +388,10 @@ class Tokenizer {
           this.expected_token = 'comment';
 
           const comment = this.comment_token.get(token);
+
           if (comment) {
             const { multiline, end_token } = comment;
-            this.skip_comment = { multiline, end_token };
+            this.comment_type = { multiline, end_token };
           }
 
           this.index -= token.length;
@@ -371,7 +404,7 @@ class Tokenizer {
           const next_token = this.get_token(this);
           if (next_token && this.token.get(next_token) === 'operator') {
             // TODO
-            this.error({ title: 'Unexpected operator', message: 'unexpected token' });
+            this.error({ title: 'Unexpected token', message: `unexpected token: '${token + next_token}'` });
           }
         }
 
@@ -384,15 +417,33 @@ class Tokenizer {
     },
     comment: () => {
 
-      if (this.skip_comment.multiline) {
+      if (this.comment_type.multiline) {
+
+        // TODO CHECK IF TOKEN LEN IS > 2
+        if ((this.char.curr + this.char.next) !== this.comment_type.end_token) {
+          return "next"
+        } else {
+          if (this.debug.comment) log(this.Token.value + this.comment_type.end_token + ';g');
+          this.Token.value = '';
+          this.index += 2, this.pos += 2;
+          this.skip_whitespace();
+          this.check_token_type();
+
+          return "continue"
+        }
 
       } else {
 
         if (this.char.curr !== '\n') {
-          return true;
+          return "next";
         } else {
+          if (this.debug.comment) log(this.Token.value + ';g');
+          this.Token.value = '';
+          ++this.index; // skip \n
+          this.skip_whitespace();
+          this.check_token_type();
 
-          log(this.Token.value + ';g');
+          return "continue"
         }
 
       }
@@ -413,32 +464,29 @@ class Tokenizer {
       // this.set_token_type('literal');
 
       if (typeof end_token === 'string') {
-        this.end_token = [end_token];
-      } else {
-        this.end_token = end_token;
+        end_token = [end_token];
       }
 
       let token_len = 1;
-      for (const token of this.end_token) {
+      for (const token of end_token) {
         if (!this.token.has(token)) {
           log(`invalid token "${token}";r`);
         } else {
-          token_len = Math.max(token_len, token.length);
+          token_len = token.length > token_len ? token.length : token_len;
         }
       }
-      this.get_token_in_literal = create_fast_get('token', token_len);
+      this.get_end_token = create_fast_get('token', token_len);
       const token = this.next();
 
       // this.forced_expected = undefined;
-      this.get_token_in_literal = undefined;
+      this.get_end_token = undefined;
       return token;
     } else {
       'Endtoken;r'
     }
   }
 
-  end_token?: string[];
-  get_token_in_literal?: Function;
+
 
 
   eat = (from: string, to?: string, config?: any) => {
@@ -628,26 +676,7 @@ class Tokenizer {
       return this.Token;
     }
 
-    const skip_reg = this.skip_newline
-      ? /\s/
-      : / /;
-
-    // SKIP WHITESPACE / NEWLINE
-    while (this.index < this.source.length) {
-      this.char.curr = this.source[this.index];
-
-      if (skip_reg.test(this.char.curr)) {
-
-        if (this.skip_newline && this.char.curr === '\n') {
-          ++this.index, ++this.line, this.pos = 1;
-          if (this.debug.newline) log('Ln:;c', this.line);
-        } else {
-          ++this.index, ++this.pos;
-        }
-
-      } else { break };
-
-    };
+    this.skip_whitespace();
 
     this.check_token_type();
 
@@ -661,65 +690,25 @@ class Tokenizer {
         continue;
       }
 
-      if (this.tokenize[this.expected_token]()) {
+      switch (this.tokenize[this.expected_token]()) {
+        case "next": {
+          this.Token.value += this.char.curr;
+          ++this.index, ++this.pos;
+          continue;
+        }
+        case "continue": {
+          continue;
+        }
+        default: {
+          // end tokenize
+          this.History.push();
 
-        this.Token.value += this.char.curr;
-        ++this.index, ++this.pos;
-        continue;
+          print();
 
-      } else {
+          return this.Token;
+        }
 
-        this.History.push();
-
-        print();
-
-        return this.Token;
       }
-
-      // if (this.stop_immediate) {
-
-
-      //   this.stop_immediate = false;
-
-      //   this.History.push();
-
-      //   print();
-
-      //   return this.Token;
-      // }
-
-
-
-
-
-      // if (this.skip_whitespace()) {
-      //   continue;
-      // }
-
-
-
-      // if (this.parse_literal()) {
-      //   continue;
-      // }
-
-      // if (this.parse_number()) {
-      //   continue;
-      // }
-
-      // if (this.parse_token()) {
-      //   continue;
-      // }
-
-      // if (this.parse_keyword()) {
-      //   continue;
-      // }
-
-      // if (this.parse_identifier()) {
-      //   continue;
-      // }
-
-
-
     }
 
     if (this.index === this.source.length) {
@@ -756,7 +745,8 @@ class Tokenizer {
 
       this.debug.token = true;
       this.debug.checkToken = true;
-      this.debug.newline = true;
+      // this.debug.comment = true;
+      // this.debug.newline = true;
       this.skip_newline = true;
 
       let max = 100;
