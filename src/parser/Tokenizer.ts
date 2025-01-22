@@ -3,7 +3,6 @@ import Context from "./Context";
 import History from "./History";
 import Program from "./Progam";
 import { create_fast_get } from "./utils";
-import TokenBuffer from "./TokenBuffer";
 
 export type TokenType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number' | 'special' | 'newline';
 export type Token = {
@@ -77,7 +76,7 @@ class Tokenizer {
       debug: this.debug,
       next: this.next,
       nextLiteral: this.next_literal,
-      expected: this.expected_next,
+      expected: this.expected,
       traverseTokens: this.traverse_tokens,
       currentContext: this.Context.get_current,
       isIdentifier: this.is.identifier,
@@ -116,10 +115,13 @@ class Tokenizer {
 
       for (const [start, end] of tokens as string[][]) {
 
-        if (end && this.token.has(end)) {
-          log(`Duplicate token "${end}" found in ${this.token.get(end)};y`);
-        } else {
-          this.token.set(end, 'comment');
+        if (end) {
+
+          if (this.token.has(end)) {
+            log(`Duplicate token "${end}" found in ${this.token.get(end)};y`);
+          } else {
+            this.token.set(end, 'comment');
+          }
         }
 
         if (this.token.has(start)) {
@@ -188,13 +190,17 @@ class Tokenizer {
     location: {} as Token['location'],
     eq(_: string | RegExp) {
       if (_ instanceof RegExp) {
-        return _.test(this.value);
+        switch (true) {
+          case (_.test(this.value)):
+            return true;
+          case (_.test(this.type)):
+            return true;
+        }
+        return false;
       }
-      return this.value === _;
+      return this.value === _ || this.type === _;
     }
   }
-
-  TokenBuffer = new TokenBuffer(this);
 
   next_token: Partial<Token> = {};
 
@@ -207,7 +213,7 @@ class Tokenizer {
   }
 
   expected_token: keyof Tokenizer['tokenize'] = 'token';
-  skip_newline = false;
+  skip_newline = true;
 
   blocking_error = false;
 
@@ -252,6 +258,8 @@ class Tokenizer {
 
   check_token_type = () => {
 
+    this.History.set_token_start();
+
     switch (true) {
       case (this.is.nl(this.char.curr)): {
         if (this.char.curr === '\r') {
@@ -265,6 +273,7 @@ class Tokenizer {
         break;
       }
       case this.is.number(this.char.curr): {
+        this.Token.type = 'number';
         this.expected_token = 'number';
         break;
       }
@@ -275,14 +284,17 @@ class Tokenizer {
           const possibly_token = this.get_token(this);
           if (possibly_token) {
             if (!this.is.identifier(possibly_token)) {
+              // ignore
               break;
             }
           }
         }
 
         if (this.is.alpha(this.char.curr)) {
+          this.Token.type = 'keyword';
           this.expected_token = 'keyword';
         } else {
+          this.Token.type = 'identifier';
           this.expected_token = 'identifier';
         }
         break;
@@ -291,7 +303,7 @@ class Tokenizer {
         this.expected_token = 'token';
     }
 
-    if (this.debug.checkToken) log('expected:;g', this.expected_token);
+    if (this.debug.checkToken) log('check token;c', 'expected:;g', this.expected_token);
   }
 
   comment_type = { multiline: false, end_token: '' };
@@ -329,8 +341,6 @@ class Tokenizer {
       this.Token.type = 'keyword';
     },
     literal: () => {
-
-      this.Token.type = 'literal';
 
       if (!this.end_token) {
         // "literal" '' | ""
@@ -486,9 +496,6 @@ class Tokenizer {
     }
   }
 
-
-
-
   eat = (from: string, to?: string, config?: any) => {
 
     // if (sequence !== this.next(breakReg)) {
@@ -502,11 +509,11 @@ class Tokenizer {
     // this.pos -= len;
   }
 
-  expected_next = (comparator?: string | ((token: Partial<Token>) => boolean), debug = false) => {
+  expected = (comparator?: string | ((token: Partial<Token>) => boolean), debug = false) => {
 
     const print = (message = 'get cached;y') => {
       if (this.debug.expected || debug) {
-        log(this.History.loc(), message, this.next_token.type + ';m', this.next_token.value);
+        log(this.History.log(), message, this.next_token.type + ';m', this.next_token.value);
       }
     }
 
@@ -522,9 +529,9 @@ class Tokenizer {
 
     } else {
 
-      this.TokenBuffer.start();
+      this.History.start();
       const { value, type, ...t } = this.next("suppress");
-      this.TokenBuffer.stop();
+      this.History.stop();
 
       Object.assign(this.next_token, t);
       this.next_token.value = value;
@@ -557,50 +564,49 @@ class Tokenizer {
 
   traverse_tokens = (startToken: string, endToken: string) => {
 
-    const { TokenBuffer, next, recursive_next } = this;
+    const { History, next, recursive_next } = this;
     let then_pipe = false;
 
-    function then(callback: (token: Token) => any) {
+    function then(callback: () => any) {
 
-      TokenBuffer.start();
+      History.start();
       if (then_pipe) {
         recursive_next(startToken, endToken);
         next();
       }
-      callback(TokenBuffer.token);
-      TokenBuffer.stop();
+      callback();
+      History.stop();
 
-      return ({ eat })
+      return ({ eat: () => { History.eat() } })
     }
 
     function eat(this: Tokenizer) {
-      TokenBuffer.eat();
+      History.eat();
       return ({ then })
     };
 
 
     return ({
       eat: () => {
-        TokenBuffer.start();
+        History.start();
         recursive_next(startToken, endToken);
-        TokenBuffer.stop();
-        TokenBuffer.eat();
+        History.stop();
+        History.eat();
 
         return ({ then })
       },
       each: (callback: (token: Token) => void) => {
 
-        TokenBuffer.start(callback);
+        History.start(callback);
         recursive_next(startToken, endToken);
-        TokenBuffer.stop();
-
+        History.stop();
 
         return ({
           eat,
           then
         })
       },
-      then: (callback: (token: Token) => any) => {
+      then: (callback: () => any) => {
         then_pipe = true;
         return then(callback);
       },
@@ -660,7 +666,7 @@ class Tokenizer {
       if ((this.debug.token || debug) && debug !== 'suppress') {
         let value = (this.Token.value || this.char.curr);
         if (this.Token.type === 'newline') value = value.replace('\n', '"\\n"')
-        log(this.History.loc(), this.Token.type + ';m', value)
+        log(this.History.log(), this.Token.type + ';m', value)
       }
     }
 
@@ -669,6 +675,7 @@ class Tokenizer {
       delete this.next_token.type;
       delete this.next_token.value;
       delete this.next_token.eq;
+      delete this.next_token.location;
     }
 
     if (this.History.shift()) {
@@ -737,36 +744,21 @@ class Tokenizer {
 
   parse_program = () => {
 
+    // this.debug.token = true
+
     try {
 
       if (this.end_program) {
         throw { message: 'end program', type: 'end' };
       }
 
-      this.debug.token = true;
-      this.debug.checkToken = true;
-      // this.debug.comment = true;
-      // this.debug.newline = true;
-      this.skip_newline = true;
+      if (this.index === 0) this.next();
 
-      let max = 100;
-
-      while (max > 0) {
-
-        this.next();
-        --max;
-
-        if (this.end_program) {
-          throw { message: 'end program', type: 'end' };
-        }
-
-
-      }
-
-      if (this.index === 0) this.next()
       log('Program token:;g', this.Token.value);
       const start_context = this.program.get(this.Token.value);
+
       if (start_context) {
+        // @ts-ignore
         start_context()
       } else {
         this.Context.default.start()
@@ -776,18 +768,20 @@ class Tokenizer {
 
       if (error.type && error.message) {
         const title = error.title || 'Error';
-        const at = " at " + (error.at || this.History.loc(true));
+        const at = " at " + (error.at || this.History.log(true));
         switch (error.type) {
           case 'error':
             log(` ${title} ;R`, `\n  ${error.message}${at};r`);
-            break;
+            console.log(this.History.tokens)
+            return;
           case 'warn':
             log(`${error.message};y`)
-            break;
+            return;
           case 'info':
             console.log(`${error.message}\n    at ${this.line}:${this.pos}`)
-            break;
+            return;
           case 'end': {
+            console.log(this.Program.toString());
             this.Program.check_references();
             // console.log(this.Program.body)
             return;
@@ -797,21 +791,6 @@ class Tokenizer {
 
       console.log(error);
     }
-
-
-    // this.debug.expected = true
-
-
-    // let index = 10
-    // while (index > 0) {
-    //   this.next()
-    //   --index;
-    // }
-    // this.debug.token = true;
-    // this.debug.expected = true;
-
-
-
   }
 
   error = (error: Error) => {
@@ -819,29 +798,6 @@ class Tokenizer {
   }
 
   each_char = (callback: (char: string, sequence: string) => boolean | undefined) => {
-
-    //   this.should_continue = true;
-    //   this.sequence.value = '';
-
-    //   while (this.should_continue && this.index < this.source.length) {
-
-    //     this.char.prev = this.source[this.index - 1];
-    //     this.char.curr = this.source[this.index];
-    //     this.char.next = this.source[this.index + 1];
-
-    //     if (this.skip_whitespace()) {
-    //       continue;
-    //     }
-
-    //     this.sequence.value += this.char.curr;
-
-    //     if (callback(this.char.curr, this.sequence.value)) {
-    //       this.should_continue = false;
-    //       return;
-    //     }
-
-    //     ++this.index, ++this.pos;
-    //   }
 
   }
 

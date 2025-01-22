@@ -18,7 +18,7 @@ class Node {
   id?: Node | Node[];
   declarator?: boolean;
   hoisting?: boolean;
-  location?: { line: number, pos: number }
+  location?: { line: number, start: number, end: number }
   toString() {
     return ''
   }
@@ -28,13 +28,13 @@ interface Identifier {
   name: string;
   rest?: boolean;
   spread?: boolean;
-  location?: { line: number, pos: number };
+  location?: { line: number, start: number, end: number };
 }
 
 class Identifier {
   name = '';
   toString() {
-    return this.name;
+    return `${this.rest || this.spread ? '...' : ''}${this.name}`;
   }
 }
 
@@ -169,6 +169,7 @@ class Program {
   }
 
   toString() {
+    console.log('parse Program')
     return this.body.map((node) => node.toString())
   }
 

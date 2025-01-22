@@ -6,20 +6,31 @@ type token = Omit<Token, 'eq'>;
 class History {
 
   history: [number, number, number][] = [];
-  Token: Omit<Token, 'eq'>[] = [];
   current: [number, number, number];
 
   tokens: token[] = [];
   tokens_buffer: number[] = [];
 
   record = false;
+  each_callback?: (token: Token) => void;
 
   constructor(public Tokenizer: Tokenizer) {
     this.current = [0, 1, 1];
   }
 
-  get_next = () => {
-    return this.tokens[this.tokens_buffer[0]];
+  token_start = 0;
+  set_token_start = () => {
+    const { pos } = this.Tokenizer;
+    this.token_start = pos;
+  }
+
+  get_next = (): Token | undefined => {
+    const next_token_index = this.tokens_buffer[0];
+    if (next_token_index !== undefined) {
+      const { value, type, location } = this.tokens[next_token_index] as Token;
+      const { eq } = this.Tokenizer.Token;
+      return { value, type, location, eq };
+    }
   }
 
   shift = () => {
@@ -30,15 +41,17 @@ class History {
 
     if (token_index !== undefined) {
       const { value, type, location } = this.tokens[token_index];
-      const { line, start, end } = location || {};
+      const { start, end } = location || {};
 
-      if (line === undefined || start === undefined || end === undefined) {
+      if (start === undefined || end === undefined) {
         throw { title: 'Unexpected Error', message: '', at: 'History.ts' }
       }
 
-      this.Tokenizer.index = end;
+      const [index, line, pos] = this.history[token_index];
+
+      this.Tokenizer.index = index;
       this.Tokenizer.line = line;
-      this.Tokenizer.pos = end;
+      this.Tokenizer.pos = pos;
 
       this.Tokenizer.Token.value = value;
       this.Tokenizer.Token.type = type;
@@ -53,17 +66,18 @@ class History {
   push = () => {
     const { index, line, pos } = this.Tokenizer;
     this.history.push([index, line, pos]);
+
     this.current = [index, line, pos];
 
     const { value, type } = this.Tokenizer.Token;
+    const { token_start } = this;
 
     // add location
-    const start = pos - value.length;
-    this.Tokenizer.Token.location.start = start;
+    this.Tokenizer.Token.location.start = token_start;
     this.Tokenizer.Token.location.end = pos;
     this.Tokenizer.Token.location.line = line;
 
-    const location = { line, start, end: pos };
+    const location = { line, start: token_start, end: pos };
 
     const token_index = this.tokens.push({ value, type, location }) - 1;
     if (this.record) {
@@ -80,29 +94,63 @@ class History {
     }
   }
 
+  eat = () => {
+    const last_token_index = this.tokens_buffer.at(-1);
+    if (last_token_index !== undefined) {
+      log('eat called')
+
+      const { value, type, location } = this.tokens[last_token_index];
+      const { line, start, end } = location || {};
+
+      if (line === undefined || start === undefined || end === undefined) {
+        throw { title: 'Unexpected Error', message: '', at: 'History.ts' }
+      }
+
+      this.Tokenizer.index = end;
+      this.Tokenizer.line = line;
+      this.Tokenizer.pos = end;
+
+      this.Tokenizer.Token.value = value;
+      this.Tokenizer.Token.type = type;
+      this.Tokenizer.Token.location.start = start;
+      this.Tokenizer.Token.location.end = end;
+      this.Tokenizer.Token.location.line = line;
+
+      this.tokens_buffer = [];
+      this.Tokenizer.next();
+    }
+  }
 
   location = () => {
     const [i, l, p] = this.history.at(-1) || this.current;
     return [i, l, p] as [number, number, number]
   }
 
-  loc = (error = false) => {
+  log = (error = false) => {
     const { location } = this.tokens.at(-1) || {};
 
     if (!location) return;
-
     const { line, start, end } = location;
     if (error) return `${line}:${start}`
     // @ts-ignore
     return `${line}`.cyan() + `:${start},${end}`;
   }
 
-  start() {
+  /**
+  * start cache tokens
+  */
+  start(each_callback?: (token: Token) => void) {
     this.record = true;
+    this.each_callback = each_callback;
+    this.tokens_buffer.push(this.tokens.length - 1);
   }
-
-  end() {
+  /**
+  * stop cache tokens
+  */
+  stop() {
     this.record = false;
+    this.each_callback = undefined;
+    this.shift();
   }
 
 }

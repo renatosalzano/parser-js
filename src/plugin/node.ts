@@ -164,11 +164,18 @@ class TemplateLiteral extends Node {
   }
 }
 
+class Empty extends Node {
+  toString() {
+    return '';
+  }
+}
+
 class Unexpected extends Node {
   tag = 'unexptected';
 }
 
 export {
+  Empty,
   Block,
   Number,
   Literal,

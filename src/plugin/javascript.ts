@@ -3,7 +3,7 @@ import type { DefaultApi } from "./";
 import { ContextObject } from 'parser/Context';
 import { log } from 'utils';
 import errors from './errors';
-import { Variable, Function, Identifier, Block, Number, Literal, TemplateLiteral, Expression, ObjectExpression, ArrayExpression, Property, Unexpected } from './node';
+import { Variable, Function, Identifier, Block, Number, Literal, TemplateLiteral, Expression, ObjectExpression, ArrayExpression, Property, Unexpected, Empty } from './node';
 import { Node } from 'parser/Progam';
 
 
@@ -21,8 +21,7 @@ const context = {
       'var': { props: { kind: 'var', hoisting: true } },
       'const': { props: { kind: 'const' } },
       'let': { props: { kind: 'let' } }
-    },
-    step: ['id', 'init']
+    }
   },
   Function: {
     props: {
@@ -146,7 +145,6 @@ export default (config: any) => {
       }
 
       function create_id() {
-        console.log('test', token)
         return createNode(Identifier, { name: token.value }, token.location);
       }
 
@@ -230,7 +228,7 @@ export default (config: any) => {
             switch (token.type) {
               case 'number':
               case 'literal': {
-                const Node = token.literal ? Literal : Number;
+                const Node = token.eq('literal') ? Literal : Number;
                 node.add(createNode(Node, { value: token.value }));
                 break;
               }
@@ -345,23 +343,23 @@ export default (config: any) => {
         Block({ functionBody }: Context['Block']['props']) {
           const node = createNode(Block, { functionBody });
           let parsing_block = true;
-          while (parsing_block) {
-            next();
-            switch (true) {
-              case token.literal:
-                const literalNode = createNode(Literal, { value: token.value });
-                appendNode(literalNode);
-                break;
-              case ctx.Function.has(token.value, true):
-                break;
-              case ctx.Variable.has(token.value, { props: { kind: token.value } }):
-                break;
-              case token.eq('}'):
-                parsing_block = false;
-                break;
-            }
+          // while (parsing_block) {
+          //   next();
+          //   switch (true) {
+          //     case token.literal:
+          //       const literalNode = createNode(Literal, { value: token.value });
+          //       appendNode(literalNode);
+          //       break;
+          //     case ctx.Function.has(token.value, true):
+          //       break;
+          //     case ctx.Variable.has(token.value, { props: { kind: token.value } }):
+          //       break;
+          //     case token.eq('}'):
+          //       parsing_block = false;
+          //       break;
+          //   }
 
-          }
+          // }
         },
 
         Variable({ kind, hoisting, implicit }: VariableProps) {
@@ -380,7 +378,7 @@ export default (config: any) => {
             l'appendNode in questo punto non è casuale,
             oltre ad aggiungerlo nel blocco statement corrente,
             essendo Variable un nodo dichiarante, salvo tutti i riferimenti
-            parsati
+            della stessa
           */
           appendNode(node);
 
@@ -392,7 +390,7 @@ export default (config: any) => {
             }
 
             this.VariableInit(node);
-            log('Variable;m', 'init done;y', token);
+            log('Variable;m', 'init done;y');
           }
 
 
@@ -502,7 +500,7 @@ export default (config: any) => {
           let expected: 'expression' | 'pattern' = 'expression';
 
           traverseTokens('{', '}')
-            .then((token) => {
+            .then(() => {
               if (token.eq('=')) {
                 console.log('object is pattern')
                 expected = 'pattern'
@@ -539,7 +537,7 @@ export default (config: any) => {
                   continue;
                 case 'literal':
                 case 'number':
-                  const Node = token.literal ? Literal : Number;
+                  const Node = token.eq('literal') ? Literal : Number;
                   key = [token.value, createNode(Node, { value: token.value })];
                   log('key:;m', token.value);
                   continue;
@@ -637,7 +635,7 @@ export default (config: any) => {
           let type: 'expression' | 'pattern' = 'expression';
 
           traverseTokens('[', ']')
-            .then((token) => {
+            .then(() => {
               if (token.eq('=')) {
                 type = 'pattern'
               }
@@ -647,7 +645,7 @@ export default (config: any) => {
         },
 
         Array(type: 'expression' | 'pattern' = 'expression') {
-          log('Array;m');
+          log('Array;m', type + ';g');
           const node = createNode(ArrayExpression, { type });
 
           let parsing_array = true;
@@ -662,7 +660,11 @@ export default (config: any) => {
             switch (token.value) {
               case ',': {
                 ++comma_count;
-                node.add(item);
+                if (!item && type === 'pattern') {
+                  node.add(createNode(Empty))
+                } else {
+                  node.add(item);
+                }
                 break;
               }
               case ']': {
@@ -671,7 +673,7 @@ export default (config: any) => {
                   node.add(item);
                 }
                 next() // over [
-                log('Array end;m')
+                log('Array end;m', node.toString())
                 return node;
               }
               case '...': {

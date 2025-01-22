@@ -4,9 +4,6 @@ import Tokenizer from "./Tokenizer";
 export type ContextObject = {
   name: string;
   props: { [key: string]: any };
-  currentStep?: string;
-  step: [string, boolean][];
-  stepIndex: 0;
   default?: boolean;
   token: Map<string, any>;
   has: (token: string, updateContext?: any) => boolean;
@@ -45,8 +42,8 @@ class Context {
 
     const prev_context_name = this.buffer.at(-1).name;
 
-    log('context:;c', `${prev_context_name} -->`, name + ';g', props)
-    this.buffer.push(cloneContext(this.context[name]));
+    log('CTX:;c', `${prev_context_name} -->`, name + ';g', props)
+    this.buffer.push(this.context[name]);
 
     this.current = this.buffer.at(-1);
     // if (data.eat) {
@@ -63,7 +60,7 @@ class Context {
 
     const ctx_name = this.current.name;
 
-    log('context:;c', `${ctx_name};g`, `<-- ${prev_context_name}`);
+    log('CTX:;c', `${ctx_name};g`, `<-- ${prev_context_name}`);
     // console.log('end at this token', this.Tokenizer.Token.value)
     if (ctx_name === 'Program') {
       this.Tokenizer.parse_program();
@@ -104,6 +101,7 @@ class Context {
 
       Context.token = new Map(Object.entries(Context[key]));
       Context.name = name;
+      Context.props = Object.freeze(Context.props || {});
 
       if (key === 'keyword') {
 
@@ -144,7 +142,9 @@ class Context {
             instruction = instruction_override;
           }
 
-          Tokenizer.Context.start(name, Object.assign(this.props || {}, props), instruction);
+          props = { ...this.props, ...props }
+
+          Tokenizer.Context.start(name, props, instruction);
         }
 
         return check;
@@ -153,33 +153,11 @@ class Context {
       Context.start = function (props?: any, instruction?: any) {
         const token = Tokenizer.Token.value;
         props = props || this.token.get(token)?.props || {};
+        console.log('start props', props)
 
         return Tokenizer.Context.start(name, Object.assign(this.props || {}, props), instruction);
       }
 
-      // ----- STEP -----
-
-      if (Context.hasOwnProperty('step')) {
-        Context.currentStep = Context.step[0]
-        Context.step = Context.step.map((step: string) => {
-          return [step, false]
-        });
-      } else {
-        Context.currentStep = undefined;
-        Context.step = []
-      }
-
-      Context.stepIndex = 0;
-
-      Context.next = function () {
-        if (this.stepIndex < this.step.length) {
-          this.step[this.stepIndex] = [this.currentStep, true];
-          ++this.stepIndex;
-          if (this.step[this.stepIndex]) {
-            this.currentStep = this.step[this.stepIndex][0];
-          }
-        }
-      }
 
       if (program_ctx.has(name)) {
         for (const [lexical] of Context.token) {
@@ -197,17 +175,5 @@ class Context {
 
   }
 }
-
-function cloneContext(context: ContextObject) {
-  const { currentStep, step, stepIndex, ...rest } = context;
-  return ({
-    ...rest,
-    step: JSON.parse(JSON.stringify(step)),
-    stepIndex: 0,
-    currentStep,
-  })
-
-}
-
 
 export default Context
