@@ -14,7 +14,7 @@ class Variable extends Node {
       ? '=' + this.init.toString()
       : '';
 
-    return `${this.kind} ${id}${init};`;
+    return `${this.kind} ${id}${init}`;
   }
 }
 

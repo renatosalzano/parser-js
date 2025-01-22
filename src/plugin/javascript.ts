@@ -194,6 +194,8 @@ export default (config: any) => {
                   return this.TemplateLiteral();
               }
             }
+            case 'newline':
+            case 'special':
             case 'unknown':
             case 'separator': {
               // TODO
@@ -204,9 +206,9 @@ export default (config: any) => {
 
         Expression({ group } = { group: false } as Context['Expression']['props']): Node {
           log('Expression;m', token.value)
-          const node = createNode(Expression, { group });
           const curr_ctx = currentContext();
           const ctx_expression = curr_ctx.name === 'Expression';
+          const node = createNode(Expression, { group });
 
           function end_context() {
             if (ctx_expression) {
@@ -660,7 +662,7 @@ export default (config: any) => {
             switch (token.value) {
               case ',': {
                 ++comma_count;
-                if (!item && type === 'pattern') {
+                if (!item) {
                   node.add(createNode(Empty))
                 } else {
                   node.add(item);
