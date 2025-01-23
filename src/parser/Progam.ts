@@ -226,7 +226,7 @@ class Program {
     return node as T;
   }
 
-  appendNode = (node: Node) => {
+  appendNode = (node: Node | Declarator | Fn) => {
     const last_node = this.block.at(-1) as Block | undefined;
 
     if (last_node) {
@@ -234,6 +234,8 @@ class Program {
     } else {
       this.body.push(node);
     }
+
+
 
   }
 

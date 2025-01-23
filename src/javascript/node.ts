@@ -134,7 +134,7 @@ class ArrayExpression extends Node {
 }
 
 class Primitive extends Node {
-  tag?: 'string' | 'number' | 'boolean' | 'null';
+  type?: string;
   value?: boolean | string | number | null;
   constructor({ value, type }: { value: string, type: 'keyword' | 'string' | 'number' }) {
     super({});
@@ -162,7 +162,12 @@ class Primitive extends Node {
     }
   }
   toString(): string {
-    return `"${this.value}"`;
+    switch (this.type) {
+      case 'string':
+        return `"${this.value}"`;
+      default:
+        return `${this.value}`;
+    }
   }
 }
 

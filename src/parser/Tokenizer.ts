@@ -510,7 +510,7 @@ class Tokenizer {
       this.get_end_token = undefined;
       return token;
     } else {
-      'Endtoken;r'
+      log('Endtoken;r')
     }
   }
 
@@ -670,16 +670,6 @@ class Tokenizer {
 
     this.Token.value = '';
 
-    // if (!this.forced_expected) {
-
-    //   this.set_token_type();
-    //   this.maybe = undefined;
-    //   this.expected = undefined;
-    // } else {
-
-    //   this.expected = this.forced_expected;
-    // }
-
     const print = () => {
       if ((this.debug.token || debug) && debug !== 'suppress') {
         let value = (this.Token.value || this.char.curr);
@@ -738,10 +728,8 @@ class Tokenizer {
 
     if (this.index === this.source.length) {
       log('source end;y');
-      this.end_program = true;
-    }
+      this.source_end = true;
 
-    if (this.end_program) {
       if (this.pairs_buffer.length > 0) {
         throw {
           title: 'Token not found',
@@ -750,34 +738,43 @@ class Tokenizer {
           type: 'error'
         }
       }
+
+      this.History.last_token();
     }
 
     return this.Token;
   }
 
-  end_program = false;
+  source_end = false;
+  parser_run = false;
 
   parse_program = () => {
 
-
     try {
 
-      while (!this.end_program) {
+      let max = 10;
+      while (max > 0 && !this.source_end) {
 
         if (this.index === 0) this.next();
 
         log('Program token:;g', this.Token.value);
 
+        this.parser_run = true;
         const parser = this.program.get(this.Token.value);
 
         if (parser) {
           // @ts-ignore
           parser();
         } else {
+          console.log('default')
           this.Context.default();
         }
 
-        if (this.end_program) {
+        this.parser_run = false;
+
+        --max;
+
+        if (this.source_end) {
           log('source end;g')
           throw { message: 'end program', type: 'end' };
         }
@@ -792,7 +789,6 @@ class Tokenizer {
         switch (error.type) {
           case 'error':
             log(` ${title} ;R`, `\n  ${error.message}${at};r`);
-            console.log(this.History.tokens)
             return;
           case 'warn':
             log(`${error.message};y`)

@@ -24,6 +24,22 @@ class History {
     this.token_start = pos;
   }
 
+  last_token = () => {
+    const last_token = this.tokens.at(-1);
+    if (last_token) {
+
+      const { value, type, location } = last_token;
+      const { line, start, end } = location || {};
+
+      this.Tokenizer.Token.value = value;
+      this.Tokenizer.Token.type = type;
+      this.Tokenizer.Token.location.start = start;
+      this.Tokenizer.Token.location.end = end;
+      this.Tokenizer.Token.location.line = line;
+
+    }
+  }
+
   get_next = (): Token | undefined => {
     const next_token_index = this.tokens_buffer[0];
     if (next_token_index !== undefined) {

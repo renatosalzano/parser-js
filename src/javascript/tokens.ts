@@ -31,7 +31,7 @@ export const context = {
     }
   },
   Expression: {
-    props: { group: false },
+    props: { group: false, append: true },
     default: true,
     token: {
       '(': null

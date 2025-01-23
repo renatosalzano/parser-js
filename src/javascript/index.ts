@@ -26,6 +26,8 @@ function statement_keyword(keyword: string) {
 
 type ExpressionType = 'unary' | 'binary' | 'ternary' | 'access' | 'call'
 
+type ExpressionProps = { group?: boolean, append?: boolean };
+
 export default (config: any) => {
 
 
@@ -64,7 +66,7 @@ export default (config: any) => {
 
       return ({
 
-        parse_expression() {
+        parse_expression({ append }: Partial<ExpressionProps> = {}) {
           log('parse expression;m', token.value, token.type)
 
           switch (token.type) {
@@ -130,7 +132,7 @@ export default (config: any) => {
           }
         },
 
-        Expression({ group } = { group: false }): Node {
+        Expression({ group, append }: ExpressionProps = {}): Node {
           log('Expression;m', token.value);
           const node = createNode(Expression, { group });
 
@@ -138,12 +140,34 @@ export default (config: any) => {
 
           let max = 10;
 
+          const end = () => {
+
+            log('Expression end;m');
+
+            if (append) {
+              appendNode(node);
+            }
+            return node;
+          }
+
           while (max > 0 && parsing_expression) {
 
-            // log('current token;c', token.value, max)
+            log('current token;c', token.value, max)
 
             switch (token.type) {
-              case 'number':
+              case 'number': {
+                if (node.expression.at(-1) === '-') {
+
+                  const last_index = node.expression.length - 1;
+                  node.expression[last_index] = createNode(
+                    Primitive,
+                    { value: `-${token.value}`, type: token.type }
+                  )
+                } else {
+                  node.add(createNode(Primitive, token));
+                }
+                break;
+              }
               case 'string': {
                 node.add(createNode(Primitive, token));
                 break;
@@ -167,7 +191,7 @@ export default (config: any) => {
                   case '(':
                     console.log('expression group start');
                     next();
-                    node.add(this.Expression({ group: true }));
+                    node.add(this.Expression({ group: true, append }));
                     break;
                   case ')':
                     if (group) {
@@ -177,8 +201,8 @@ export default (config: any) => {
                     }
                     break;
                   case '}': {
-                    log('Expression end;m')
-                    return node;
+                    log('Expression end;m', node)
+                    return end();
                   }
                 }
               }
@@ -187,13 +211,16 @@ export default (config: any) => {
                   if (ctx.Function.has(token.value)) {
                     // node.add(this.Function({ expression}));
                     break;
+                  } else {
+                    error({ title: 'keyword', message: 'porca madonna' })
                   }
-                  if (statement_keyword(token.value)) {
-                    // TODO ERROR
-                    error({ title: errors.unexpected, message: 'TODO' })
-                  };
                   break;
                 }
+
+                if (statement_keyword(token.value)) {
+                  error({ title: errors.unexpected, message: 'TODO' })
+                };
+
                 switch (token.value) {
                   case 'null':
                   case 'true':
@@ -211,40 +238,21 @@ export default (config: any) => {
                 switch (token.value) {
                   case ';': {
                     next();
-                    return node;
-                  }
-                }
-              }
-            }
-
-            expected();
-
-            // log('next token;y', nextToken.value)
-
-            switch (nextToken.type) {
-              case 'keyword': {
-                if (!group && statement_keyword(nextToken.value)) {
-                  log('Expression end;m')
-                  return node;
-                }
-              }
-              case 'separator': {
-                switch (nextToken.value) {
-                  case ';': {
-                    next();
-                    return node;
+                    return end();
                   }
                   case ',': {
+                    next();
                     if (!group) {
-                      log('Expression end;m')
-                      return node;
+                      return end();
                     }
                   }
                 }
               }
             }
 
+            log('porco dio;r', token.value)
             next();
+
             --max;
 
             // next();
@@ -274,13 +282,17 @@ export default (config: any) => {
             next();
           }
 
+          if (token.eq(';')) {
+            skip_multiple_token(token.value);
+            next();
+          }
+
           while (max > 0 && parsing_block) {
-            console.log('curr tok:', token.type, token.value)
+            log('block:;c', token.type, token.value)
 
             if (token.eq('}')) {
               log('Block end;m');
               node.endBlock();
-              console.log(node)
               next();
               parsing_block = false;
               return node;
@@ -300,7 +312,6 @@ export default (config: any) => {
               case 'bracket': {
                 switch (token.value) {
                   case '{': {
-
                     traverseTokens('{', '}').then(() => {
                       if (token.eq('=')) {
 
@@ -313,6 +324,24 @@ export default (config: any) => {
                   case '(':
                     break;
                 }
+              }
+              case 'identifier': {
+                ctx.Expression.start({ append: true });
+                break;
+              }
+              case 'separator': {
+                switch (token.value) {
+                  case ';':
+                    skip_multiple_token(token.value)
+                    break;
+                  case ',':
+                    next();
+                    if (token.eq(',')) {
+                      error({ title: errors.syntax, message: errors.expression.expected })
+                    }
+                    break;
+                }
+                break;
               }
 
             }
@@ -356,6 +385,7 @@ export default (config: any) => {
 
             if (token.eq(';')) {
               skip_multiple_token(token.value);
+              next();
             }
 
             if (token.eq(',')) {

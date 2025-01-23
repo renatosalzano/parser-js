@@ -7,7 +7,7 @@ export type ContextObject = {
   default?: boolean;
   token: Map<string, any>;
   has: (token: string, parse?: boolean) => boolean;
-  start: (props: any) => any;
+  start: (props?: any) => any;
 }
 
 
@@ -30,7 +30,7 @@ class Context {
 
   start = (name: string, props: any = {}) => {
 
-    if (this.Tokenizer.end_program) {
+    if (this.Tokenizer.source_end) {
       log('unexpected start parser;r')
       return;
     }
@@ -99,8 +99,6 @@ class Context {
 
       Context.start = (props = {}) => {
         props = { ...Context.props, ...props };
-
-        console.log('CONTEXT', name, Context.props)
         return this.Tokenizer.parser[name](props);
       }
 
