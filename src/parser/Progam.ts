@@ -31,7 +31,7 @@ class Declarator extends Node {
   endDeclaration() { };
 }
 
-class FunctionDeclarator extends Node {
+class Fn extends Node {
   tag?: string;
   id?: Node;
   hoisting?: boolean;
@@ -55,6 +55,10 @@ class Block extends Node {
   }
 
   endBlock() { };
+
+  toString() {
+    return `{${this.body.map((node) => node.toString()).join(';')}}`
+  }
 }
 
 interface Identifier {
@@ -85,7 +89,7 @@ class ReferenceTree {
     return this.scope.at(-1) || this.Program;
   }
 
-  declare = (node: Declarator | FunctionDeclarator) => {
+  declare = (node: Declarator | Fn) => {
 
     const current_scope = this.current_scope();
 
@@ -154,20 +158,16 @@ class Program {
       node.location = location;
     }
 
-    // if (this.expected_block) {
-    //   console.log('EXPECTED', node)
-    //   this.expected_block = node instanceof Block;
-    // }
-
     switch (true) {
 
       case (node instanceof Block): {
+
         if (this.expected_block) {
           this.expected_block = false;
-          console.log('expected block')
+          log('expected fn block;g');
         } else {
           this.ReferenceTree.scope.push(new Map());
-          console.log('NEW SCOPE')
+          log('new statement block;y');
         }
         this.block.push(node);
 
@@ -177,7 +177,7 @@ class Program {
         break;
       }
 
-      case (node instanceof FunctionDeclarator): {
+      case (node instanceof Fn): {
         this.check_reference = false;
 
         node.startParams = () => {
@@ -242,7 +242,6 @@ class Program {
   }
 
   toString() {
-    console.log('parse Program')
     return this.body.map((node) => node.toString())
   }
 
@@ -256,5 +255,5 @@ class Program {
   }
 }
 
-export { Node, Declarator, FunctionDeclarator, Block, Identifier };
+export { Node, Declarator, Fn, Block, Identifier };
 export default Program

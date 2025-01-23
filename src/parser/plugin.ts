@@ -43,11 +43,8 @@ type DefaultApi = {
   createNode: Program['createNode'];
   logNode: Program['log'];
   eat(sequence: string, breakReg?: RegExp): void;
-  // startContext(context: string, props?: ContextObject['props'], instruction?: { [key: string]: any }): void;
-  // endContext(): void;
   error(error: Error): void;
   isIdentifier(value: string): boolean;
-  currentContext(): ContextObject;
 }
 
 

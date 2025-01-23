@@ -6,8 +6,8 @@ export type ContextObject = {
   props: { [key: string]: any };
   default?: boolean;
   token: Map<string, any>;
-  has: (token: string) => boolean;
-  end: () => void;
+  has: (token: string, parse?: boolean) => boolean;
+  start: (props: any) => any;
 }
 
 
@@ -28,43 +28,20 @@ class Context {
     this.current = this.buffer.at(-1);
   }
 
-  get_current = () => {
-    return this.current;
-  }
-
   start = (name: string, props: any = {}) => {
 
     if (this.Tokenizer.end_program) {
-      log('unexpected start context;r')
+      log('unexpected start parser;r')
       return;
     }
 
-    const prev_context_name = this.buffer.at(-1).name;
+    log('Parsing:;c', name + ';g', props);
+    // this.buffer.push(this.context[name]);
 
-    log('CTX:;c', `${prev_context_name} -->`, name + ';g', props)
-    this.buffer.push(this.context[name]);
+    // this.current = this.buffer.at(-1);
 
-    this.current = this.buffer.at(-1);
-    // if (data.eat) {
-    //   this.Parser.eat(data.eat);
-    // }
     return this.Tokenizer.parser[name](props);
   }
-
-  end = (name: string) => {
-
-    this.buffer.pop();
-    this.current = this.buffer.at(-1);
-
-    const ctx_name = this.current.name;
-
-    log('CTX:;c', `${ctx_name};g`, `<-- ${name}`);
-    // console.log('end at this token', this.Tokenizer.Token.value)
-    if (ctx_name === 'Program') {
-      this.Tokenizer.parse_program();
-    }
-  }
-
 
   extend = (context: any) => {
 
@@ -111,12 +88,20 @@ class Context {
       }
 
       // Function.has(sequence, { props: {}, eat: {}})
-      Context.has = function (token: string) {
+      Context.has = function (token: string, parse?: boolean) {
+        const check = this.token.has(token);
+        if (check && parse) {
+          let props = this.token.get(token) || {};
+          Tokenizer.parser[this.name]({ ...this.props, ...props });
+        }
         return this.token.has(token);
       }
 
-      Context.end = () => {
-        return this.end(Context.name);
+      Context.start = (props = {}) => {
+        props = { ...Context.props, ...props };
+
+        console.log('CONTEXT', name, Context.props)
+        return this.Tokenizer.parser[name](props);
       }
 
       for (const [token] of Context.token) {

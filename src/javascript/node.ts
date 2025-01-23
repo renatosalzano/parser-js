@@ -1,4 +1,4 @@
-import { Block, Declarator, FunctionDeclarator, Identifier, Node } from "parser/Progam";
+import { Block, Declarator, Fn, Identifier, Node } from "parser/Progam";
 
 class Variable extends Declarator {
   tag = 'variable'
@@ -16,22 +16,20 @@ class Variable extends Declarator {
   }
 }
 
-class Function extends FunctionDeclarator {
+class Function extends Fn {
   tag = 'function';
   id?: Identifier;
   expression?: boolean;
   async?: boolean;
   arrow?: boolean;
   params: Node[] = [];
-  body?: Node = undefined;
+  body = {} as Node;
   returnType = 'void';
 
   toString() {
     const params = this.params.map(n => n.toString()).join(',');
     if (this.arrow) {
-      return `(${params})=>{}`
-    } else if (true) {
-
+      return `(${params})=>${this.body.toString()}`
     }
     return `function ${this.id}(${params}){}`
   }
@@ -167,7 +165,6 @@ class Primitive extends Node {
     return `"${this.value}"`;
   }
 }
-
 
 class TemplateLiteral extends Node {
   tag = 'template-literal'

@@ -1,86 +1,18 @@
-import Parser from 'parser/Tokenizer'
-import type { DefaultApi } from "./";
+import Parser from 'parser/Tokenizer';
+import type { DefaultApi } from "../parser/plugin";
 import { ContextObject } from 'parser/Context';
 import { log } from 'utils';
 import errors from './errors';
 import { Variable, Function, Identifier, Block, Primitive, TemplateLiteral, Expression, ObjectExpression, ArrayExpression, Property, Unexpected, Empty } from './node';
 import { Node } from 'parser/Progam';
+import { context, tokens } from './tokens';
 
-const context = {
-  Block: {
-    props: { functionBody: false },
-    token: {
-      "{": null,
-    }
-  },
-  Variable: {
-    props: { implicit: false },
-    keyword: {
-      'var': { kind: 'var', hoisting: true },
-      'const': { kind: 'const' },
-      'let': { kind: 'let' }
-    }
-  },
-  Function: {
-    props: {
-      async: false,
-      arrow: false,
-      method: false,
-      expression: false,
-    },
-    keyword: {
-      'function': null,
-      'async': { async: true },
-    }
-  },
-  Class: {
-    keyword: {
-      'class': null
-    }
-  },
-  Expression: {
-    props: { group: false },
-    default: true,
-    token: {
-      '(': null
-    }
-  },
-  Statement: {
-    keyword: {
-      'if': null,
-      'else': null,
-      'switch': null,
-      'return': null
-    }
-  }
-}
-
-const operator = [
-  '+', '-', '*', '/', '%', '.', '>', '<', '!', '=', '&', '|', '^', '~', '?', '??', '??=', '++', '--', '==', '!=', '>=', '<=', '&&', '&&=', '||', '||=', '+=', '-=', '*=', '/=', '%=', '<<', '>>', '===', '!==', '>>>', '>>>=', 'new', 'typeof', 'instanceof'
-];
-
-const bracket = ['(', ')', '[', ']', '{', '}'];
-
-const separator = [',', ':', ';', '\n'];
-
-const keyword = ['true', 'false', 'null', 'this', 'super'];
-
-const specialToken = ['=>', '...', '?.', '`', '${'];
-
-const comment = [
-  ['//'],
-  ['/*', '*/']
-]
-
+type Context = typeof context;
 type Api = DefaultApi & {
   ctx: {
-    [K in keyof typeof context]: ContextObject;
+    [K in keyof Context]: ContextObject;
   }
 }
-
-type EndContext = () => void;
-type Context = typeof context;
-
 
 function statement_keyword(keyword: string) {
   return /var|let|const|function|async|if|else|switch|for|while|do|return/.test(keyword);
@@ -99,14 +31,7 @@ export default (config: any) => {
 
   return {
     context,
-    tokens: {
-      keyword,
-      bracket,
-      comment,
-      operator,
-      separator,
-      specialToken,
-    },
+    tokens,
     parser: ({
       ctx,
       token,
@@ -121,7 +46,6 @@ export default (config: any) => {
       createNode,
       logNode,
       error,
-      currentContext,
       debug,
     }: Api) => {
 
@@ -150,7 +74,6 @@ export default (config: any) => {
               // current [operator]
 
               if (expected('operator')) {
-                console.log('operator here!')
                 return this.Expression();
               }
 
@@ -209,22 +132,11 @@ export default (config: any) => {
 
         Expression({ group } = { group: false }): Node {
           log('Expression;m', token.value);
-
-          const curr_ctx = currentContext();
-          const ctx_expression = curr_ctx.name === 'Expression';
           const node = createNode(Expression, { group });
-
-          function end_context() {
-            if (ctx_expression) {
-              log('Expression end;m', node.toString());
-              appendNode(node);
-              return node;
-            }
-          }
 
           let parsing_expression = true;
 
-          let max = 10
+          let max = 10;
 
           while (max > 0 && parsing_expression) {
 
@@ -299,7 +211,6 @@ export default (config: any) => {
                 switch (token.value) {
                   case ';': {
                     next();
-                    end_context();
                     return node;
                   }
                 }
@@ -321,15 +232,10 @@ export default (config: any) => {
                 switch (nextToken.value) {
                   case ';': {
                     next();
-                    if (curr_ctx.name === 'Expression') {
-                      appendNode(node);
-                      ctx.Expression.end();
-                      return node;
-                    }
                     return node;
                   }
                   case ',': {
-                    if (!group && curr_ctx.name !== 'Expression') {
+                    if (!group) {
                       log('Expression end;m')
                       return node;
                     }
@@ -360,7 +266,6 @@ export default (config: any) => {
 
         Block({ functionBody = false }: Partial<Block>) {
           log('Block;m');
-          const ctx_is_block = currentContext().name = 'Block';
           const node = createNode(Block, { functionBody });
           let parsing_block = true;
           let max = 10;
@@ -377,17 +282,18 @@ export default (config: any) => {
               node.endBlock();
               console.log(node)
               next();
-              end();
               parsing_block = false;
               return node;
             }
 
             switch (token.type) {
               case 'keyword': {
+                console.log('keyword', token.value)
                 switch (true) {
                   case (ctx.Variable.has(token.value, true)):
                     break;
-                  case (ctx.Function.has(token.value, true)):
+                  case (ctx.Function.has(token.value)):
+
                     break;
                 }
               }
@@ -426,7 +332,7 @@ export default (config: any) => {
 
           this.VariableId(node); // parse id
 
-          log('Variable;m', 'ID done;g');
+          log('Variable;m', 'ID done;g', node.id);
           node.endDeclaration();
 
           if (expected_init && !token.eq('=')) {
@@ -444,7 +350,7 @@ export default (config: any) => {
             log('Variable;m', 'init done;y');
           }
 
-
+          appendNode(node);
 
           if (token.eq(/[,;]/)) {
 
@@ -457,8 +363,7 @@ export default (config: any) => {
             }
           }
 
-          appendNode(node);
-          ctx.Variable.end();
+
           log('Variable end;m', token.value)
         },
 
@@ -505,8 +410,6 @@ export default (config: any) => {
         },
 
         Function({ async = false, arrow = false, expression = false }: Partial<Function>) {
-
-          const ctx_is_function = currentContext().name === 'Function';
 
           const node = createNode(Function, { async, arrow, expression });
 
@@ -572,10 +475,14 @@ export default (config: any) => {
           if (token.eq('{')) {
             // block
             node.body = this.Block({ functionBody: true });
+          } else {
+            error({ title: 'PORCO DIO', message: 'porco dio' })
           }
 
-          if (ctx_is_function) {
+          node.endBody();
 
+          if (!expression) {
+            appendNode(node)
           }
 
           return node;

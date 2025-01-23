@@ -1,4 +1,4 @@
-import javascript from 'plugin/javascript';
+import javascript from 'javascript';
 import Tokenizer from './Tokenizer';
 import { log } from 'utils';
 

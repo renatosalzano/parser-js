@@ -77,7 +77,6 @@ class Tokenizer {
       nextString: this.next_string,
       expected: this.expected,
       traverseTokens: this.traverse_tokens,
-      currentContext: this.Context.get_current,
       isIdentifier: this.is.identifier,
       eachChar: this.each_char,
       eat: this.eat,
@@ -88,8 +87,6 @@ class Tokenizer {
       logNode: this.Program.log,
       /* CONTEXT */
       ctx: this.Context.context,
-      startContext: this.Context.start,
-      endContext: this.Context.end,
     }, {
       get(api, p) {
         return Reflect.get(api, p)
@@ -115,8 +112,9 @@ class Tokenizer {
     const { keyword = [], operator = [], bracket = [], separator = [], specialToken = [], comment = [] } = tokens;
 
     this.extend_token('bracket', bracket);
-    this.extend_token('operator', operator);
     this.extend_token('keyword', keyword);
+    this.extend_token('operator', operator);
+    this.extend_token('separator', separator);
     this.extend_token('special', specialToken);
     this.extend_token('comment', comment);
 
@@ -739,6 +737,7 @@ class Tokenizer {
     }
 
     if (this.index === this.source.length) {
+      log('source end;y');
       this.end_program = true;
     }
 
@@ -751,10 +750,6 @@ class Tokenizer {
           type: 'error'
         }
       }
-      // await closing current context
-      if (this.Context.current.name === 'Program') {
-        throw { message: 'end source', type: 'end' };
-      }
     }
 
     return this.Token;
@@ -764,24 +759,29 @@ class Tokenizer {
 
   parse_program = () => {
 
-    // this.debug.token = true
 
     try {
 
-      if (this.end_program) {
-        throw { message: 'end program', type: 'end' };
-      }
+      while (!this.end_program) {
 
-      if (this.index === 0) this.next();
+        if (this.index === 0) this.next();
 
-      log('Program token:;g', this.Token.value);
-      const start_context = this.program.get(this.Token.value);
+        log('Program token:;g', this.Token.value);
 
-      if (start_context) {
-        // @ts-ignore
-        start_context();
-      } else {
-        this.Context.default();
+        const parser = this.program.get(this.Token.value);
+
+        if (parser) {
+          // @ts-ignore
+          parser();
+        } else {
+          this.Context.default();
+        }
+
+        if (this.end_program) {
+          log('source end;g')
+          throw { message: 'end program', type: 'end' };
+        }
+
       }
 
     } catch (error: any) {
@@ -801,8 +801,8 @@ class Tokenizer {
             console.log(`${error.message}\n    at ${this.line}:${this.pos}`)
             return;
           case 'end': {
-            // console.log(this.Program.body)
             console.log(this.Program.body);
+            console.log(this.Program.toString())
             this.Program.check_references();
             // console.log(this.Program.body)
             return;
