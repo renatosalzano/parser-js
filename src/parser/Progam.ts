@@ -2,7 +2,7 @@ import { log } from "utils";
 import Context from "./Context";
 import Tokenizer from "./Tokenizer";
 
-interface Constructor<T> {
+interface Ctor<T> {
   new(...args: any): T
 }
 
@@ -17,10 +17,25 @@ class Node {
   tag?: string;
   id?: Node | Node[];
   declarator?: boolean;
+  function?: boolean;
   hoisting?: boolean;
-  location?: { line: number, start: number, end: number }
+
+  location?: { line: number, start: number, end: number };
+  constructor(init: { [key: string]: any }) {
+
+    Object.assign(this, init);
+  }
   toString() {
     return ''
+  }
+}
+
+class Block extends Node {
+  tag = 'block';
+  functionBody = false;
+  body: Node[] = [];
+  appendNode(node: Node) {
+    this.body.push(node);
   }
 }
 
@@ -30,10 +45,16 @@ interface Identifier {
   spread?: boolean;
   param?: boolean;
   location?: { line: number, start: number, end: number };
+
 }
 
 class Identifier {
   name = '';
+
+  constructor(init: { [key: string]: any }) {
+    Object.assign(this, init);
+  }
+
   toString() {
     return `${this.rest || this.spread ? '...' : ''}${this.name}`;
   }
@@ -91,14 +112,7 @@ class ReferenceTree {
   }
 }
 
-class Block extends Node {
-  tag = 'block';
-  functionBody = false;
-  body: Node[] = [];
-  appendNode(node: Node) {
-    this.body.push(node);
-  }
-}
+
 
 type InitNode<T> = {
   [K in keyof T]?: T[K]
@@ -116,9 +130,9 @@ class Program {
   constructor(private Tokenizer: Tokenizer) {
   }
 
-  createNode = <T>(NodeConstructor: Constructor<T>, init?: InitNode<T>, location?: Node['location']) => {
+  createNode = <T>(NodeCtor: Ctor<T>, init?: InitNode<T>, location?: Node['location']) => {
 
-    const node = new NodeConstructor() as Node;
+    const node = new NodeCtor(init) as Node;
 
     if (location) {
       node.location = location;
@@ -127,18 +141,17 @@ class Program {
     if (node instanceof Block) {
       this.ReferenceTree.scope.push(new Map());
       this.blocks.push(node);
-    } else {
-      if (init) {
-        Object.assign(node, init)
-      }
     }
 
     if (node.declarator) {
       this.current_declarator = node;
     }
 
-    if (node instanceof Identifier && !this.current_declarator) {
-      this.ReferenceTree.check(node)
+    if (node instanceof Identifier) {
+
+      if (!this.current_declarator) {
+        this.ReferenceTree.check(node)
+      }
     }
 
     this.current_node = node;
@@ -157,6 +170,8 @@ class Program {
     if (node.declarator) {
       this.current_declarator = undefined;
       this.ReferenceTree.declare(node);
+      delete node.declarator;
+      delete node.hoisting;
     }
 
   }

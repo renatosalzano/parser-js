@@ -4,7 +4,7 @@ import History from "./History";
 import Program from "./Progam";
 import { create_fast_get } from "./utils";
 
-export type TokenType = 'unknown' | 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number' | 'special' | 'newline';
+export type TokenType = 'unknown' | 'string' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number' | 'special' | 'newline';
 export type Token = {
   value: string;
   type: TokenType;
@@ -75,7 +75,7 @@ class Tokenizer {
       nextToken: this.next_token,
       debug: this.debug,
       next: this.next,
-      nextLiteral: this.next_literal,
+      nextString: this.next_string,
       expected: this.expected,
       traverseTokens: this.traverse_tokens,
       currentContext: this.Context.get_current,
@@ -269,7 +269,7 @@ class Tokenizer {
         break;
       }
       case this.is.quote(this.char.curr): {
-        this.expected_token = 'literal';
+        this.expected_token = 'string';
         break;
       }
       case this.is.number(this.char.curr): {
@@ -340,10 +340,10 @@ class Tokenizer {
 
       this.Token.type = 'keyword';
     },
-    literal: () => {
+    string: () => {
 
       if (!this.end_token) {
-        // "literal" '' | ""
+        // "string" '' | ""
         this.end_token = this.char.curr;
 
         this.Token.value = '';
@@ -365,7 +365,7 @@ class Tokenizer {
         case (this.char.curr !== this.end_token):
           return "next";
         default: {
-          // end "literal"
+          // end "string"
           this.end_token = '';
           this.Token.value = this.Token.value;
           ++this.index, ++this.pos; // over quote
@@ -468,10 +468,9 @@ class Tokenizer {
     }
   }
 
-  next_literal = (end_token: string | string[]) => {
+  next_string = (end_token: string | string[]) => {
     if (end_token) {
-      // this.forced_expected = 'literal';
-      // this.set_token_type('literal');
+      // this.forced_expected = 'string';
 
       if (typeof end_token === 'string') {
         end_token = [end_token];
@@ -781,6 +780,7 @@ class Tokenizer {
             console.log(`${error.message}\n    at ${this.line}:${this.pos}`)
             return;
           case 'end': {
+            console.log(this.Program.body)
             console.log(this.Program.toString());
             this.Program.check_references();
             // console.log(this.Program.body)
@@ -791,6 +791,7 @@ class Tokenizer {
 
       console.log(error);
     }
+
   }
 
   error = (error: Error) => {

@@ -3,9 +3,8 @@ import type { DefaultApi } from "./";
 import { ContextObject } from 'parser/Context';
 import { log } from 'utils';
 import errors from './errors';
-import { Variable, Function, Identifier, Block, Number, Literal, TemplateLiteral, Expression, ObjectExpression, ArrayExpression, Property, Unexpected, Empty } from './node';
+import { Variable, Function, Identifier, Block, Primitive, TemplateLiteral, Expression, ObjectExpression, ArrayExpression, Property, Unexpected, Empty } from './node';
 import { Node } from 'parser/Progam';
-
 
 const context = {
   Program: ['Variable', 'Function', 'Expression', 'Block', 'Statement', 'Class', 'Invalid', 'TemplateLiteral'],
@@ -16,7 +15,7 @@ const context = {
     }
   },
   Variable: {
-    props: { kind: 'var' as 'var' | 'const' | 'let', implicit: false },
+    props: { implicit: false },
     keyword: {
       'var': { props: { kind: 'var', hoisting: true } },
       'const': { props: { kind: 'const' } },
@@ -79,9 +78,6 @@ const comment = [
   ['/*', '*/']
 ]
 
-type Context = typeof context;
-type VariableProps = Context['Variable']['props'] & Context['Variable']['keyword']['var']['props']
-
 type Api = DefaultApi & {
   ctx: {
     [K in keyof typeof context]: ContextObject;
@@ -91,7 +87,7 @@ type Api = DefaultApi & {
 
 
 function statement_keyword(keyword: string) {
-  return /var|let|const|function|async|if|else|switch/.test(keyword);
+  return /var|let|const|function|async|if|else|switch|for|while|do|return/.test(keyword);
 }
 
 // const Test = new PropertyMap();
@@ -120,7 +116,7 @@ export default (config: any) => {
       token,
       nextToken,
       next,
-      nextLiteral,
+      nextString,
       traverseTokens,
       expected,
       eat,
@@ -156,31 +152,39 @@ export default (config: any) => {
 
           switch (token.type) {
             case 'number':
-            case 'literal':
+            case 'string':
             case 'identifier': {
               // current [operator]
 
               if (expected('operator')) {
+                console.log('operator here!')
                 return this.Expression();
+              }
+
+              if (expected('=>')) {
+                return this.Function({ arrow: true, expression: true });
               }
 
               if (token.type === 'identifier') {
                 if (expected('(')) {
                   // identifier()
                   if (this.check_is_arrow_fn()) {
-                    return ctx.Function.start({ arrow: true });
+                    return this.Function({ arrow: true, expression: true });
                   }
                   return this.Expression({ group: true });
                 }
 
                 return create_id();
               } else {
-                const Node = token.type === 'literal' ? Literal : Number;
-                return createNode(Node, { value: token.value });
+                return createNode(Primitive, token);
               }
             }
             case 'keyword': {
-              return this.Expression();
+              const node = this.Expression() as Expression;
+              if (node.expression.length === 1) {
+                return node.expression[0];
+              }
+              return node;
             }
             case 'operator': {
               return this.Expression();
@@ -193,7 +197,7 @@ export default (config: any) => {
                   return this.Array();
                 case '(':
                   if (this.check_is_arrow_fn()) {
-                    return ctx.Function.start({ arrow: true });
+                    return this.Function({ arrow: true, expression: true });
                   }
                   return this.Expression({ group: true });
                 case '`':
@@ -210,8 +214,8 @@ export default (config: any) => {
           }
         },
 
-        Expression({ group } = { group: false } as Context['Expression']['props']): Node {
-          log('Expression;m', token.value)
+        Expression({ group } = { group: false }): Node {
+          log('Expression;m', token.value);
           const curr_ctx = currentContext();
           const ctx_expression = curr_ctx.name === 'Expression';
           const node = createNode(Expression, { group });
@@ -235,9 +239,8 @@ export default (config: any) => {
 
             switch (token.type) {
               case 'number':
-              case 'literal': {
-                const Node = token.eq('literal') ? Literal : Number;
-                node.add(createNode(Node, { value: token.value }));
+              case 'string': {
+                node.add(createNode(Primitive, token));
                 break;
               }
               case 'identifier': {
@@ -282,13 +285,20 @@ export default (config: any) => {
                   }
                   if (statement_keyword(token.value)) {
                     // TODO ERROR
-                    log(`unexpected keyword "${token.value}";r`)
-                    break;
-                  }
-                  node.add(token.value);
+                    error({ title: errors.unexpected, message: 'TODO' })
+                  };
                   break;
                 }
-                node.add(token.value);
+                switch (token.value) {
+                  case 'null':
+                  case 'true':
+                  case 'false':
+                    node.add(createNode(Primitive, token))
+                    break;
+                  default:
+                    node.add(token.value);
+                    break;
+                }
                 // node.expression.push()
                 break;
               }
@@ -349,20 +359,20 @@ export default (config: any) => {
           let is_arrow_fn = false;
           traverseTokens('(', ')')
             .then(() => {
-              console.log('TEST ', token.value)
               is_arrow_fn = token.eq('=>')
             })
 
           return is_arrow_fn;
         },
 
-        Block({ functionBody }: Context['Block']['props']) {
+        Block({ functionBody = false }: Partial<Block>) {
           const node = createNode(Block, { functionBody });
           let parsing_block = true;
+
           // while (parsing_block) {
           //   next();
           //   switch (true) {
-          //     case token.literal:
+          //     case token.string:
           //       const literalNode = createNode(Literal, { value: token.value });
           //       appendNode(literalNode);
           //       break;
@@ -376,9 +386,11 @@ export default (config: any) => {
           //   }
 
           // }
+
+          return node;
         },
 
-        Variable({ kind, hoisting, implicit }: VariableProps) {
+        Variable({ kind, hoisting, implicit }: Variable & { implicit?: boolean }) {
           log('Variable;m', kind + ";c", 'implicit:', implicit, 'hoisting', hoisting)
 
           const node = createNode(Variable, { tag: kind, kind, hoisting });
@@ -422,7 +434,7 @@ export default (config: any) => {
           }
 
           endContext();
-          log('Variable end;m', node.toString())
+          log('Variable end;m', node)
         },
 
         VariableId(node: Variable) {
@@ -459,18 +471,22 @@ export default (config: any) => {
           if (node.init) {
             switch (node.init.constructor) {
               case Identifier:
-              case Number:
-              case Literal:
+              case Primitive:
                 next();
                 break;
             }
           }
         },
 
-        Function({ async, arrow }: Context['Function']['props']) {
+        Function({ async = false, arrow = false, expression = false }: Partial<Function>) {
 
-          const node = createNode(Function, { async, arrow });
-          appendNode(node)
+          const ctx_is_function = currentContext().name === 'Function';
+
+          const node = createNode(Function, { async, arrow, expression });
+
+          if (ctx_is_function) {
+            appendNode(node);
+          }
 
           if (token.eq('function')) {
             next();
@@ -483,27 +499,33 @@ export default (config: any) => {
                 node.params = this.Params();
                 break;
               case (token.eq('identifier')): {
-                node.params = [createNode(Identifier, { param: true })]
+                node.params = [createNode(Identifier, { name: token.value, param: true })];
+                next();
                 break;
               }
               default:
                 error({ title: errors.unexpected, message: 'TODO' })
             }
 
+            console.log('end params', token);
+
             if (token.eq('=>')) {
               next();
               if (token.eq('{')) {
                 node.body = ctx.Block.start({ functionBody: true });
               } else {
-                node.body = this.parse_expression()
-                node.returnType = node.body?.tag || 'void';
-
-                console.log(node)
+                // implicit return
+                node.body = this.parse_expression();
+                next();
               }
             }
 
+            console.log(node)
             log('Arrow Function end;m')
-            endContext();
+
+            if (ctx_is_function) {
+              endContext();
+            }
             return node;
           }
 
@@ -523,8 +545,14 @@ export default (config: any) => {
           next();
           if (token.eq('{')) {
             // block
-            node.body = ctx.Block.start({ functionBody: true });
+            node.body = this.Block({ functionBody: true });
           }
+
+          if (ctx_is_function) {
+            endContext();
+          }
+
+          return node;
         },
 
         Params() {
@@ -554,8 +582,7 @@ export default (config: any) => {
           traverseTokens('{', '}')
             .then(() => {
               if (token.eq('=')) {
-                console.log('object is pattern')
-                expected = 'pattern'
+                expected = 'pattern';
               }
             })
 
@@ -587,10 +614,9 @@ export default (config: any) => {
                   key = [token.value, createNode(Identifier, { name: token.value })];
                   log('key:;m', token.value);
                   continue;
-                case 'literal':
+                case 'string':
                 case 'number':
-                  const Node = token.eq('literal') ? Literal : Number;
-                  key = [token.value, createNode(Node, { value: token.value })];
+                  key = [token.value, createNode(Primitive, token)];
                   log('key:;m', token.value);
                   continue;
                 case 'bracket': {
@@ -757,8 +783,8 @@ export default (config: any) => {
           let loop = 5;
           while (loop > 0 && parsing_lit) {
 
-            nextLiteral(['${', '`']);
-            node.expression.push(createNode(Literal, { value: token.value }));
+            nextString(['${', '`']);
+            node.expression.push(createNode(Primitive, token));
             next();
 
             if (token.eq('`')) {

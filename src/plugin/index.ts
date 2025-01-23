@@ -36,7 +36,7 @@ type DefaultApi = {
   nextToken: Token;
   debug: Tokenizer['debug'];
   next(debug?: boolean): Token;
-  nextLiteral(endToken: string | string[]): Token;
+  nextString(endToken: string | string[]): Token;
   traverseTokens: Tokenizer['traverse_tokens']
   expected(comparator?: string | ((token: Token) => boolean)): boolean;
   appendNode: Program['appendNode'];

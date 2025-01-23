@@ -2,10 +2,9 @@ import { Block, Identifier, Node } from "parser/Progam";
 
 class Variable extends Node {
   tag = 'variable'
-  kind = 'var' as 'var' | 'const' | 'let';
+  kind?: 'var' | 'const' | 'let';
   id = {} as Node;
   init?: Node;
-
   declarator = true;
 
   toString(): string {
@@ -21,11 +20,12 @@ class Variable extends Node {
 class Function extends Node {
   tag = 'function';
   id?: Identifier;
-  declarator = true;
+  expression?: boolean;
+  declarator?: boolean;
   async?: boolean;
   arrow?: boolean;
   params: Node[] = [];
-  body: Node | null = null;
+  body?: Node = undefined;
   returnType = 'void';
 
   toString() {
@@ -39,9 +39,6 @@ class Function extends Node {
   }
 }
 
-class Param extends Node {
-
-}
 
 class Expression extends Node {
   tag = 'expression';
@@ -140,21 +137,39 @@ class ArrayExpression extends Node {
   }
 }
 
-class Literal extends Node {
-  tag = 'literal'
-  value = '';
+class Primitive extends Node {
+  tag?: 'string' | 'number' | 'boolean' | 'null';
+  value?: boolean | string | number | null;
+  constructor({ value, type }: { value: string, type: 'keyword' | 'string' | 'number' }) {
+    super({});
+    switch (type) {
+      case 'keyword':
+        switch (value) {
+          case 'true':
+          case 'false':
+            this.tag = 'boolean';
+            this.value = value === 'true' ? true : false;
+            break;
+          case 'null':
+            this.tag = 'null';
+            this.value = null;
+            break;
+        }
+        break;
+      case 'string':
+        this.tag = 'string';
+        break;
+      case 'number':
+        this.tag = 'number';
+        this.value = Number(value);
+        break;
+    }
+  }
   toString(): string {
     return `"${this.value}"`;
   }
 }
 
-class Number extends Node {
-  tag = 'number'
-  value = '';
-  toString(): string {
-    return this.value;
-  }
-}
 
 class TemplateLiteral extends Node {
   tag = 'template-literal'
@@ -181,11 +196,10 @@ class Unexpected extends Node {
 export {
   Empty,
   Block,
-  Number,
-  Literal,
   Variable,
   Function,
   Property,
+  Primitive,
   Identifier,
   Expression,
   Unexpected,
