@@ -32,7 +32,7 @@ export type Error = {
 }
 
 
-type Extend = (
+type ExtendToken = (
   type: "operator" | "bracket" | "separator" | "keyword" | "special" | "comment",
   token: string[] | string[][]
 ) => void;
@@ -62,7 +62,7 @@ class Tokenizer {
 
   comment_token = new Map<string, { multiline: boolean, end_token: string }>();
 
-  parse: any = {};
+  parser: any = {};
 
   constructor() {
     this.Context = new Context(this);
@@ -111,7 +111,20 @@ class Tokenizer {
     log('end parse program;g')
   }
 
-  extend: Extend = (type, tokens) => {
+  extend = (context: any, tokens: any, parser: any) => {
+    const { keyword = [], operator = [], bracket = [], separator = [], specialToken = [], comment = [] } = tokens;
+
+    this.extend_token('bracket', bracket);
+    this.extend_token('operator', operator);
+    this.extend_token('keyword', keyword);
+    this.extend_token('special', specialToken);
+    this.extend_token('comment', comment);
+
+    this.Context.extend(context);
+    this.parser = parser(this.api);
+  }
+
+  extend_token: ExtendToken = (type, tokens) => {
 
     if (type === 'comment') {
 
@@ -167,6 +180,12 @@ class Tokenizer {
         }
       }
     }
+  };
+
+  extend_parser = (parser: (api: any) => { [key: string]: ((params: any, done: () => void) => any) }) => {
+    log('extend parser;y');
+    const Parser = parser(this.api);
+    console.log(Parser);
   }
 
 
@@ -760,9 +779,9 @@ class Tokenizer {
 
       if (start_context) {
         // @ts-ignore
-        start_context()
+        start_context();
       } else {
-        this.Context.default.start()
+        this.Context.default();
       }
 
     } catch (error: any) {

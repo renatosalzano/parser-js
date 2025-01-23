@@ -7,7 +7,6 @@ import { Variable, Function, Identifier, Block, Primitive, TemplateLiteral, Expr
 import { Node } from 'parser/Progam';
 
 const context = {
-  Program: ['Variable', 'Function', 'Expression', 'Block', 'Statement', 'Class', 'Invalid', 'TemplateLiteral'],
   Block: {
     props: { functionBody: false },
     token: {
@@ -17,9 +16,9 @@ const context = {
   Variable: {
     props: { implicit: false },
     keyword: {
-      'var': { props: { kind: 'var', hoisting: true } },
-      'const': { props: { kind: 'const' } },
-      'let': { props: { kind: 'let' } }
+      'var': { kind: 'var', hoisting: true },
+      'const': { kind: 'const' },
+      'let': { kind: 'let' }
     }
   },
   Function: {
@@ -31,7 +30,7 @@ const context = {
     },
     keyword: {
       'function': null,
-      'async': { props: { async: true } },
+      'async': { async: true },
     }
   },
   Class: {
@@ -52,11 +51,6 @@ const context = {
       'else': null,
       'switch': null,
       'return': null
-    }
-  },
-  TemplateLiteral: {
-    token: {
-      '`': null,
     }
   }
 }
@@ -84,6 +78,8 @@ type Api = DefaultApi & {
   }
 }
 
+type EndContext = () => void;
+type Context = typeof context;
 
 
 function statement_keyword(keyword: string) {
@@ -111,7 +107,7 @@ export default (config: any) => {
       separator,
       specialToken,
     },
-    parse: ({
+    parser: ({
       ctx,
       token,
       nextToken,
@@ -126,8 +122,6 @@ export default (config: any) => {
       logNode,
       error,
       currentContext,
-      startContext,
-      endContext,
       debug,
     }: Api) => {
 
@@ -143,7 +137,6 @@ export default (config: any) => {
       function create_id() {
         return createNode(Identifier, { name: token.value }, token.location);
       }
-
 
       return ({
 
@@ -225,7 +218,6 @@ export default (config: any) => {
             if (ctx_expression) {
               log('Expression end;m', node.toString());
               appendNode(node);
-              endContext();
               return node;
             }
           }
@@ -281,7 +273,7 @@ export default (config: any) => {
               case 'keyword': {
                 if (group) {
                   if (ctx.Function.has(token.value)) {
-                    node.add(ctx.Function.start());
+                    // node.add(this.Function({ expression}));
                     break;
                   }
                   if (statement_keyword(token.value)) {
@@ -331,7 +323,7 @@ export default (config: any) => {
                     next();
                     if (curr_ctx.name === 'Expression') {
                       appendNode(node);
-                      endContext();
+                      ctx.Expression.end();
                       return node;
                     }
                     return node;
@@ -384,9 +376,8 @@ export default (config: any) => {
               log('Block end;m');
               node.endBlock();
               console.log(node)
-              appendNode(node);
               next();
-              endContext();
+              end();
               parsing_block = false;
               return node;
             }
@@ -427,8 +418,8 @@ export default (config: any) => {
           return node;
         },
 
-        Variable({ kind, hoisting, implicit }: Variable & { implicit?: boolean }) {
-          log('Variable;m', kind + ";c", 'implicit:', implicit, 'hoisting', hoisting)
+        Variable({ kind, hoisting, implicit }: Partial<Variable> & { implicit?: boolean }) {
+          log('Variable;m', kind + ";c", 'implicit:', implicit, 'hoisting', hoisting);
 
           const node = createNode(Variable, { tag: kind, kind, hoisting });
           const expected_init = kind === 'const';
@@ -462,12 +453,12 @@ export default (config: any) => {
             }
 
             if (token.eq(',')) {
-              startContext('Variable', { kind, implicit: true, hoisting });
+              this.Variable({ kind, implicit: true, hoisting });
             }
           }
 
           appendNode(node);
-          endContext();
+          ctx.Variable.end();
           log('Variable end;m', token.value)
         },
 
@@ -548,7 +539,7 @@ export default (config: any) => {
 
               node.startBody();
               if (token.eq('{')) {
-                node.body = ctx.Block.start({ functionBody: true });
+                node.body = this.Block({ functionBody: true });
               } else {
                 // implicit return
                 node.body = this.parse_expression();
@@ -557,10 +548,6 @@ export default (config: any) => {
             }
 
             log('Arrow Function end;m')
-
-            if (ctx_is_function) {
-              endContext();
-            }
             return node;
           }
 
@@ -588,11 +575,13 @@ export default (config: any) => {
           }
 
           if (ctx_is_function) {
-            endContext();
+
           }
 
           return node;
         },
+
+        Statement() { },
 
         Params() {
           const params: Node[] = [];
@@ -845,7 +834,8 @@ export default (config: any) => {
           return node;
 
         }
-      })
+      });
+
     }
   }
 }

@@ -14,13 +14,14 @@ namespace ParserConfig {
       specialToken?: string[];
       comment?: string[][];
     }
-    parse: (api: any) => {}
+    parser: (api: any) => {}
   }
 }
 
 type DefaultStartContext = Function & { $name: string };
 
 let instance: ParserConfig | null = null;
+
 class ParserConfig {
 
   private allow_config = true;
@@ -34,20 +35,11 @@ class ParserConfig {
 
   private extend_parser = (plugin: ParserConfig.Plugin | ParserConfig.ParserStructure) => {
 
-    const { context = {}, tokens = {}, parse } = typeof plugin === "function"
+    const { context = {}, tokens = {}, parser } = typeof plugin === "function"
       ? plugin(this.plugin)
       : plugin;
 
-    const { keyword = [], operator = [], bracket = [], separator = [], specialToken = [], comment = [] } = tokens;
-
-    this.Tokenizer.extend('separator', separator);
-    this.Tokenizer.extend('bracket', bracket);
-    this.Tokenizer.extend('operator', operator);
-    this.Tokenizer.extend('keyword', keyword);
-    this.Tokenizer.extend('special', specialToken);
-    this.Tokenizer.extend('comment', comment);
-    this.Tokenizer.Context.extend(context);
-    Object.assign(this.Tokenizer.parse, parse(this.Tokenizer.api));
+    this.Tokenizer.extend(context, tokens, parser);
     log('extended parser;y')
   }
 

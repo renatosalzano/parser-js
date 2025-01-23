@@ -6,15 +6,14 @@ export type ContextObject = {
   props: { [key: string]: any };
   default?: boolean;
   token: Map<string, any>;
-  has: (token: string, updateContext?: any) => boolean;
-  start(props?: { [key: string]: any }, instruction?: { [key: string]: any }): any;
-  next(): void;
+  has: (token: string) => boolean;
+  end: () => void;
 }
 
 
 class Context {
 
-  default = {} as ContextObject;
+  default = () => null;
   context: { [key: string]: ContextObject } = {};
   buffer: any = [];
   current: ContextObject;
@@ -33,7 +32,7 @@ class Context {
     return this.current;
   }
 
-  start = (name: string, props: any = {}, instruction: any = {}) => {
+  start = (name: string, props: any = {}) => {
 
     if (this.Tokenizer.end_program) {
       log('unexpected start context;r')
@@ -49,44 +48,27 @@ class Context {
     // if (data.eat) {
     //   this.Parser.eat(data.eat);
     // }
-    return this.Tokenizer.parse[name](props);
+    return this.Tokenizer.parser[name](props);
   }
 
-  end = () => {
+  end = (name: string) => {
 
-    const prev_context_name = this.buffer.at(-1).name;
     this.buffer.pop();
     this.current = this.buffer.at(-1);
 
     const ctx_name = this.current.name;
 
-    log('CTX:;c', `${ctx_name};g`, `<-- ${prev_context_name}`);
+    log('CTX:;c', `${ctx_name};g`, `<-- ${name}`);
     // console.log('end at this token', this.Tokenizer.Token.value)
     if (ctx_name === 'Program') {
       this.Tokenizer.parse_program();
     }
   }
 
-  load(context: ContextObject) {
-    if (context?.default) {
-
-      if (this.default) {
-        log(`default context is "${context.name}", was "${this.default.name}";y`)
-      }
-      this.default = context as ContextObject;
-    }
-
-    this.context[context.name] = context;
-  }
 
   extend = (context: any) => {
 
     const Tokenizer = this.Tokenizer;
-
-    const program_ctx = new Set<string>(context?.Program || []);
-    const invalid_ctx = new Set<string>(program_ctx);
-
-    delete context.Program;
 
     for (const name of Object.keys(context)) {
 
@@ -101,79 +83,68 @@ class Context {
 
       Context.token = new Map(Object.entries(Context[key]));
       Context.name = name;
-      Context.props = Object.freeze(Context.props || {});
+      Context.props = Context.props || {};
 
       if (key === 'keyword') {
 
         const context_keyword: string[] = []
 
-        for (const [lexical] of Context.token) {
+        for (const [token] of Context.token) {
 
-          if (Tokenizer.is.alpha(lexical)) {
-            if (!Tokenizer.keyword.has(lexical)) {
+          if (Tokenizer.is.alpha(token)) {
+            if (!Tokenizer.keyword.has(token)) {
               // Parser.keyword.set(lexical, name);
-              context_keyword.push(lexical)
+              context_keyword.push(token)
             } else {
-              Context.token.delete(lexical);
-              log(`duplicate keyword "${lexical}", found in context: ${name};r`);
+              Context.token.delete(token);
+              log(`duplicate keyword "${token}", found in context: ${name};r`);
             }
           } else {
-            Context.token.delete(lexical);
-            log(`invalid "${lexical}", should be [a-z] found in context: ${name};r`);
+            Context.token.delete(token);
+            log(`invalid "${token}", should be [a-z] found in context: ${name};r`);
           }
         }
 
-        Tokenizer.extend('keyword', context_keyword);
+        Tokenizer.extend_token('keyword', context_keyword);
       } else {
         delete Context.keyword;
       }
 
       // Function.has(sequence, { props: {}, eat: {}})
-      Context.has = function (token: string, updateContext?: boolean | any) {
+      Context.has = function (token: string) {
+        return this.token.has(token);
+      }
 
-        const check = this.token.has(token);
-        if (check && updateContext !== undefined) {
+      Context.end = () => {
+        return this.end(Context.name);
+      }
 
-          let { props = {}, ...instruction } = this.token.get(token) || {};
+      for (const [token] of Context.token) {
+        Tokenizer.program.set(token, (props = {}) => {
+          props = Context.token.get(token) || {};
+          props = { ...Context.props, ...props };
+          return this.start(name, props);
+        })
+      }
 
-          if (updateContext.constructor === Object) {
-            let { props: props_override = {}, ...instruction_override } = updateContext || {};
-            props = props_override;
-            instruction = instruction_override;
-          }
-
-          props = { ...this.props, ...props }
-
-          Tokenizer.Context.start(name, props, instruction);
+      if (context?.default) {
+        if (this.default) {
+          log(`default context is "${context.name}", was "${this.default.name}";y`)
         }
-
-        return check;
+        this.default = (props = {}) => {
+          props = Context.props;
+          return this.start(name, props);
+        };
       }
 
-      Context.start = function (props?: any, instruction?: any) {
-        const token = Tokenizer.Token.value;
-        props = props || this.token.get(token)?.props || {};
-        props = { ...this.props, ...props };
+      Object.freeze(Context);
 
-        return Tokenizer.Context.start(name, props, instruction);
-      }
-
-
-      if (program_ctx.has(name)) {
-        for (const [lexical] of Context.token) {
-          Tokenizer.program.set(lexical, () => Context.has(lexical, true))
-        }
-        invalid_ctx.delete(name)
-      }
-
-      Tokenizer.Context.load(Context);
-    }
-
-    for (const name of invalid_ctx) {
-      log(`invalid context: ${name};r`)
-    }
+      this.context[name] = Context;
+    } // end for
 
   }
+
+
 }
 
 export default Context
