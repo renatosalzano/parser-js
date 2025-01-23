@@ -31,7 +31,7 @@ const context = {
     },
     keyword: {
       'function': null,
-      'async': { eat: "function", props: { async: true } },
+      'async': { props: { async: true } },
     }
   },
   Class: {
@@ -216,6 +216,7 @@ export default (config: any) => {
 
         Expression({ group } = { group: false }): Node {
           log('Expression;m', token.value);
+
           const curr_ctx = currentContext();
           const ctx_expression = curr_ctx.name === 'Expression';
           const node = createNode(Expression, { group });
@@ -235,7 +236,7 @@ export default (config: any) => {
 
           while (max > 0 && parsing_expression) {
 
-            log('current token;c', token.value, max)
+            // log('current token;c', token.value, max)
 
             switch (token.type) {
               case 'number':
@@ -315,7 +316,7 @@ export default (config: any) => {
 
             expected();
 
-            log('next token;y', nextToken.value)
+            // log('next token;y', nextToken.value)
 
             switch (nextToken.type) {
               case 'keyword': {
@@ -366,26 +367,62 @@ export default (config: any) => {
         },
 
         Block({ functionBody = false }: Partial<Block>) {
+          log('Block;m');
+          const ctx_is_block = currentContext().name = 'Block';
           const node = createNode(Block, { functionBody });
           let parsing_block = true;
+          let max = 10;
 
-          // while (parsing_block) {
-          //   next();
-          //   switch (true) {
-          //     case token.string:
-          //       const literalNode = createNode(Literal, { value: token.value });
-          //       appendNode(literalNode);
-          //       break;
-          //     case ctx.Function.has(token.value, true):
-          //       break;
-          //     case ctx.Variable.has(token.value, { props: { kind: token.value } }):
-          //       break;
-          //     case token.eq('}'):
-          //       parsing_block = false;
-          //       break;
-          //   }
+          if (token.eq('{')) {
+            next();
+          }
 
-          // }
+          while (max > 0 && parsing_block) {
+            console.log('curr tok:', token.type, token.value)
+
+            if (token.eq('}')) {
+              log('Block end;m');
+              node.endBlock();
+              console.log(node)
+              appendNode(node);
+              next();
+              endContext();
+              parsing_block = false;
+              return node;
+            }
+
+            switch (token.type) {
+              case 'keyword': {
+                switch (true) {
+                  case (ctx.Variable.has(token.value, true)):
+                    break;
+                  case (ctx.Function.has(token.value, true)):
+                    break;
+                }
+              }
+              case 'bracket': {
+                switch (token.value) {
+                  case '{': {
+
+                    traverseTokens('{', '}').then(() => {
+                      if (token.eq('=')) {
+
+                      }
+                    })
+
+                    break;
+                  }
+                  case '[':
+                  case '(':
+                    break;
+                }
+              }
+
+            }
+
+            --max;
+
+          }
 
           return node;
         },
@@ -397,18 +434,13 @@ export default (config: any) => {
           const expected_init = kind === 'const';
 
           this.VariableId(node); // parse id
+
           log('Variable;m', 'ID done;g');
+          node.endDeclaration();
 
           if (expected_init && !token.eq('=')) {
             error({ message: errors.variable.expected_init });
           }
-          /* 
-            l'appendNode in questo punto non è casuale,
-            oltre ad aggiungerlo nel blocco statement corrente,
-            essendo Variable un nodo dichiarante, salvo tutti i riferimenti
-            della stessa
-          */
-          appendNode(node);
 
           if (token.eq('=')) {
             next(); // over "="
@@ -422,6 +454,7 @@ export default (config: any) => {
           }
 
 
+
           if (token.eq(/[,;]/)) {
 
             if (token.eq(';')) {
@@ -433,8 +466,9 @@ export default (config: any) => {
             }
           }
 
+          appendNode(node);
           endContext();
-          log('Variable end;m', node)
+          log('Variable end;m', token.value)
         },
 
         VariableId(node: Variable) {
@@ -463,6 +497,7 @@ export default (config: any) => {
               error({ title: errors.syntax, message: `unexpected token '${token.value}'` });
             // unexpected token
           }
+
         },
 
         VariableInit(node: Variable) {
@@ -484,22 +519,23 @@ export default (config: any) => {
 
           const node = createNode(Function, { async, arrow, expression });
 
-          if (ctx_is_function) {
-            appendNode(node);
-          }
-
           if (token.eq('function')) {
             next();
           }
 
           if (arrow) {
 
+            log('Arrow Function;m')
+
+            node.startParams();
+
             switch (true) {
               case (token.eq('(')):
                 node.params = this.Params();
                 break;
               case (token.eq('identifier')): {
-                node.params = [createNode(Identifier, { name: token.value, param: true })];
+
+                node.params = [createNode(Identifier, { name: token.value })];
                 next();
                 break;
               }
@@ -507,10 +543,10 @@ export default (config: any) => {
                 error({ title: errors.unexpected, message: 'TODO' })
             }
 
-            console.log('end params', token);
-
             if (token.eq('=>')) {
               next();
+
+              node.startBody();
               if (token.eq('{')) {
                 node.body = ctx.Block.start({ functionBody: true });
               } else {
@@ -520,7 +556,6 @@ export default (config: any) => {
               }
             }
 
-            console.log(node)
             log('Arrow Function end;m')
 
             if (ctx_is_function) {
@@ -536,6 +571,7 @@ export default (config: any) => {
             next();
           }
 
+          node.startParams();
 
           if (token.eq('(')) {
             console.log('params')
@@ -543,6 +579,9 @@ export default (config: any) => {
           }
 
           next();
+
+          node.startBody();
+
           if (token.eq('{')) {
             // block
             node.body = this.Block({ functionBody: true });

@@ -1,11 +1,10 @@
-import { Block, Identifier, Node } from "parser/Progam";
+import { Block, Declarator, FunctionDeclarator, Identifier, Node } from "parser/Progam";
 
-class Variable extends Node {
+class Variable extends Declarator {
   tag = 'variable'
   kind?: 'var' | 'const' | 'let';
   id = {} as Node;
   init?: Node;
-  declarator = true;
 
   toString(): string {
     const id = typeof this.id === 'string' ? this.id : this.id.toString();
@@ -17,11 +16,10 @@ class Variable extends Node {
   }
 }
 
-class Function extends Node {
+class Function extends FunctionDeclarator {
   tag = 'function';
   id?: Identifier;
   expression?: boolean;
-  declarator?: boolean;
   async?: boolean;
   arrow?: boolean;
   params: Node[] = [];

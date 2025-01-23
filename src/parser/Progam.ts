@@ -6,46 +6,61 @@ interface Ctor<T> {
   new(...args: any): T
 }
 
-// type Node<T extends { [key: string]: any } = { [key: string]: any }> = {
-//   toString(): string;
-//   appendNode?: (node: Node) => any;
-// } & {
-//   [K in keyof T]: T[K]
-// }
-
 class Node {
   tag?: string;
   id?: Node | Node[];
-  declarator?: boolean;
-  function?: boolean;
-  hoisting?: boolean;
-
   location?: { line: number, start: number, end: number };
   constructor(init: { [key: string]: any }) {
-
     Object.assign(this, init);
   }
   toString() {
     return ''
   }
+
+}
+
+class Declarator extends Node {
+  tag?: string;
+  id?: Node | Node[];
+  hoisting?: boolean;
+
+  constructor(init: { [key: string]: any }) {
+    super(init);
+  }
+
+  endDeclaration() { };
+}
+
+class FunctionDeclarator extends Node {
+  tag?: string;
+  id?: Node;
+  hoisting?: boolean;
+
+  constructor(init: { [key: string]: any }) {
+    super(init);
+  }
+
+  startParams() { };
+  startBody() { };
+  endBody() { };
 }
 
 class Block extends Node {
   tag = 'block';
   functionBody = false;
   body: Node[] = [];
+
   appendNode(node: Node) {
     this.body.push(node);
   }
+
+  endBlock() { };
 }
 
 interface Identifier {
   name: string;
   rest?: boolean;
   spread?: boolean;
-  param?: boolean;
-  location?: { line: number, start: number, end: number };
-
 }
 
 class Identifier {
@@ -70,11 +85,9 @@ class ReferenceTree {
     return this.scope.at(-1) || this.Program;
   }
 
-  declare = (node: Node) => {
+  declare = (node: Declarator | FunctionDeclarator) => {
 
     const current_scope = this.current_scope();
-
-    // TODO CHECK IF HOISTED
 
     if (node.id) {
 
@@ -110,9 +123,8 @@ class ReferenceTree {
       this.pending_ref.add(node.name);
     }
   }
+
 }
-
-
 
 type InitNode<T> = {
   [K in keyof T]?: T[K]
@@ -122,13 +134,17 @@ type InitNode<T> = {
 
 class Program {
   body: Node[] = [];
-  blocks: Node[] = []
+  block: Node[] = []
   ReferenceTree = new ReferenceTree();
   current_node?: Node;
   current_declarator?: Node;
+  current_function?: { params: Node[] }
 
-  constructor(private Tokenizer: Tokenizer) {
-  }
+  params = new Map<string, Node>();
+  check_reference = true;
+  check_params = false;
+  store_params = false;
+  expected_block = false;
 
   createNode = <T>(NodeCtor: Ctor<T>, init?: InitNode<T>, location?: Node['location']) => {
 
@@ -138,28 +154,80 @@ class Program {
       node.location = location;
     }
 
-    if (node instanceof Block) {
-      this.ReferenceTree.scope.push(new Map());
-      this.blocks.push(node);
-    }
+    // if (this.expected_block) {
+    //   console.log('EXPECTED', node)
+    //   this.expected_block = node instanceof Block;
+    // }
 
-    if (node.declarator) {
-      this.current_declarator = node;
-    }
+    switch (true) {
 
-    if (node instanceof Identifier) {
+      case (node instanceof Block): {
+        if (this.expected_block) {
+          this.expected_block = false;
+          console.log('expected block')
+        } else {
+          this.ReferenceTree.scope.push(new Map());
+          console.log('NEW SCOPE')
+        }
+        this.block.push(node);
 
-      if (!this.current_declarator) {
-        this.ReferenceTree.check(node)
+        node.endBlock = () => {
+          this.block.pop();
+        }
+        break;
+      }
+
+      case (node instanceof FunctionDeclarator): {
+        this.check_reference = false;
+
+        node.startParams = () => {
+          this.ReferenceTree.declare(node);
+          delete node.hoisting;
+          this.store_params = true;
+        }
+
+        node.startBody = () => {
+          this.store_params = false;
+          this.check_reference = true;
+          this.expected_block = true;
+          const { params } = this;
+          this.ReferenceTree.scope.push(params);
+          this.params = new Map();
+        }
+
+        node.endBody = () => {
+          this.check_reference = true;
+        }
+
+        break;
+      }
+      case (node instanceof Declarator): {
+        this.check_reference = false;
+        node.endDeclaration = () => {
+          this.check_reference = true;
+          this.ReferenceTree.declare(node);
+          delete node.hoisting;
+        }
+        break;
+      }
+      case (node instanceof Identifier): {
+        if (this.check_reference) {
+          this.ReferenceTree.check(node);
+        }
+        if (this.store_params) {
+          this.params.set(node.name, node);
+        }
+        break;
       }
     }
 
+    this.expected_block = false;
     this.current_node = node;
     return node as T;
   }
 
   appendNode = (node: Node) => {
-    const last_node = this.blocks.at(-1) as Block | undefined;
+    const last_node = this.block.at(-1) as Block | undefined;
 
     if (last_node) {
       last_node.appendNode(node);
@@ -167,17 +235,6 @@ class Program {
       this.body.push(node);
     }
 
-    if (node.declarator) {
-      this.current_declarator = undefined;
-      this.ReferenceTree.declare(node);
-      delete node.declarator;
-      delete node.hoisting;
-    }
-
-  }
-
-  endNode = () => {
-    this.blocks.pop();
   }
 
   log = () => {
@@ -199,5 +256,5 @@ class Program {
   }
 }
 
-export { Node, Block, Identifier }
+export { Node, Declarator, FunctionDeclarator, Block, Identifier };
 export default Program

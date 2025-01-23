@@ -66,10 +66,9 @@ class Tokenizer {
 
   constructor() {
     this.Context = new Context(this);
-    this.Program = new Program(this);
+    this.Program = new Program();
 
     this.api = new Proxy({
-      ctx: this.Context.context,
       char: this.char,
       token: this.Token,
       nextToken: this.next_token,
@@ -81,13 +80,16 @@ class Tokenizer {
       currentContext: this.Context.get_current,
       isIdentifier: this.is.identifier,
       eachChar: this.each_char,
+      eat: this.eat,
+      error: this.error,
+      /* PROGRAM */
       createNode: this.Program.createNode,
       appendNode: this.Program.appendNode,
       logNode: this.Program.log,
+      /* CONTEXT */
+      ctx: this.Context.context,
       startContext: this.Context.start,
       endContext: this.Context.end,
-      eat: this.eat,
-      error: this.error
     }, {
       get(api, p) {
         return Reflect.get(api, p)
@@ -780,8 +782,8 @@ class Tokenizer {
             console.log(`${error.message}\n    at ${this.line}:${this.pos}`)
             return;
           case 'end': {
-            console.log(this.Program.body)
-            console.log(this.Program.toString());
+            // console.log(this.Program.body)
+            console.log(this.Program.body);
             this.Program.check_references();
             // console.log(this.Program.body)
             return;
