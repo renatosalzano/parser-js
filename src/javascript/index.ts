@@ -4,7 +4,7 @@ import { log } from 'utils';
 import errors from './errors';
 import { Variable, Function, Identifier, Block, Primitive, TemplateLiteral, Expression, ObjectExpression, ArrayExpression, Property, Unexpected, Empty } from './node';
 import { Node } from 'parser/Progam';
-import { tokens } from './tokens';
+import { CtxTempateLiteral, tokens } from './tokens';
 
 const program = {
   Block: {
@@ -52,6 +52,9 @@ const program = {
       'switch': null,
       'return': null
     }
+  },
+  TemplateLiteral: {
+    token: { '`': null }
   }
 }
 
@@ -89,6 +92,8 @@ export default (config: any) => {
       eat,
       appendNode,
       createNode,
+      createContext,
+      endContext,
       error,
       debug,
       $
@@ -162,12 +167,14 @@ export default (config: any) => {
                     return this.Function({ arrow: true, expression: true });
                   }
                   return this.Expression({ group: true });
-                case '`':
-                  return this.TemplateLiteral();
+              }
+            }
+            case 'special': {
+              if (token.eq('`')) {
+                return this.TemplateLiteral()
               }
             }
             case 'newline':
-            case 'special':
             case 'unknown':
             case 'separator': {
               // TODO
@@ -790,6 +797,9 @@ export default (config: any) => {
           const node = createNode(TemplateLiteral);
           let parsing_lit = true;
           let loop = 5;
+
+          createContext(CtxTempateLiteral);
+
           while (loop > 0 && parsing_lit) {
 
             nextLiteral(['${', '`']);

@@ -3,6 +3,7 @@ import History from "./History";
 import Program from "./Progam";
 import { create_fast_get } from "./utils";
 import { extend, ParserObject } from "./extend";
+import Context from "./Context";
 
 export type TokenType<T> = 'string' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number' | 'special' | 'newline' | T;
 export type Token = {
@@ -31,7 +32,7 @@ export type Error = {
   at?: string;
 }
 
-type Tokenize = { [key: string]: () => "next" | "continue" | void }
+type Tokenize = { [key: string]: () => "next" | "skip" | void }
 
 class Tokenizer {
 
@@ -39,6 +40,7 @@ class Tokenizer {
 
   Program: Program;
   History = new History(this);
+  Context = new Context(this);
 
   program = new Map<string, Function>();
 
@@ -52,7 +54,6 @@ class Tokenizer {
 
   comment_token = new Map<string, { multiline: boolean, end_token: string }>();
 
-
   parser: { [key: string]: Function } = {};
 
   constructor() {
@@ -61,7 +62,10 @@ class Tokenizer {
     Object.assign(this.api, {
       isFnBody: this.Program.is_fn_body,
       createNode: this.Program.create_node,
-      appendNode: this.Program.append_node
+      appendNode: this.Program.append_node,
+      /* Context */
+      createContext: this.Context.create_context,
+      endContext: this.Context.end_context,
     });
   }
 
@@ -73,14 +77,6 @@ class Tokenizer {
   }
 
   extend = (...plugin: [string, any, any, any]) => extend.apply(this, plugin);
-
-
-  extend_parser = (parser: (api: any) => { [key: string]: ((params: any, done: () => void) => any) }) => {
-    log('extend parser;y');
-    const Parser = parser(this.api);
-    console.log(Parser);
-  }
-
 
   is = {
     quote: (char: string) => /['|"]/.test(char),
@@ -254,7 +250,7 @@ class Tokenizer {
 
         this.Token.value = '';
         ++this.index, ++this.pos; // over quote
-        return "continue";
+        return "skip";
       }
 
       const end_token = this.get_end_token
@@ -345,7 +341,7 @@ class Tokenizer {
           this.skip_whitespace();
           this.check_token_type();
 
-          return "continue"
+          return "skip"
         }
 
       } else {
@@ -359,7 +355,7 @@ class Tokenizer {
           this.skip_whitespace();
           this.check_token_type();
 
-          return "continue"
+          return "skip"
         }
 
       }
@@ -581,7 +577,11 @@ class Tokenizer {
 
     this.skip_whitespace();
 
+    this.Context.check_token_type();
+
     this.check_token_type();
+
+    const tokenize = this.Context.tokenize || this.tokenize[this.expected_token];
 
     while (this.index < this.source.length) {
 
@@ -593,13 +593,15 @@ class Tokenizer {
         continue;
       }
 
+
+
       switch (this.tokenize[this.expected_token]()) {
         case "next": {
           this.Token.value += this.char.curr;
           ++this.index, ++this.pos;
           continue;
         }
-        case "continue": {
+        case "skip": {
           continue;
         }
         default: {
@@ -711,7 +713,7 @@ class Tokenizer {
     traverseTokens: this.traverse_tokens,
     eat: this.eat,
     error: this.error,
-    $: {} as { [key: string]: ParserObject },
+    $: {} as { [key: string]: ParserObject }
   }
 
 }

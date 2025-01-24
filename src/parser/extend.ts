@@ -1,6 +1,7 @@
 import { log } from "utils";
 import Tokenizer from "./Tokenizer";
 import Program from "./Progam";
+import Context from "./Context";
 import { create_fast_get } from "./utils";
 // import type { ParserMethod } from "./Tokenizer";
 
@@ -19,6 +20,9 @@ export type Api<T> =
     appendNode: Program['append_node'];
     createNode: Program['create_node'];
     isFnBody: Program['is_fn_body'];
+
+    createContext: Context['create_context'];
+    endContext: Context['end_context'];
   }
 
 let plugin_name: string;
@@ -34,8 +38,9 @@ export function extend(this: Tokenizer, name: string, program: any, tokens: any,
   extend_tokens.call(this, 'comment', comment);
 
   extend_parser.call(this, program);
-  this.parser = parser(this.api);
+  // TODO check parser keys
 
+  this.parser = parser(this.api);
 }
 
 function extend_tokens(this: Tokenizer, type: string, tokens: string[] | string[][]) {
@@ -100,7 +105,6 @@ function extend_tokens(this: Tokenizer, type: string, tokens: string[] | string[
 function extend_parser(this: Tokenizer, program: { [key: string]: { [key: string]: any } }) {
 
   for (const name of Object.keys(program)) {
-
 
     if (!program[name]?.keyword && !program[name]?.token) {
       log(`invalid Parser ${name};r`);
