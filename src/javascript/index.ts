@@ -1,18 +1,62 @@
 import Parser from 'parser/Tokenizer';
-import type { DefaultApi } from "../parser/plugin";
-import { ContextObject } from 'parser/Context';
+import type { Api } from 'parser/extend';
 import { log } from 'utils';
 import errors from './errors';
 import { Variable, Function, Identifier, Block, Primitive, TemplateLiteral, Expression, ObjectExpression, ArrayExpression, Property, Unexpected, Empty } from './node';
 import { Node } from 'parser/Progam';
-import { context, tokens } from './tokens';
+import { tokens } from './tokens';
 
-type Context = typeof context;
-type Api = DefaultApi & {
-  ctx: {
-    [K in keyof Context]: ContextObject;
+const program = {
+  Block: {
+    props: { functionBody: false },
+    token: {
+      "{": null,
+    }
+  },
+  Variable: {
+    props: { implicit: false },
+    keyword: {
+      'var': { kind: 'var', hoisting: true },
+      'const': { kind: 'const' },
+      'let': { kind: 'let' }
+    }
+  },
+  Function: {
+    props: {
+      async: false,
+      arrow: false,
+      method: false,
+      expression: false,
+    },
+    keyword: {
+      'function': null,
+      'async': { async: true },
+    }
+  },
+  Class: {
+    keyword: {
+      'class': null
+    }
+  },
+  Expression: {
+    props: { group: false, append: true },
+    default: true,
+    token: {
+      '(': null
+    }
+  },
+  Statement: {
+    keyword: {
+      'if': null,
+      'else': null,
+      'switch': null,
+      'return': null
+    }
   }
 }
+
+type JSProgram = typeof program;
+
 
 function statement_keyword(keyword: string) {
   return /var|let|const|function|async|if|else|switch|for|while|do|return/.test(keyword);
@@ -32,24 +76,24 @@ export default (config: any) => {
 
 
   return {
-    context,
+    name: 'javascript',
+    program,
     tokens,
     parser: ({
-      ctx,
       token,
       nextToken,
       next,
-      nextString,
+      nextLiteral,
       traverseTokens,
       expected,
       eat,
-      isIdentifier,
       appendNode,
       createNode,
-      logNode,
       error,
       debug,
-    }: Api) => {
+      $
+
+    }: Api<JSProgram>) => {
 
 
       function skip_multiple_token(token: string) {
@@ -208,7 +252,7 @@ export default (config: any) => {
               }
               case 'keyword': {
                 if (group) {
-                  if (ctx.Function.has(token.value)) {
+                  if ($.Function.has(token.value)) {
                     // node.add(this.Function({ expression}));
                     break;
                   } else {
@@ -302,9 +346,9 @@ export default (config: any) => {
               case 'keyword': {
                 console.log('keyword', token.value)
                 switch (true) {
-                  case (ctx.Variable.has(token.value, true)):
+                  case ($.Variable.has(token.value, true)):
                     break;
-                  case (ctx.Function.has(token.value)):
+                  case ($.Function.has(token.value)):
 
                     break;
                 }
@@ -326,7 +370,7 @@ export default (config: any) => {
                 }
               }
               case 'identifier': {
-                ctx.Expression.start({ append: true });
+                $.Expression.start({ append: true });
                 break;
               }
               case 'separator': {
@@ -748,7 +792,7 @@ export default (config: any) => {
           let loop = 5;
           while (loop > 0 && parsing_lit) {
 
-            nextString(['${', '`']);
+            nextLiteral(['${', '`']);
             node.expression.push(createNode(Primitive, token));
             next();
 

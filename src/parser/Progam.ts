@@ -1,5 +1,4 @@
 import { log } from "utils";
-import Context from "./Context";
 import Tokenizer from "./Tokenizer";
 
 interface Ctor<T> {
@@ -150,7 +149,9 @@ class Program {
   store_params = false;
   expected_block = false;
 
-  createNode = <T>(NodeCtor: Ctor<T>, init?: InitNode<T>, location?: Node['location']) => {
+  is_fn_body = false;
+
+  create_node = <T>(NodeCtor: Ctor<T>, init?: InitNode<T>, location?: Node['location']) => {
 
     const node = new NodeCtor(init) as Node;
 
@@ -187,15 +188,18 @@ class Program {
         }
 
         node.startBody = () => {
+          this.is_fn_body = true;
           this.store_params = false;
           this.check_reference = true;
           this.expected_block = true;
+
           const { params } = this;
           this.ReferenceTree.scope.push(params);
           this.params = new Map();
         }
 
         node.endBody = () => {
+          this.is_fn_body = false;
           this.check_reference = true;
         }
 
@@ -226,7 +230,7 @@ class Program {
     return node as T;
   }
 
-  appendNode = (node: Node | Declarator | Fn) => {
+  append_node = (node: Node | Declarator | Fn) => {
     const last_node = this.block.at(-1) as Block | undefined;
 
     if (last_node) {
@@ -234,10 +238,9 @@ class Program {
     } else {
       this.body.push(node);
     }
-
-
-
   }
+
+
 
   log = () => {
     return this.body;

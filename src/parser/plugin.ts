@@ -29,26 +29,6 @@ type ParserApi<T, A> = {
   [K in keyof A]: A[K]
 }
 
-type DefaultApi = {
-  ctx: { [key: string]: ContextObject };
-  char: { curr: string, prev: string, next: string };
-  token: Token;
-  nextToken: Token;
-  debug: Tokenizer['debug'];
-  next(debug?: boolean): Token;
-  nextString(endToken: string | string[]): Token;
-  traverseTokens: Tokenizer['traverse_tokens']
-  expected(comparator?: string | ((token: Token) => boolean)): boolean;
-  appendNode: Program['appendNode'];
-  createNode: Program['createNode'];
-  logNode: Program['log'];
-  eat(sequence: string, breakReg?: RegExp): void;
-  error(error: Error): void;
-  isIdentifier(value: string): boolean;
-}
-
-
-
 
 type plugin = {
   context: { [K in Exclude<string, 'Program'>]: ContextObject } & { Program?: string[] };
@@ -62,7 +42,6 @@ type Plugin = (config?: { [key: string]: any }) => plugin
 export {
   Plugin,
   plugin,
-  DefaultApi
 }
 
 // export default Plugin;

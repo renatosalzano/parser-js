@@ -5,7 +5,8 @@ import { log } from 'utils';
 namespace ParserConfig {
   export type Plugin = (prev: ParserStructure) => ParserStructure;
   export type ParserStructure = {
-    context: any;
+    name: string;
+    program: any;
     tokens?: {
       operator?: string[];
       bracket?: string[];
@@ -35,12 +36,12 @@ class ParserConfig {
 
   private extend_parser = (plugin: ParserConfig.Plugin | ParserConfig.ParserStructure) => {
 
-    const { context = {}, tokens = {}, parser } = typeof plugin === "function"
+    const { name = '', program = {}, tokens = {}, parser } = typeof plugin === "function"
       ? plugin(this.plugin)
       : plugin;
 
-    this.Tokenizer.extend(context, tokens, parser);
-    log('extended parser;y')
+    log(`plugin: ${name};y`);
+    this.Tokenizer.extend(name, program, tokens, parser);
   }
 
   static config = (config: any) => {

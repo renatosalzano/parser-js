@@ -1,13 +1,13 @@
 import { log } from "utils";
-import Context from "./Context";
 import History from "./History";
 import Program from "./Progam";
 import { create_fast_get } from "./utils";
+import { extend, ParserObject } from "./extend";
 
-export type TokenType = 'unknown' | 'string' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number' | 'special' | 'newline';
+export type TokenType<T> = 'string' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number' | 'special' | 'newline' | T;
 export type Token = {
   value: string;
-  type: TokenType;
+  type: string;
   location: { line: number; start: number; end: number };
   eq(comparator: string | RegExp): boolean;
 }
@@ -31,28 +31,18 @@ export type Error = {
   at?: string;
 }
 
-
-type ExtendToken = (
-  type: "operator" | "bracket" | "separator" | "keyword" | "special" | "comment",
-  token: string[] | string[][]
-) => void;
-
 type Tokenize = { [key: string]: () => "next" | "continue" | void }
 
 class Tokenizer {
 
   source = '';
 
-  Context: Context;
-
   Program: Program;
   History = new History(this);
 
-  api: any = {}
+  program = new Map<string, Function>();
 
-  program = new Map<string, Function>()
-
-  token = new Map<string, 'operator' | 'bracket' | 'separator' | 'special' | 'comment'>();
+  token = new Map<string, string>();
 
   max_len = { token: 1, keyword: 1 };
   get_token = create_fast_get('token', 1);
@@ -62,43 +52,17 @@ class Tokenizer {
 
   comment_token = new Map<string, { multiline: boolean, end_token: string }>();
 
-  parser: any = {};
+
+  parser: { [key: string]: Function } = {};
 
   constructor() {
-    this.Context = new Context(this);
     this.Program = new Program();
 
-    this.api = new Proxy({
-      char: this.char,
-      token: this.Token,
-      nextToken: this.next_token,
-      debug: this.debug,
-      next: this.next,
-      nextString: this.next_string,
-      expected: this.expected,
-      traverseTokens: this.traverse_tokens,
-      isIdentifier: this.is.identifier,
-      eachChar: this.each_char,
-      eat: this.eat,
-      error: this.error,
-      /* PROGRAM */
-      createNode: this.Program.createNode,
-      appendNode: this.Program.appendNode,
-      logNode: this.Program.log,
-      /* CONTEXT */
-      ctx: this.Context.context,
-    }, {
-      get(api, p) {
-        return Reflect.get(api, p)
-      },
-      set(api, p, v) {
-        return Reflect.set(api, p, v)
-      }
-    })
-
-
-    this.api.char
-
+    Object.assign(this.api, {
+      isFnBody: this.Program.is_fn_body,
+      createNode: this.Program.create_node,
+      appendNode: this.Program.append_node
+    });
   }
 
   async Parse(source: string) {
@@ -108,77 +72,8 @@ class Tokenizer {
     log('end parse program;g')
   }
 
-  extend = (context: any, tokens: any, parser: any) => {
-    const { keyword = [], operator = [], bracket = [], separator = [], specialToken = [], comment = [] } = tokens;
+  extend = (...plugin: [string, any, any, any]) => extend.apply(this, plugin);
 
-    this.extend_token('bracket', bracket);
-    this.extend_token('keyword', keyword);
-    this.extend_token('operator', operator);
-    this.extend_token('separator', separator);
-    this.extend_token('special', specialToken);
-    this.extend_token('comment', comment);
-
-    this.Context.extend(context);
-    this.parser = parser(this.api);
-  }
-
-  extend_token: ExtendToken = (type, tokens) => {
-
-    if (type === 'comment') {
-
-      for (const [start, end] of tokens as string[][]) {
-
-        if (end) {
-
-          if (this.token.has(end)) {
-            log(`Duplicate token "${end}" found in ${this.token.get(end)};y`);
-          } else {
-            this.token.set(end, 'comment');
-          }
-        }
-
-        if (this.token.has(start)) {
-          log(`Duplicate token "${start}" found in ${this.token.get(start)};y`);
-        } else {
-          this.token.set(start, 'comment');
-        }
-
-        this.comment_token.set(start, {
-          multiline: end !== undefined,
-          end_token: end || '\n'
-        });
-
-      };
-
-      return;
-    }
-
-    for (const token of tokens as string[]) {
-
-      if (this.token.has(token)) {
-        log(`warn: duplicate "${token}" found in ${type};y`);
-      } else {
-
-        if (this.is.alpha(token) || type === 'keyword') {
-
-          this.keyword.set(token, type);
-
-          if (token.length > this.max_len.keyword) {
-            this.max_len.keyword = token.length;
-            this.get_keyword = create_fast_get('keyword', token.length);
-          }
-
-        } else {
-          this.token.set(token, type);
-
-          if (token.length > this.max_len.token) {
-            this.max_len.token = token.length;
-            this.get_token = create_fast_get('token', token.length);
-          }
-        }
-      }
-    }
-  };
 
   extend_parser = (parser: (api: any) => { [key: string]: ((params: any, done: () => void) => any) }) => {
     log('extend parser;y');
@@ -205,7 +100,7 @@ class Tokenizer {
 
   Token: Token = {
     value: '',
-    type: 'unknown' as TokenType,
+    type: 'unknown',
     location: {} as Token['location'],
     eq(_: string | RegExp) {
       if (_ instanceof RegExp) {
@@ -222,14 +117,6 @@ class Tokenizer {
   }
 
   next_token: Partial<Token> = {};
-
-  set_token_type = (type?: TokenType) => {
-    if (type) {
-      this.Token.type = type;
-    } else {
-      this.Token.type = 'unknown';
-    }
-  }
 
   expected_token: keyof Tokenizer['tokenize'] = 'token';
   skip_newline = true;
@@ -487,7 +374,7 @@ class Tokenizer {
     }
   }
 
-  next_string = (end_token: string | string[]) => {
+  next_literal = (end_token: string | string[]) => {
     if (end_token) {
       // this.forced_expected = 'string';
 
@@ -511,10 +398,11 @@ class Tokenizer {
       return token;
     } else {
       log('Endtoken;r')
+      return ({}) as Token;
     }
   }
 
-  eat = (from: string, to?: string, config?: any) => {
+  eat = (from: string, to?: string) => {
 
     // if (sequence !== this.next(breakReg)) {
     //   this.prev();
@@ -760,14 +648,11 @@ class Tokenizer {
         log('Program token:;g', this.Token.value);
 
         this.parser_run = true;
-        const parser = this.program.get(this.Token.value);
+        const parser = this.program.get(this.Token.value) || this.program.get('default');
 
         if (parser) {
           // @ts-ignore
           parser();
-        } else {
-          console.log('default')
-          this.Context.default();
         }
 
         this.parser_run = false;
@@ -815,8 +700,18 @@ class Tokenizer {
     throw { type: 'error', ...error };
   }
 
-  each_char = (callback: (char: string, sequence: string) => boolean | undefined) => {
-
+  api = {
+    char: this.char,
+    token: this.Token,
+    nextToken: this.next_token as Token,
+    debug: this.debug,
+    next: this.next,
+    nextLiteral: this.next_literal,
+    expected: this.expected,
+    traverseTokens: this.traverse_tokens,
+    eat: this.eat,
+    error: this.error,
+    $: {} as { [key: string]: ParserObject },
   }
 
 }
