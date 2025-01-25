@@ -43,20 +43,19 @@ class Context {
 
   current?: string;
   buffer: Ctx[] = [];
-  curr_ctx = {} as Ctx;
+  curr_ctx?: Ctx;
 
   tokenize?: () => any;
 
   create_context = <T>(Ctx: Ctor<T>) => {
     const ctx = new Ctx() as Ctx;
 
-    // TODO BETTER CONTEXT CHECK
     if (!ctx.checkTokenType || !ctx.tokenize || !ctx.name) {
       log('invalid context');
     }
 
     this.buffer.push(ctx);
-    this.curr_ctx = this.buffer.at(-1)!;
+    this.curr_ctx = this.buffer.at(-1) as Ctx;
 
     log('created context:;y', this.curr_ctx.name);
 
@@ -71,12 +70,12 @@ class Context {
       log('unexpected end context');
     }
 
-    const prev = this.curr_ctx.name;
+    const prev = this.curr_ctx?.name;
 
     this.buffer.pop();
 
     this.current = this.buffer.at(-1)?.name;
-    this.curr_ctx = this.buffer.at(-1) || {} as Ctx;
+    this.curr_ctx = this.buffer.at(-1);
 
     if (this.buffer.length > 0) {
       this.check_token_type = this.run_context;
@@ -100,23 +99,25 @@ class Context {
 
   run_context = () => {
 
-    if (!this.curr_ctx.active && this.tokenize) {
-      console.log('ctx disabled')
-      this.tokenize = undefined;
+    switch (true) {
+      case !this.curr_ctx:
+        return;
+      case (this.curr_ctx && !this.curr_ctx.active) && this.tokenize !== undefined:
+        this.tokenize = undefined;
+        return;
+      case (this.curr_ctx && this.curr_ctx.active): {
+        const type = this.curr_ctx.checkTokenType(this.get_api());
+        if (type) {
+          this.tokenize = () => {
+            return this.curr_ctx?.tokenize(this.get_api())[type]();
+          }
+        }
+        break;
+      }
     }
 
-    if (this.curr_ctx.active) {
-      const type = this.curr_ctx.checkTokenType(this.get_api());
-      if (type) {
-        console.log('type found', type);
-        this.tokenize = () => {
-          return this.curr_ctx.tokenize(this.get_api())[type]();
-        }
-        // this.curr_ctx.tokenize(this.get_api());
-      } else {
-        // no type no tokenize
-        this.tokenize = undefined;
-      }
+    if (!this.curr_ctx) {
+      return
     }
 
   }
