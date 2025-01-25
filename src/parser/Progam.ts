@@ -80,12 +80,13 @@ interface Identifier {
   spread?: boolean;
 }
 
-class Identifier {
+class Identifier extends Node {
   tag = 'identifier';
   name = '';
 
   constructor(init: { [key: string]: any }) {
-    Object.assign(this, init);
+    super(init);
+    this.name = init.name;
   }
 
   toString() {
@@ -93,7 +94,7 @@ class Identifier {
   }
 
   toJSON() {
-    const { toString, toJSON, ...json } = this;
+    const { toString, toJSON, location, ...json } = this;
     return json;
   }
 }
@@ -262,8 +263,6 @@ class Program {
       this.body.push(node);
     }
   }
-
-
 
   log = () => {
     return this.body;

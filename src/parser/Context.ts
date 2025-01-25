@@ -73,8 +73,6 @@ class Context {
 
     const prev = this.curr_ctx.name;
 
-
-
     this.buffer.pop();
 
     this.current = this.buffer.at(-1)?.name;
