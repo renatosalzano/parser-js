@@ -331,7 +331,7 @@ class Tokenizer {
         if ((this.char.curr + this.char.next) !== this.comment_type.end_token) {
           return "next"
         } else {
-          if (this.debug.comment) log(this.Token.value + this.comment_type.end_token + ';g');
+          if (this.debug.comment) log(this.line, this.Token.value + this.comment_type.end_token + ';g');
           this.Token.value = '';
           this.index += 2, this.pos += 2;
           this.skip_whitespace();
@@ -345,9 +345,9 @@ class Tokenizer {
         if (this.char.curr !== '\n') {
           return "next";
         } else {
-          if (this.debug.comment) log(this.Token.value + ';g');
+          if (this.debug.comment) log(this.line, this.Token.value + ';g');
           this.Token.value = '';
-          ++this.index; // skip \n
+          // ++this.index; // skip \n
           this.skip_whitespace();
           this.check_token_type();
 
@@ -355,9 +355,6 @@ class Tokenizer {
         }
 
       }
-
-
-      throw { title: "Porco dio", 'message': 'dio cane' }
     },
     newline: () => {
       this.Token.type = 'newline';
@@ -515,12 +512,6 @@ class Tokenizer {
   pairs_buffer: string[] = [];
   pairs_end: string = '';
 
-  next_pairs = (token_pairs: [string, string]) => {
-    const [start_token, end_token] = token_pairs;
-    this.pairs_end = end_token;
-    return this.recursive_next(start_token, end_token);
-  }
-
   recursive_next = (start_token: string, end_token: string, output: Token[] = []): Token[] => {
 
     let end_recursion = false;
@@ -545,7 +536,6 @@ class Tokenizer {
     return output;
   }
 
-  stop_immediate = false;
   next = (debug: boolean | 'suppress' = false) => {
 
     this.Token.value = '';
@@ -583,10 +573,10 @@ class Tokenizer {
       this.char.curr = this.source[this.index];
       this.char.next = this.source[this.index + 1];
 
-      if (this.check_new_line()) {
-        ++this.index, ++this.pos;
-        continue;
-      }
+      // if (this.check_new_line()) {
+      //   ++this.index, ++this.pos;
+      //   continue;
+      // }
 
       switch ((this.Context.tokenize || this.tokenize[this.expected_token])()) {
         case "next": {
@@ -632,6 +622,9 @@ class Tokenizer {
   parser_run = false;
 
   parse_program = () => {
+
+    this.debug.comment = true;
+    // this.debug.newline = true;
 
     try {
 
