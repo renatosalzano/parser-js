@@ -37,10 +37,26 @@ export function extend(this: Tokenizer, name: string, program: any, tokens: any,
   extend_tokens.call(this, 'special', specialToken);
   extend_tokens.call(this, 'comment', comment);
 
-  extend_parser.call(this, program);
+  const keys_to_check = extend_parser.call(this, program);
   // TODO check parser keys
 
-  this.parser = parser(this.api);
+  parser = parser(this.api);
+
+  for (const key in parser) {
+    if (keys_to_check.has(key)) {
+      keys_to_check.delete(key);
+    }
+    if (this.parser[key]) {
+      log(`plugin '${name}' override method '${key}';y`)
+    }
+    this.parser[key] = parser[key];
+  }
+
+  if (keys_to_check.size) {
+    for (const invalid_key of keys_to_check) {
+      log(' Plugin Error ;R', `\n name: ${name}`, `\n '${invalid_key}' was defined in program, but not found in parser;r`);
+    }
+  }
 }
 
 function extend_tokens(this: Tokenizer, type: string, tokens: string[] | string[][]) {
@@ -103,6 +119,8 @@ function extend_tokens(this: Tokenizer, type: string, tokens: string[] | string[
 }
 
 function extend_parser(this: Tokenizer, program: { [key: string]: { [key: string]: any } }) {
+
+  const keys_to_check = new Set<string>();
 
   for (const name of Object.keys(program)) {
 
@@ -175,6 +193,9 @@ function extend_parser(this: Tokenizer, program: { [key: string]: { [key: string
 
     this.api.$[name] = Parser;
 
+    keys_to_check.add(name);
+
   } // end for
 
+  return keys_to_check;
 }

@@ -3,6 +3,21 @@ import Parser from './parser/index';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
 
+function plugin(config?: any) {
+
+  return (prev: any) => {
+    console.log(prev)
+    return {
+      name: 'test',
+      parser: () => ({
+        parse_expression() {
+          console.log('override')
+        }
+      })
+    }
+  }
+
+}
 
 
 async function main() {

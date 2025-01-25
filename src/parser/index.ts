@@ -52,11 +52,12 @@ class ParserConfig {
     return instance;
   }
 
-  static extend = (plugin: ParserConfig.Plugin | ParserConfig.ParserStructure) => {
+  static extend = (plugin: ParserConfig.Plugin) => {
     instance ??= new this();
     instance.allow_config = false;
     // TODO EXTEND PLUG IN
-    return instance;
+    instance.extend_parser(plugin)
+    return this
   }
 
   static parse = async (code: string) => {

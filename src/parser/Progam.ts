@@ -156,7 +156,12 @@ class Program {
     const node = new NodeCtor(init) as Node;
 
     if (location) {
-      node.location = location;
+      const { start, end, line } = location;
+      node.location = {
+        start,
+        end,
+        line
+      };
     }
 
     switch (true) {

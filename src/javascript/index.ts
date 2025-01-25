@@ -52,9 +52,6 @@ const program = {
       'switch': null,
       'return': null
     }
-  },
-  TemplateLiteral: {
-    token: { '`': null }
   }
 }
 
@@ -113,7 +110,7 @@ export default (config: any) => {
         return createNode(Identifier, { name: token.value }, token.location);
       }
 
-      return ({
+      return {
 
         parse_expression({ append }: Partial<ExpressionProps> = {}) {
           log('parse expression;m', token.value, token.type)
@@ -147,14 +144,14 @@ export default (config: any) => {
               }
             }
             case 'keyword': {
-              const node = this.Expression() as Expression;
+              const node = this.Expression({ append }) as Expression;
               if (node.expression.length === 1) {
                 return node.expression[0];
               }
               return node;
             }
             case 'operator': {
-              return this.Expression();
+              return this.Expression({ append });
             }
             case 'bracket': {
               switch (token.value) {
@@ -166,17 +163,19 @@ export default (config: any) => {
                   if (this.check_is_arrow_fn()) {
                     return this.Function({ arrow: true, expression: true });
                   }
-                  return this.Expression({ group: true });
+                  return this.Expression({ append, group: true });
               }
             }
             case 'special': {
               if (token.eq('`')) {
                 return this.TemplateLiteral()
               }
+              return createNode(Unexpected);
             }
             case 'newline':
             case 'unknown':
-            case 'separator': {
+            case 'separator':
+            default: {
               // TODO
               return createNode(Unexpected);
             }
@@ -194,6 +193,12 @@ export default (config: any) => {
           const end = () => {
 
             log('Expression end;m');
+            if (node.expression.length === 1) {
+              if (append) {
+                appendNode(node.expression[0]);
+              }
+              return node.expression[0];
+            }
 
             if (append) {
               appendNode(node);
@@ -203,7 +208,7 @@ export default (config: any) => {
 
           while (max > 0 && parsing_expression) {
 
-            log('current token;c', token.value, max)
+            log('expr curr:;c', token.value, token.type + ';y', max)
 
             switch (token.type) {
               case 'number': {
@@ -268,8 +273,10 @@ export default (config: any) => {
                   break;
                 }
 
+                console.log('wat', token)
+
                 if (statement_keyword(token.value)) {
-                  error({ title: errors.unexpected, message: 'TODO' })
+                  return end();
                 };
 
                 switch (token.value) {
@@ -284,6 +291,14 @@ export default (config: any) => {
                 }
                 // node.expression.push()
                 break;
+              }
+              case 'special': {
+                switch (token.value) {
+                  case '`': {
+                    node.add(this.TemplateLiteral());
+                    continue;
+                  }
+                }
               }
               case 'separator': {
                 switch (token.value) {
@@ -798,34 +813,46 @@ export default (config: any) => {
           let parsing_lit = true;
           let loop = 5;
 
-          createContext(CtxTempateLiteral);
+          const ctx = createContext(CtxTempateLiteral);
+
+          if (token.eq('`')) {
+            next();
+          }
 
           while (loop > 0 && parsing_lit) {
 
-            nextLiteral(['${', '`']);
-            node.expression.push(createNode(Primitive, token));
-            next();
+            log('templ curr:;c', token.value, token.type + ';y');
 
             if (token.eq('`')) {
-              log('Template Literal end;m')
+              log('Template Literal end;m');
+              endContext();
+              next();
               parsing_lit = false;
-              console.log(node.expression)
               return node;
             }
 
-            next() // over ${
+            if (token.eq('string')) {
+              node.expression.push(createNode(Primitive, token));
+            }
 
-            node.expression.push(this.parse_expression()!);
+            if (token.eq('${')) {
+              next();
+              node.expression.push(this.parse_expression());
+            }
+
+            if (token.eq('}')) {
+              ctx.active = true;
+            }
+
+            next();
 
             --loop;
           }
 
-          console.log('end lit', node)
-
           return node;
 
-        }
-      });
+        },
+      };
 
     }
   }

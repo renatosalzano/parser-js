@@ -175,7 +175,6 @@ class Tokenizer {
         break;
       }
       case this.is.number(this.char.curr): {
-        this.Token.type = 'number';
         this.expected_token = 'number';
         break;
       }
@@ -186,17 +185,15 @@ class Tokenizer {
           const possibly_token = this.get_token(this);
           if (possibly_token) {
             if (!this.is.identifier(possibly_token)) {
-              // ignore
+              this.expected_token = 'token';
               break;
             }
           }
         }
 
         if (this.is.alpha(this.char.curr)) {
-          this.Token.type = 'keyword';
           this.expected_token = 'keyword';
         } else {
-          this.Token.type = 'identifier';
           this.expected_token = 'identifier';
         }
         break;
@@ -217,6 +214,9 @@ class Tokenizer {
     number: () => {
       if (!this.is.space(this.char.curr) && this.is.number(this.Token.value + this.char.curr)) {
         return "next";
+      } else {
+        // end
+        this.Token.type = 'number';
       }
     },
     keyword: () => {
@@ -253,14 +253,7 @@ class Tokenizer {
         return "skip";
       }
 
-      const end_token = this.get_end_token
-        ? this.get_end_token(this)
-        : undefined;
-
       switch (true) {
-        case (end_token !== undefined): {
-          return;
-        }
         case (this.char.curr + this.char.next === `\\${this.end_token}`):
           ++this.index, ++this.pos; // over escaped quote
           return "next"
@@ -269,6 +262,7 @@ class Tokenizer {
         default: {
           // end "string"
           this.end_token = '';
+          this.Token.type = 'string';
           this.Token.value = this.Token.value;
           ++this.index, ++this.pos; // over quote
           return;
@@ -279,6 +273,8 @@ class Tokenizer {
     identifier: () => {
       if (this.is.identifier(this.Token.value + this.char.curr)) {
         return "next";
+      } else {
+        this.Token.type = 'identifier';
       }
     },
     token: () => {
@@ -553,6 +549,7 @@ class Tokenizer {
   next = (debug: boolean | 'suppress' = false) => {
 
     this.Token.value = '';
+    this.Token.type = '';
 
     const print = () => {
       if ((this.debug.token || debug) && debug !== 'suppress') {
@@ -581,8 +578,6 @@ class Tokenizer {
 
     this.check_token_type();
 
-    const tokenize = this.Context.tokenize || this.tokenize[this.expected_token];
-
     while (this.index < this.source.length) {
 
       this.char.curr = this.source[this.index];
@@ -593,9 +588,7 @@ class Tokenizer {
         continue;
       }
 
-
-
-      switch (this.tokenize[this.expected_token]()) {
+      switch ((this.Context.tokenize || this.tokenize[this.expected_token])()) {
         case "next": {
           this.Token.value += this.char.curr;
           ++this.index, ++this.pos;
@@ -686,6 +679,7 @@ class Tokenizer {
           case 'end': {
             console.log(this.Program.body);
             console.log(this.Program.toString())
+            console.log(this.History.tokens)
             this.Program.check_references();
             // console.log(this.Program.body)
             return;

@@ -23,6 +23,8 @@ export interface Ctx {
 
   name: string;
 
+  active: boolean;
+
   checkTokenType: (params: CtxParams) => string | undefined | void;
 
   tokenize: (params: CtxParams) => {
@@ -47,7 +49,8 @@ class Context {
 
   create_context = <T>(Ctx: Ctor<T>) => {
     const ctx = new Ctx() as Ctx;
-    console.log('new context');
+
+    // TODO BETTER CONTEXT CHECK
     if (!ctx.checkTokenType || !ctx.tokenize || !ctx.name) {
       log('invalid context');
     }
@@ -55,7 +58,11 @@ class Context {
     this.buffer.push(ctx);
     this.curr_ctx = this.buffer.at(-1)!;
 
+    log('created context:;y', this.curr_ctx.name);
+
     this.check_token_type = this.run_context;
+
+    return ctx as T;
   }
 
   end_context = () => {
@@ -64,15 +71,22 @@ class Context {
       log('unexpected end context');
     }
 
-    log('close context:;c', this.current);
+    const prev = this.curr_ctx.name;
+
+
 
     this.buffer.pop();
+
+    this.current = this.buffer.at(-1)?.name;
+    this.curr_ctx = this.buffer.at(-1) || {} as Ctx;
+
     if (this.buffer.length > 0) {
-      // restore prev context
-      this.current = this.buffer.at(-1)!.name;
-      this.curr_ctx = this.buffer.at(-1)!;
       this.check_token_type = this.run_context;
+    } else {
+      this.check_token_type = function () { };
     }
+
+    log('close context:;g', `${prev} --> ${this.current || 'null'}`);
 
     this.current = this.buffer.at(-1)?.name;
   }
@@ -87,15 +101,26 @@ class Context {
   })
 
   run_context = () => {
-    const type = this.curr_ctx.checkTokenType(this.get_api());
-    if (type) {
-      console.log('type found', type);
 
-      this.tokenize = () => {
-        this.curr_ctx.tokenize(this.get_api());
-      }
-      // this.curr_ctx.tokenize(this.get_api());
+    if (!this.curr_ctx.active && this.tokenize) {
+      console.log('ctx disabled')
+      this.tokenize = undefined;
     }
+
+    if (this.curr_ctx.active) {
+      const type = this.curr_ctx.checkTokenType(this.get_api());
+      if (type) {
+        console.log('type found', type);
+        this.tokenize = () => {
+          return this.curr_ctx.tokenize(this.get_api())[type]();
+        }
+        // this.curr_ctx.tokenize(this.get_api());
+      } else {
+        // no type no tokenize
+        this.tokenize = undefined;
+      }
+    }
+
   }
 
   check_token_type = () => { };

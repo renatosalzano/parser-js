@@ -154,6 +154,7 @@ class Primitive extends Node {
         break;
       case 'string':
         this.tag = 'string';
+        this.value = value;
         break;
       case 'number':
         this.tag = 'number';
@@ -177,9 +178,14 @@ class TemplateLiteral extends Node {
   toString() {
     let expr: string[] = [];
     for (const item of this.expression) {
-      expr.push(item.toString());
+
+      if (item instanceof Identifier) {
+        expr.push(`\${${item.toString()}}`)
+      } else {
+        expr.push(item.toString());
+      }
     }
-    return expr.join('');
+    return `\`${expr.join('')}\``;
   }
 }
 

@@ -21,24 +21,32 @@ export class CtxTempateLiteral implements Ctx {
 
   name = 'template-literal';
 
-  checkTokenType({ char }: CtxParams) {
-    if (char.curr + char.next === '${') {
+  expression = false;
+  active = true;
 
+  checkTokenType({ char }: CtxParams) {
+    if (char.curr === '`') {
+      return;
     }
     return 'string';
   }
 
-  tokenize = ({ getToken }: CtxParams) => ({
+  tokenize = ({ Token, getToken }: CtxParams) => ({
     string: () => {
+
       const token = getToken();
-      if (token) {
-        console.log(token)
-        return
-      } else {
-        return 'next';
+      const end_string = token === '${';
+
+      switch (true) {
+        case end_string:
+          Token.type = 'string';
+          this.active = false;
+          return;
+        default:
+          return 'next';
       }
     }
-  })
+  });
 }
 
 
