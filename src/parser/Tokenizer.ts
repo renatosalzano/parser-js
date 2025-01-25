@@ -670,9 +670,9 @@ class Tokenizer {
             console.log(`${error.message}\n    at ${this.line}:${this.pos}`)
             return;
           case 'end': {
+            this.History.JSON(process.cwd() + '\\dist\\history.json')
             console.log(this.Program.body);
             console.log(this.Program.toString())
-            console.log(this.History.tokens)
             this.Program.check_references();
             // console.log(this.Program.body)
             return;

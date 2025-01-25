@@ -1,5 +1,6 @@
 import { log } from "utils";
 import Tokenizer, { Token } from "./Tokenizer";
+import { writeFileSync } from "fs";
 
 type token = Omit<Token, 'eq'>;
 
@@ -167,6 +168,10 @@ class History {
     this.record = false;
     this.each_callback = undefined;
     this.shift();
+  }
+
+  JSON = (path: string) => {
+    writeFileSync(path, JSON.stringify(this.tokens, null, 2))
   }
 
 }
