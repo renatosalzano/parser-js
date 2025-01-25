@@ -144,11 +144,7 @@ export default (config: any) => {
               }
             }
             case 'keyword': {
-              const node = this.Expression({ append }) as Expression;
-              if (node.expression.length === 1) {
-                return node.expression[0];
-              }
-              return node;
+              return this.Expression({ append })
             }
             case 'operator': {
               return this.Expression({ append });
@@ -193,7 +189,7 @@ export default (config: any) => {
           const end = () => {
 
             log('Expression end;m');
-            if (node.expression.length === 1) {
+            if (node.expression.length === 1 && node.expression[0] instanceof Node) {
               if (append) {
                 appendNode(node.expression[0]);
               }

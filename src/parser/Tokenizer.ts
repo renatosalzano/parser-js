@@ -671,8 +671,7 @@ class Tokenizer {
             return;
           case 'end': {
             this.History.JSON(process.cwd() + '\\dist\\history.json')
-            console.log(this.Program.body);
-            console.log(this.Program.toString())
+            this.Program.toJSON(process.cwd() + '\\dist\\ast.json')
             this.Program.check_references();
             // console.log(this.Program.body)
             return;

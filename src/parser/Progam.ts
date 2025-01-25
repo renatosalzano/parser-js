@@ -1,5 +1,6 @@
 import { log } from "utils";
 import Tokenizer from "./Tokenizer";
+import { writeFileSync } from "fs";
 
 interface Ctor<T> {
   new(...args: any): T
@@ -9,11 +10,23 @@ class Node {
   tag?: string;
   id?: Node | Node[];
   location?: { line: number, start: number, end: number };
+
   constructor(init: { [key: string]: any }) {
     Object.assign(this, init);
   }
+
   toString() {
     return ''
+  }
+
+  toJSON() {
+    const json: any = {};
+    for (const key in this) {
+      if (typeof this[key] !== 'function') {
+        json[key] = this[key]
+      }
+    }
+    return json;
   }
 
 }
@@ -58,6 +71,7 @@ class Block extends Node {
   toString() {
     return `{${this.body.map((node) => node.toString()).join(';')}}`
   }
+
 }
 
 interface Identifier {
@@ -67,6 +81,7 @@ interface Identifier {
 }
 
 class Identifier {
+  tag = 'identifier';
   name = '';
 
   constructor(init: { [key: string]: any }) {
@@ -75,6 +90,11 @@ class Identifier {
 
   toString() {
     return `${this.rest || this.spread ? '...' : ''}${this.name}`;
+  }
+
+  toJSON() {
+    const { toString, toJSON, ...json } = this;
+    return json;
   }
 }
 
@@ -140,8 +160,6 @@ class Program {
   block: Node[] = []
   ReferenceTree = new ReferenceTree();
   current_node?: Node;
-  current_declarator?: Node;
-  current_function?: { params: Node[] }
 
   params = new Map<string, Node>();
   check_reference = true;
@@ -263,6 +281,15 @@ class Program {
       }
     }
   }
+
+  toJSON = (path: string) => {
+    const json = JSON.stringify(this.body.map((n) => n.toJSON()), null, 2);
+    writeFileSync(path, json)
+  }
+}
+
+function jsonify(node: any) {
+  return JSON.stringify(node, (k, v) => typeof v === 'function' ? undefined : v, 2)
 }
 
 export { Node, Declarator, Fn, Block, Identifier };

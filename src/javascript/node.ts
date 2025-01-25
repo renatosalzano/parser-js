@@ -170,6 +170,7 @@ class Primitive extends Node {
         return `${this.value}`;
     }
   }
+
 }
 
 class TemplateLiteral extends Node {
