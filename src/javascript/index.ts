@@ -179,156 +179,275 @@ export default (config: any) => {
           }
         },
 
+        check_expression() {
+
+          switch (token.type) {
+            case 'string':
+            case 'number':
+            case 'identifier':
+              return 'literal';
+            case 'keyword': {
+              if (/null|true|false/.test(token.value)) {
+                return 'literal';
+              }
+              break;
+            }
+            case 'special': {
+              if (token.eq('`')) {
+                return 'literal'
+              }
+            }
+            case 'bracket': {
+              switch (token.value) {
+                case '{':
+                  return 'object';
+                case '[':
+                  return 'array';
+                case '(':
+                  let is_arrow_fn = false;
+                  traverseTokens('(', ')').then(() => is_arrow_fn = token.eq('=>'));
+                  if (is_arrow_fn) {
+                    return 'arrow'
+                  }
+                  return 'group';
+              }
+            }
+            case 'operator': {
+              switch (token.value) {
+                case '++':
+                case '--': {
+                  expected();
+                  if (!nextToken.eq('number') || !nextToken.eq('identifier')) {
+                    error({ title: errors.syntax, message: errors.expression.prefix });
+                  }
+                }
+
+              }
+            }
+          }
+
+        },
+
         Expression({ group, append }: ExpressionProps = {}): Node {
-          log('Expression;m', token.value);
 
           createContext(CtxExpression);
 
-          const node = createNode(Expression, { group });
+          // 1. check expression type;
+          const type = this.check_expression();
+
+          if (type) {
+
+            const node = createNode(Expression, { group });
+
+            const end = () => {
+
+              log('Expression end;m');
+
+              endContext();
+
+              // if (node.expression.length === 1 && node.expression[0] instanceof Node) {
+              //   if (append) {
+              //     appendNode(node.expression[0]);
+              //   }
+              //   return node.expression[0];
+              // }
+
+              if (append) {
+                appendNode(node);
+              }
+              return node;
+            }
+
+            switch (type) {
+              case 'literal':
+                return this.literal_expression(node, end);
+              case 'object':
+              case 'group':
+              case 'array':
+              case 'arrow':
+            }
+          }
+
+          log('Expression;m', token.value);
+
+
 
           let parsing_expression = true;
 
           let max = 10;
 
-          const end = () => {
 
-            log('Expression end;m');
 
-            endContext();
+          // while (max > 0 && parsing_expression) {
 
-            if (node.expression.length === 1 && node.expression[0] instanceof Node) {
-              if (append) {
-                appendNode(node.expression[0]);
+          //   log('expr curr:;c', token.value, token.type + ';y', max)
+
+          //   switch (token.type) {
+          //     case 'number': {
+          //       if (node.expression.at(-1) === '-') {
+
+          //         const last_index = node.expression.length - 1;
+          //         node.expression[last_index] = createNode(
+          //           Primitive,
+          //           { value: `-${token.value}`, type: token.type }
+          //         )
+          //       } else {
+          //         node.add(createNode(Primitive, token));
+          //       }
+          //       break;
+          //     }
+          //     case 'string': {
+          //       node.add(createNode(Primitive, token));
+          //       break;
+          //     }
+          //     case 'identifier': {
+          //       node.add(createNode(Identifier, { name: token.value }));
+          //       break;
+          //     }
+          //     case 'operator': {
+          //       node.add(token.value);
+          //       break;
+          //     }
+          //     case 'bracket': {
+          //       switch (token.value) {
+          //         case '{':
+          //           node.add(this.ObjectExpression());
+          //           continue;
+          //         case '[':
+          //           node.add(this.ArrayExpression());
+          //           continue;
+          //         case '(':
+          //           console.log('expression group start');
+          //           next();
+          //           node.add(this.Expression({ group: true, append }));
+          //           break;
+          //         case ')':
+          //           if (group) {
+          //             console.log('expression group end');
+          //             parsing_expression = false;
+          //             return node;
+          //           }
+          //           break;
+          //         case '}': {
+          //           log('Expression end;m', node)
+          //           return end();
+          //         }
+          //       }
+          //     }
+          //     case 'keyword': {
+          //       if (group) {
+          //         if ($.Function.has(token.value)) {
+          //           // node.add(this.Function({ expression}));
+          //           break;
+          //         } else {
+          //           error({ title: 'keyword', message: 'porca madonna' })
+          //         }
+          //         break;
+          //       }
+
+          //       console.log('wat', token)
+
+          //       if (statement_keyword(token.value)) {
+          //         return end();
+          //       };
+
+          //       switch (token.value) {
+          //         case 'null':
+          //         case 'true':
+          //         case 'false':
+          //           node.add(createNode(Primitive, token))
+          //           break;
+          //         default:
+          //           node.add(token.value);
+          //           break;
+          //       }
+          //       // node.expression.push()
+          //       break;
+          //     }
+          //     case 'special': {
+          //       switch (token.value) {
+          //         case '`': {
+          //           node.add(this.TemplateLiteral());
+          //           continue;
+          //         }
+          //       }
+          //     }
+          //     case 'separator': {
+          //       switch (token.value) {
+          //         case ';': {
+          //           next();
+          //           return end();
+          //         }
+          //         case ',': {
+          //           next();
+          //           if (!group) {
+          //             return end();
+          //           }
+          //         }
+          //       }
+          //     }
+          //   }
+
+          //   log('porco dio;r', token.value)
+          //   next();
+
+          //   --max;
+
+          //   // next();
+          // }
+
+        },
+
+        literal_expression(node: Expression, end: () => void) {
+          log('literal expression;m');
+
+          let type = token.type;
+
+          switch (token.type) {
+            case 'string':
+            case 'number':
+              node.add(createNode(Primitive, token));
+              break;
+            case 'identifier':
+              node.add(createNode(Identifier, { name: token.value }));
+              break;
+            case 'special':
+              if (token.eq('`')) {
+                type = 'string';
+                node.add(this.TemplateLiteral());
+                break;
               }
-              return node.expression[0];
-            }
-
-            if (append) {
-              appendNode(node);
-            }
-            return node;
           }
 
-          while (max > 0 && parsing_expression) {
+          console.log(type)
 
-            log('expr curr:;c', token.value, token.type + ';y', max)
+          if (expected('operator')) {
+            if (type === 'string') {
+              switch (nextToken.value) {
+                case '+':
+                // concat string
+                case '.':
+                // member access
 
-            switch (token.type) {
-              case 'number': {
-                if (node.expression.at(-1) === '-') {
+              }
 
-                  const last_index = node.expression.length - 1;
-                  node.expression[last_index] = createNode(
-                    Primitive,
-                    { value: `-${token.value}`, type: token.type }
-                  )
-                } else {
-                  node.add(createNode(Primitive, token));
-                }
-                break;
-              }
-              case 'string': {
-                node.add(createNode(Primitive, token));
-                break;
-              }
-              case 'identifier': {
-                node.add(createNode(Identifier, { name: token.value }));
-                break;
-              }
-              case 'operator': {
-                node.add(token.value);
-                break;
-              }
-              case 'bracket': {
-                switch (token.value) {
-                  case '{':
-                    node.add(this.ObjectExpression());
-                    continue;
-                  case '[':
-                    node.add(this.ArrayExpression());
-                    continue;
-                  case '(':
-                    console.log('expression group start');
-                    next();
-                    node.add(this.Expression({ group: true, append }));
-                    break;
-                  case ')':
-                    if (group) {
-                      console.log('expression group end');
-                      parsing_expression = false;
-                      return node;
-                    }
-                    break;
-                  case '}': {
-                    log('Expression end;m', node)
-                    return end();
-                  }
-                }
-              }
-              case 'keyword': {
-                if (group) {
-                  if ($.Function.has(token.value)) {
-                    // node.add(this.Function({ expression}));
-                    break;
-                  } else {
-                    error({ title: 'keyword', message: 'porca madonna' })
-                  }
-                  break;
-                }
 
-                console.log('wat', token)
-
-                if (statement_keyword(token.value)) {
-                  return end();
-                };
-
-                switch (token.value) {
-                  case 'null':
-                  case 'true':
-                  case 'false':
-                    node.add(createNode(Primitive, token))
-                    break;
-                  default:
-                    node.add(token.value);
-                    break;
-                }
-                // node.expression.push()
-                break;
-              }
-              case 'special': {
-                switch (token.value) {
-                  case '`': {
-                    node.add(this.TemplateLiteral());
-                    continue;
-                  }
-                }
-              }
-              case 'separator': {
-                switch (token.value) {
-                  case ';': {
-                    next();
-                    return end();
-                  }
-                  case ',': {
-                    next();
-                    if (!group) {
-                      return end();
-                    }
-                  }
-                }
-              }
+              console.log('string porco dio')
             }
-
-            log('porco dio;r', token.value)
-            next();
-
-            --max;
-
-            // next();
+            console.log(nextToken)
           }
 
-          return node;
+          return end();
+        },
 
+        expression: {
+
+          object: (node: Expression) => {
+            this
+          },
+          array: (node: Expression) => { },
+          group: (node: Expression) => { },
+          arrow: (node: Expression) => { }
         },
 
         check_is_arrow_fn() {

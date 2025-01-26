@@ -42,6 +42,7 @@ export function extend(this: Tokenizer, name: string, program: any, tokens: any,
 
   parser = parser(this.api);
 
+
   for (const key in parser) {
     if (keys_to_check.has(key)) {
       keys_to_check.delete(key);

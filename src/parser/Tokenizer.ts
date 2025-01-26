@@ -632,6 +632,8 @@ class Tokenizer {
       let max = 10;
       while (max > 0 && !this.source_end) {
 
+        // TODO check multiple traverse tokens called
+
         if (this.index === 0) this.next();
 
         log('Program token:;g', this.Token.value);

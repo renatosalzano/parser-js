@@ -4,6 +4,11 @@ export class CtxExpression implements Ctx {
   name = 'expression';
 }
 
+export class CtxLiteralExpression implements Ctx {
+  name = 'literal-expression';
+
+}
+
 export class CtxTempateLiteral implements Ctx {
 
   name = 'template-literal';

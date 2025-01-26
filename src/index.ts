@@ -22,6 +22,24 @@ function plugin(config?: any) {
 
 async function main() {
 
+  log('TEST JS;r')
+
+  try {
+
+    let a = 1
+
+    'string';
+
+    a++
+
+    console.log(1 - +'0');
+
+
+
+  } catch (error) {
+    console.error(error)
+  }
+
 
   log('Parser start;g')
 
