@@ -1,15 +1,6 @@
 import { log } from "utils";
 import Tokenizer from "./Tokenizer";
 
-type Char = { curr: string; next: string };
-
-interface TokenContext {
-  start: string | string[];
-  end: string | string[];
-  checkTokenType(char: { curr: string; next: string }): void;
-  tokenize: { [key: string]: Function };
-}
-
 export type CtxParams = {
   char: Tokenizer['char'];
   Token: Tokenizer['Token'];
@@ -19,18 +10,16 @@ export type CtxParams = {
   getKeyword: () => string | undefined;
 }
 
-export interface Ctx {
-
+export type Ctx = {
   name: string;
-
-  active: boolean;
-
-  checkTokenType: (params: CtxParams) => string | undefined | void;
-
-  tokenize: (params: CtxParams) => {
+  checkTokenType?: (params: CtxParams) => string | undefined | void;
+  tokenize?: (params: CtxParams) => {
     [key: string]: () => 'next' | 'skip' | void;
   }
+}
 
+type context = Ctx & {
+  methods: Map<string, () => any>;
 }
 
 interface Ctor<T> {
@@ -42,20 +31,17 @@ class Context {
   constructor(public Tokenizer: Tokenizer) { };
 
   current?: string;
-  buffer: Ctx[] = [];
-  curr_ctx?: Ctx;
+  buffer: context[] = [];
+  curr_ctx?: context;
 
   tokenize?: () => any;
 
   create_context = <T>(Ctx: Ctor<T>) => {
-    const ctx = new Ctx() as Ctx;
 
-    if (!ctx.checkTokenType || !ctx.tokenize || !ctx.name) {
-      log('invalid context');
-    }
+    const ctx = this.check_context(Ctx);
 
     this.buffer.push(ctx);
-    this.curr_ctx = this.buffer.at(-1) as Ctx;
+    this.curr_ctx = this.buffer.at(-1)!;
 
     log('created context:;y', this.curr_ctx.name);
 
@@ -67,7 +53,8 @@ class Context {
   end_context = () => {
     // close last context active;
     if (this.buffer.length === 0) {
-      log('unexpected end context');
+      this.Tokenizer.error({ message: 'unexpected end context' });
+      return;
     }
 
     const prev = this.curr_ctx?.name;
@@ -80,12 +67,49 @@ class Context {
     if (this.buffer.length > 0) {
       this.check_token_type = this.run_context;
     } else {
-      this.check_token_type = function () { };
+      this.check_token_type = () => { };
     }
 
     log('close context:;g', `${prev} --> ${this.current || 'null'}`);
 
     this.current = this.buffer.at(-1)?.name;
+  }
+
+  context_map = new WeakMap();
+
+  check_context = <T>(Ctx: Ctor<T>) => {
+
+    if (this.context_map.has(Ctx)) {
+      return this.context_map.get(Ctx) as context;
+    }
+
+    const ctx = new Ctx() as context;
+
+    log('new fresh context;y', ctx.name);
+
+    switch (true) {
+      case !ctx.name:
+        this.Tokenizer.error({ title: 'Unexpected context', message: 'Missing \'name\'' });
+        break;
+      case 'checkTokenType' in ctx || 'tokenize' in ctx: {
+
+        if (!('checkTokenType' in ctx)) {
+          this.Tokenizer.error({ title: 'Unexpected context', message: 'Missing \'checkTokenType\'' });
+          break;
+        }
+
+        if (!('tokenize' in ctx)) {
+          this.Tokenizer.error({ title: 'Unexpected context', message: 'Missing \'tokenizer\'' });
+          break;
+        }
+        // @ts-ignore
+        ctx.methods = new Map(Object.entries(ctx.tokenize({} as any)));
+        break;
+      }
+    }
+
+    this.context_map.set(Ctx, ctx);
+    return ctx;
   }
 
   get_api = () => ({
@@ -99,25 +123,15 @@ class Context {
 
   run_context = () => {
 
-    switch (true) {
-      case !this.curr_ctx:
-        return;
-      case (this.curr_ctx && !this.curr_ctx.active) && this.tokenize !== undefined:
+    if (this.curr_ctx && this.curr_ctx.checkTokenType && this.curr_ctx.tokenize) {
+      const type = this.curr_ctx.checkTokenType(this.get_api());
+      log('run context;c', type)
+      if (type && this.curr_ctx.methods.has(type)) {
+        this.tokenize ??= this.curr_ctx.tokenize(this.get_api())[type];
+      } else {
         this.tokenize = undefined;
-        return;
-      case (this.curr_ctx && this.curr_ctx.active): {
-        const type = this.curr_ctx.checkTokenType(this.get_api());
-        if (type) {
-          this.tokenize = () => {
-            return this.curr_ctx?.tokenize(this.get_api())[type]();
-          }
-        }
-        break;
+        return
       }
-    }
-
-    if (!this.curr_ctx) {
-      return
     }
 
   }

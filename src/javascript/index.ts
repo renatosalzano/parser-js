@@ -4,7 +4,8 @@ import { log } from 'utils';
 import errors from './errors';
 import { Variable, Function, Identifier, Block, Primitive, TemplateLiteral, Expression, ObjectExpression, ArrayExpression, Property, Unexpected, Empty } from './node';
 import { Node } from 'parser/Progam';
-import { CtxTempateLiteral, tokens } from './tokens';
+import { tokens } from './tokens';
+import { CtxExpression, CtxTempateLiteral } from './context';
 
 const program = {
   Block: {
@@ -180,6 +181,9 @@ export default (config: any) => {
 
         Expression({ group, append }: ExpressionProps = {}): Node {
           log('Expression;m', token.value);
+
+          createContext(CtxExpression);
+
           const node = createNode(Expression, { group });
 
           let parsing_expression = true;
@@ -189,6 +193,9 @@ export default (config: any) => {
           const end = () => {
 
             log('Expression end;m');
+
+            endContext();
+
             if (node.expression.length === 1 && node.expression[0] instanceof Node) {
               if (append) {
                 appendNode(node.expression[0]);
@@ -807,9 +814,9 @@ export default (config: any) => {
 
           const node = createNode(TemplateLiteral);
           let parsing_lit = true;
-          let loop = 5;
+          let loop = 10;
 
-          const ctx = createContext(CtxTempateLiteral);
+          createContext(CtxTempateLiteral);
 
           if (token.eq('`')) {
             next();
@@ -829,21 +836,22 @@ export default (config: any) => {
 
             if (token.eq('string')) {
               node.expression.push(createNode(Primitive, token));
+              // ++loop;
             }
 
             if (token.eq('${')) {
               next();
+              console.log('hey there', token)
               node.expression.push(this.parse_expression());
+              // ++loop;
             }
 
-            if (token.eq('}')) {
-              ctx.active = true;
-            }
+            // if (token.eq('}')) {}
 
             next();
 
             --loop;
-          }
+          } // end while
 
           return node;
 

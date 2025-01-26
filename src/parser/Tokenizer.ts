@@ -130,6 +130,7 @@ class Tokenizer {
 
     while (this.index < this.source.length) {
       this.char.curr = this.source[this.index];
+      this.char.next = this.source[this.index + 1];
 
       if (skip_reg.test(this.char.curr)) {
 
@@ -623,7 +624,7 @@ class Tokenizer {
 
   parse_program = () => {
 
-    this.debug.comment = true;
+    // this.debug.comment = true;
     // this.debug.newline = true;
 
     try {
@@ -656,7 +657,8 @@ class Tokenizer {
 
     } catch (error: any) {
 
-      if (error.type && error.message) {
+      if ('message' in error) {
+        console.log('error')
         const title = error.title || 'Error';
         const at = " at " + (error.at || this.History.log(true));
         switch (error.type) {
