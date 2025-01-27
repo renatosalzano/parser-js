@@ -29,7 +29,7 @@ let plugin_name: string;
 export function extend(this: Tokenizer, name: string, program: any, tokens: any, parser: any) {
   plugin_name = name;
 
-  const { keyword = [], operator = [], bracket = [], separator = [], specialToken = [], comment = [] } = tokens;
+  const { keyword = [], operator = [], bracket = [], separator = [], specialToken = [], comment = [], context = [] } = tokens;
   extend_tokens.call(this, 'bracket', bracket);
   extend_tokens.call(this, 'keyword', keyword);
   extend_tokens.call(this, 'operator', operator);
@@ -37,11 +37,11 @@ export function extend(this: Tokenizer, name: string, program: any, tokens: any,
   extend_tokens.call(this, 'special', specialToken);
   extend_tokens.call(this, 'comment', comment);
 
+  this.Context.extend(context);
+
   const keys_to_check = extend_parser.call(this, program);
-  // TODO check parser keys
 
   parser = parser(this.api);
-
 
   for (const key in parser) {
     if (keys_to_check.has(key)) {
@@ -200,3 +200,4 @@ function extend_parser(this: Tokenizer, program: { [key: string]: { [key: string
 
   return keys_to_check;
 }
+

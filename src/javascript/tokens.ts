@@ -1,4 +1,4 @@
-import type { Ctx, CtxParams } from "parser/Context";
+import { Ctx } from "parser/Context";
 
 const operator = [
   '+', '-', '*', '/', '%', '**',
@@ -42,17 +42,56 @@ const comment = [
   ['/*', '*/']
 ]
 
-export const unaryOperators = new Set([
-  '++',  // Operatore di incremento
-  '--',  // Operatore di decremento
-  '+',   // Operatore unario positivo
-  '-',   // Operatore unario negativo
-  '!',   // Operatore di negazione logica
-  '~',   // Operatore di bitwise NOT
-  'typeof', // Operatore typeof
-  'delete', // Operatore delete
-  'void'    // Operatore void
-]);
+
+class TempateLiteral extends Ctx {
+
+  name = 'template-literal';
+
+  start = '`';
+
+  expression = false;
+
+  checkTokenType() {
+
+    if (this.expression) {
+
+      if (this.char.curr === '}') {
+        this.expression = false;
+      }
+
+      return;
+    } else {
+
+      if (this.char.curr === '`') {
+        return this.end();
+      }
+
+    }
+
+    if ((this.char.curr + this.char.next) === '${') {
+      return;
+    }
+
+    return 'string';
+  }
+
+  tokenize = {
+    string: () => {
+
+      const token = this.getToken();
+      const end_string = token === '${';
+
+      switch (true) {
+        case end_string:
+          this.token.type = 'string';
+          this.expression = true;
+          return;
+        default:
+          return 'next';
+      }
+    }
+  }
+}
 
 export const tokens = {
   bracket,
@@ -60,5 +99,8 @@ export const tokens = {
   keyword,
   operator,
   separator,
-  specialToken
+  specialToken,
+  context: [
+    TempateLiteral
+  ]
 }

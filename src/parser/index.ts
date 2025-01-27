@@ -14,6 +14,7 @@ namespace ParserConfig {
       separator?: string[];
       specialToken?: string[];
       comment?: string[][];
+      context?: Function[];
     }
     parser: (api: any) => {}
   }

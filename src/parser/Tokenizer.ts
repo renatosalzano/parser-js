@@ -161,8 +161,6 @@ class Tokenizer {
 
   check_token_type = () => {
 
-    this.History.set_token_start();
-
     switch (true) {
       case (this.is.nl(this.char.curr)): {
         if (this.char.curr === '\r') {
@@ -489,7 +487,7 @@ class Tokenizer {
         History.stop();
         History.eat();
 
-        return ({ then })
+        return ({ then });
       },
       each: (callback: (token: Token) => void) => {
 
@@ -565,6 +563,8 @@ class Tokenizer {
 
     this.skip_whitespace();
 
+    this.History.set_token_start();
+
     this.Context.check_token_type();
 
     this.check_token_type();
@@ -591,6 +591,7 @@ class Tokenizer {
         default: {
           // end tokenize
           this.History.push();
+          this.Context.check();
 
           print();
 
@@ -624,10 +625,32 @@ class Tokenizer {
 
   parse_program = () => {
 
+    this.debug.token = true;
     // this.debug.comment = true;
     // this.debug.newline = true;
 
+
     try {
+
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      console.log(this.index, this.source.length)
+      // end subtembplate
+      this.next();
+      this.next();
+      this.next();
+
+      // console.log(this.Token)
+
+
+      return;
 
       let max = 10;
       while (max > 0 && !this.source_end) {

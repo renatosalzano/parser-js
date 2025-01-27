@@ -1,6 +1,6 @@
-import Parser from "./Tokenizer";
+import Tokenizer from "./Tokenizer";
 
-type GetToken = ((parser: Parser) => string | undefined);
+type GetToken = ((Tokenizer: Tokenizer) => string | undefined);
 
 export function create_fast_get(type: 'keyword' | 'token' | 'comment_token', max_length: number): GetToken {
 

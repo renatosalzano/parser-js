@@ -5,7 +5,6 @@ import errors from './errors';
 import { Variable, Function, Identifier, Block, Primitive, TemplateLiteral, Expression, ObjectExpression, ArrayExpression, Property, Unexpected, Empty } from './node';
 import { Node } from 'parser/Progam';
 import { tokens } from './tokens';
-import { CtxExpression, CtxTempateLiteral } from './context';
 
 const program = {
   Block: {
@@ -230,8 +229,6 @@ export default (config: any) => {
 
         Expression({ group, append }: ExpressionProps = {}): Node {
 
-          createContext(CtxExpression);
-
           // 1. check expression type;
           const type = this.check_expression();
 
@@ -256,15 +253,6 @@ export default (config: any) => {
                 appendNode(node);
               }
               return node;
-            }
-
-            switch (type) {
-              case 'literal':
-                return this.literal_expression(node, end);
-              case 'object':
-              case 'group':
-              case 'array':
-              case 'arrow':
             }
           }
 
@@ -935,8 +923,6 @@ export default (config: any) => {
           let parsing_lit = true;
           let loop = 10;
 
-          createContext(CtxTempateLiteral);
-
           if (token.eq('`')) {
             next();
           }
@@ -947,7 +933,7 @@ export default (config: any) => {
 
             if (token.eq('`')) {
               log('Template Literal end;m');
-              endContext();
+
               next();
               parsing_lit = false;
               return node;

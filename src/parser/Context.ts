@@ -10,17 +10,30 @@ export type CtxParams = {
   getKeyword: () => string | undefined;
 }
 
-export type Ctx = {
-  name: string;
-  checkTokenType?: (params: CtxParams) => string | undefined | void;
-  tokenize?: (params: CtxParams) => {
-    [key: string]: () => 'next' | 'skip' | void;
+type Get = () => string | undefined;
+
+export class Ctx {
+  name: string = '';
+  start: string = '';
+
+  constructor(
+    public char: Tokenizer['char'],
+    public token: Tokenizer['Token'],
+    public getToken: Get,
+    public getKeyword: Get,
+    public increment: (value?: number) => void,
+    public end: () => void
+  ) {
+
   }
+
+  checkTokenType(): string | undefined | void { };
+  tokenize: { [key: string]: () => 'next' | 'skip' | undefined } = {};
+
+
 }
 
-type context = Ctx & {
-  methods: Map<string, () => any>;
-}
+type context = Ctx & { _index: number, _end: boolean };
 
 interface Ctor<T> {
   new(...args: any): T
@@ -28,30 +41,85 @@ interface Ctor<T> {
 
 class Context {
 
+  start_tokens = new Map<string, Ctor<Ctx>>()
+
   constructor(public Tokenizer: Tokenizer) { };
 
   current?: string;
   buffer: context[] = [];
   curr_ctx?: context;
 
+  ctx_map = new WeakMap();
+
   tokenize?: () => any;
+
+  new_ctx = (Ctx: Ctor<Ctx>) => {
+    return new Ctx(
+      this.Tokenizer.char,
+      this.Tokenizer.Token,
+      () => this.Tokenizer.get_token(this.Tokenizer),
+      () => this.Tokenizer.get_keyword(this.Tokenizer),
+      (value = 1) => void (this.Tokenizer.index += value, this.Tokenizer.pos += value),
+      () => void (this.curr_ctx && (this.curr_ctx._end = true))
+    )
+  }
+
+  extend = (Ctxs: Ctor<Ctx>[]) => {
+
+    for (const Ctx of Ctxs) {
+      const ctx = this.new_ctx(Ctx);
+
+      if (!ctx.name) {
+        log('ctx must have a name;r')
+      }
+
+      for (const method in ctx.tokenize) {
+        if (typeof ctx.tokenize[method] !== 'function') {
+          log('invalid context tokenize;r');
+        }
+      }
+
+      if (ctx.start) {
+        this.start_tokens.set(ctx.start, Ctx);
+      }
+    }
+
+  }
+
+  check = () => {
+
+    if (this.curr_ctx?._end) {
+      this.end_context();
+    } else {
+
+      const token = this.Tokenizer.Token.value
+      const Ctx = this.start_tokens.get(token);
+
+      if (Ctx) {
+
+        const ctx = this.new_ctx(Ctx) as context;
+
+        log('ctx:;c', ctx.name, this.buffer.length);
+
+        ctx._index = this.buffer.length;
+        ctx._end = false;
+
+        this.buffer.push(ctx);
+        this.curr_ctx = this.buffer.at(-1)!;
+      }
+
+    }
+
+
+  }
 
   create_context = <T>(Ctx: Ctor<T>) => {
 
-    const ctx = this.check_context(Ctx);
 
-    this.buffer.push(ctx);
-    this.curr_ctx = this.buffer.at(-1)!;
-
-    log('created context:;y', this.curr_ctx.name);
-
-    this.check_token_type = this.run_context;
-
-    return ctx as T;
   }
 
   end_context = () => {
-    // close last context active;
+
     if (this.buffer.length === 0) {
       this.Tokenizer.error({ message: 'unexpected end context' });
       return;
@@ -64,79 +132,23 @@ class Context {
     this.current = this.buffer.at(-1)?.name;
     this.curr_ctx = this.buffer.at(-1);
 
-    if (this.buffer.length > 0) {
-      this.check_token_type = this.run_context;
-    } else {
-      this.check_token_type = () => { };
-    }
+    console.log(this.curr_ctx)
 
-    log('close context:;g', `${prev} --> ${this.current || 'null'}`);
+    log('close context:;g', ` ${this.current || 'null'} <- ${prev}`);
 
     this.current = this.buffer.at(-1)?.name;
   }
 
-  context_map = new WeakMap();
-
-  check_context = <T>(Ctx: Ctor<T>) => {
-
-    if (this.context_map.has(Ctx)) {
-      return this.context_map.get(Ctx) as context;
-    }
-
-    const ctx = new Ctx() as context;
-
-    log('new fresh context;y', ctx.name);
-
-    switch (true) {
-      case !ctx.name:
-        this.Tokenizer.error({ title: 'Unexpected context', message: 'Missing \'name\'' });
-        break;
-      case 'checkTokenType' in ctx || 'tokenize' in ctx: {
-
-        if (!('checkTokenType' in ctx)) {
-          this.Tokenizer.error({ title: 'Unexpected context', message: 'Missing \'checkTokenType\'' });
-          break;
-        }
-
-        if (!('tokenize' in ctx)) {
-          this.Tokenizer.error({ title: 'Unexpected context', message: 'Missing \'tokenizer\'' });
-          break;
-        }
-        // @ts-ignore
-        ctx.methods = new Map(Object.entries(ctx.tokenize({} as any)));
-        break;
-      }
-    }
-
-    this.context_map.set(Ctx, ctx);
-    return ctx;
-  }
-
-  get_api = () => ({
-    char: this.Tokenizer.char,
-    Token: this.Tokenizer.Token,
-    index: this.Tokenizer.index,
-    increment: (value: number) => { this.Tokenizer.index += value; this.Tokenizer.pos += value },
-    getToken: () => this.Tokenizer.get_token(this.Tokenizer),
-    getKeyword: () => this.Tokenizer.get_keyword(this.Tokenizer),
-  })
-
-  run_context = () => {
-
-    if (this.curr_ctx && this.curr_ctx.checkTokenType && this.curr_ctx.tokenize) {
-      const type = this.curr_ctx.checkTokenType(this.get_api());
-      log('run context;c', type)
-      if (type && this.curr_ctx.methods.has(type)) {
-        this.tokenize ??= this.curr_ctx.tokenize(this.get_api())[type];
+  check_token_type = () => {
+    if (this.curr_ctx) {
+      const result = this.curr_ctx.checkTokenType();
+      if (result && this.curr_ctx.tokenize[result]) {
+        this.tokenize ??= this.curr_ctx.tokenize[result];
       } else {
         this.tokenize = undefined;
-        return
       }
     }
-
-  }
-
-  check_token_type = () => { };
+  };
 }
 
 export default Context;
