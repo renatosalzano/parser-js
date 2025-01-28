@@ -565,7 +565,7 @@ class Tokenizer {
 
     this.History.set_token_start();
 
-    this.Context.check_token_type();
+    this.Context.check_tokenize();
 
     this.check_token_type();
 

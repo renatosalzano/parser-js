@@ -1,4 +1,4 @@
-import { Ctx } from "parser/Context";
+import { TokenContext } from "parser/Context";
 
 const operator = [
   '+', '-', '*', '/', '%', '**',
@@ -42,53 +42,34 @@ const comment = [
   ['/*', '*/']
 ]
 
+class Ctx extends TokenContext {
+  expression = false;
+}
+
+class ExpressionStart extends Ctx {
+  name = 'expression';
+  start = ['{', '[', '(', '${'];
+  end = ['}', ']', ')']
+  expression = true;
+
+  onEnd() {
+    this.expression = false;
+  }
+}
+
 
 class TempateLiteral extends Ctx {
-
   name = 'template-literal';
-
-  start = '`';
-
+  start = ['`'];
+  end = ['`'];
   expression = false;
 
-  checkTokenType() {
-
+  tokenize() {
     if (this.expression) {
-
-      if (this.char.curr === '}') {
-        this.expression = false;
-      }
-
-      return;
+      // expected end
+      this.Token.type = 'string';
     } else {
-
-      if (this.char.curr === '`') {
-        return this.end();
-      }
-
-    }
-
-    if ((this.char.curr + this.char.next) === '${') {
-      return;
-    }
-
-    return 'string';
-  }
-
-  tokenize = {
-    string: () => {
-
-      const token = this.getToken();
-      const end_string = token === '${';
-
-      switch (true) {
-        case end_string:
-          this.token.type = 'string';
-          this.expression = true;
-          return;
-        default:
-          return 'next';
-      }
+      return 'next';
     }
   }
 }
@@ -101,6 +82,7 @@ export const tokens = {
   separator,
   specialToken,
   context: [
+    ExpressionStart,
     TempateLiteral
   ]
 }
