@@ -46,8 +46,8 @@ class Ctx extends TokenContext {
   expression = false;
 }
 
-class ExpressionStart extends Ctx {
-  name = 'expression';
+class ExpressionContainer extends Ctx {
+  name = 'expression-container';
   start = ['{', '[', '(', '${'];
   end = ['}', ']', ')']
   expression = true;
@@ -74,6 +74,19 @@ class TempateLiteral extends Ctx {
   }
 }
 
+class TagStart extends Ctx {
+  name = 'tag';
+  start = ['<'];
+
+  is_tag_name(name: string) {
+    /^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$/.test(name);
+  }
+
+  // tokenize() {
+  //   if ()
+  // }
+}
+
 export const tokens = {
   bracket,
   comment,
@@ -82,7 +95,7 @@ export const tokens = {
   separator,
   specialToken,
   context: [
-    ExpressionStart,
+    ExpressionContainer,
     TempateLiteral
   ]
 }

@@ -362,34 +362,6 @@ class Tokenizer {
     }
   }
 
-  next_literal = (end_token: string | string[]) => {
-    if (end_token) {
-      // this.forced_expected = 'string';
-
-      if (typeof end_token === 'string') {
-        end_token = [end_token];
-      }
-
-      let token_len = 1;
-      for (const token of end_token) {
-        if (!this.token.has(token)) {
-          log(`invalid token "${token}";r`);
-        } else {
-          token_len = token.length > token_len ? token.length : token_len;
-        }
-      }
-      this.get_end_token = create_fast_get('token', token_len);
-      const token = this.next();
-
-      // this.forced_expected = undefined;
-      this.get_end_token = undefined;
-      return token;
-    } else {
-      log('Endtoken;r')
-      return ({}) as Token;
-    }
-  }
-
   eat = (from: string, to?: string) => {
 
     // if (sequence !== this.next(breakReg)) {
@@ -625,7 +597,7 @@ class Tokenizer {
 
   parse_program = () => {
 
-    this.debug.token = true;
+    // this.debug.token = true;
     // this.debug.comment = true;
     // this.debug.newline = true;
 
@@ -641,8 +613,20 @@ class Tokenizer {
       this.next();
       this.next();
       this.next();
-      console.log(this.index, this.source.length)
       // end subtembplate
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
+      this.next();
       this.next();
       this.next();
       this.next();
@@ -721,7 +705,6 @@ class Tokenizer {
     nextToken: this.next_token as Token,
     debug: this.debug,
     next: this.next,
-    nextLiteral: this.next_literal,
     expected: this.expected,
     traverseTokens: this.traverse_tokens,
     eat: this.eat,

@@ -51,6 +51,8 @@ class Context {
 
   ctx_state = new WeakMap();
 
+  end_token = '';
+
   constructor(public Tokenizer: Tokenizer) {
     // @ts-ignore;
     this.default_keys = new Set(Object.getOwnPropertyNames(new TokenContext));
@@ -93,6 +95,7 @@ class Context {
     return ctx;
   }
 
+
   extend = (Ctxs: Ctor<TokenContext>[]) => {
 
     for (const Ctx of Ctxs) {
@@ -105,9 +108,6 @@ class Context {
       const properties = Object.getOwnPropertyNames(ctx) as (keyof typeof ctx)[];
 
       const state: any = {}
-      // const tokenize = Ctx.prototype.tokenize;
-      // const onStart = Ctx.prototype.onStart;
-      // const onEnd = Ctx
 
       for (const key of properties) {
         if (!this.default_keys.has(key)) {
@@ -126,16 +126,15 @@ class Context {
 
   }
 
+
   check = (current_token = this.Tokenizer.Token.value) => {
 
-    console.log('current token', current_token);
+    if (this.is_end_context(current_token)) {
+      return;
+    }
 
-    if (this.curr_ctx) {
-      if (this.curr_ctx.end.has(current_token)) {
-        console.log('expected end here', this.curr_ctx.name)
-        this.end_context();
-        return;
-      }
+    if (this.end_token == current_token) {
+      return;
     }
 
     const Ctx = this.start_tokens.get(current_token);
@@ -151,30 +150,77 @@ class Context {
 
       const ctx = this.new_ctx(Ctx) as context;
 
-      log('ctx:;c', ctx.name, this.buffer.length);
+      log('ctx:;c', ctx.name, this.buffer.length, this.Tokenizer.Token.value + ';g');
 
       this.current = ctx.name;
       this.buffer.push(ctx);
       this.curr_ctx = this.buffer.at(-1)!;
 
-      if (ctx.tokenize) {
-        this.tokenize = () => {
-          const next_token = this.get_next_token();
-          if (next_token) this.check_next(next_token);
-          if (this.curr_ctx?.tokenize) {
-            return this.curr_ctx.tokenize();
-          }
-        }
-      } else {
-        this.tokenize = undefined;
-      }
+      this.update_tokenize();
     }
-
-
   }
 
 
+  end_context = () => {
+
+    if (this.buffer.length === 0) {
+      this.Tokenizer.error({ message: 'unexpected end context' });
+      return;
+    }
+
+    if (this.curr_ctx && this.curr_ctx.onEnd) {
+      this.curr_ctx.onEnd();
+    }
+
+    const prev = this.curr_ctx?.name;
+
+    this.buffer.pop();
+
+    this.current = this.buffer.at(-1)?.name;
+    this.curr_ctx = this.buffer.at(-1);
+
+    if (this.curr_ctx) {
+      Object.assign(this.curr_ctx!, this.ctx_state.get(this.curr_ctx.constructor));
+      this.update_tokenize();
+    }
+
+    log('ctx end:;c', `${this.current || 'null'} <- ${prev}`, this.buffer.length, this.Tokenizer.Token.value + ';g');
+
+    this.current = this.buffer.at(-1)?.name;
+  }
+
+
+  update_tokenize = () => {
+
+    if (this.curr_ctx?.tokenize) {
+      this.tokenize = () => {
+        const next_token = this.get_next_token();
+        if (next_token) this.check_next(next_token);
+        if (this.curr_ctx?.tokenize) {
+          return this.curr_ctx.tokenize();
+        }
+      }
+    } else {
+      this.tokenize = undefined;
+    }
+
+  }
+
+  is_end_context(token: string) {
+    if (this.curr_ctx) {
+      if (this.curr_ctx.end.has(token)) {
+        this.end_token = token;
+        this.end_context();
+        return true;
+      }
+    }
+  }
+
   check_next(next_token: string) {
+
+    if (this.is_end_context(next_token)) {
+      return;
+    }
 
     const Ctx = this.start_tokens.get(next_token);
     if (Ctx) {
@@ -204,50 +250,8 @@ class Context {
 
   }
 
-
-  end_context = () => {
-
-    if (this.buffer.length === 0) {
-      this.Tokenizer.error({ message: 'unexpected end context' });
-      return;
-    }
-
-    if (this.curr_ctx && this.curr_ctx.onEnd) {
-      this.curr_ctx.onEnd();
-    }
-
-    const prev = this.curr_ctx?.name;
-
-    this.buffer.pop();
-
-    this.current = this.buffer.at(-1)?.name;
-    this.curr_ctx = this.buffer.at(-1);
-
-    console.log(this.curr_ctx)
-
-    log('close context:;g', ` ${this.current || 'null'} <- ${prev}`);
-
-    this.current = this.buffer.at(-1)?.name;
-  }
-
-
   check_tokenize = () => {
-    // if (this.curr_ctx) {
 
-    //   console.log('test', this.curr_ctx.name, this.curr_ctx.tokenize)
-
-    //   if (this.curr_ctx.tokenize) {
-
-    //     this.tokenize = () => {
-    //       const next_token = this.get_next_token();
-    //       if (next_token) this.check(next_token);
-    //       // @ts-ignore
-    //       return this.curr_ctx.tokenize();
-    //     }
-    //   } else {
-    //     this.tokenize = undefined;
-    //   }
-    // }
   };
 
 

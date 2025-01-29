@@ -83,7 +83,6 @@ export default (config: any) => {
       token,
       nextToken,
       next,
-      nextLiteral,
       traverseTokens,
       expected,
       eat,
