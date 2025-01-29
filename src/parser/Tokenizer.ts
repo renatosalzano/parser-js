@@ -9,7 +9,9 @@ export type TokenType<T> = 'string' | 'operator' | 'bracket' | 'keyword' | 'sepa
 export type Token = {
   value: string;
   type: string;
-  location: { line: number; start: number; end: number };
+  start: number;
+  end: number;
+  loc: { start: { ln: number; col: number }; end: { ln: number; col: number } };
   eq(comparator: string | RegExp): boolean;
 }
 
@@ -72,7 +74,8 @@ class Tokenizer {
   async Parse(source: string) {
     this.source = source;
     log('start parse program;y');
-    this.parse_program()
+    this.parse_program();
+    this.History.JSON(process.cwd() + '\\dist\\history.json')
     log('end parse program;g')
   }
 
@@ -96,7 +99,12 @@ class Tokenizer {
   Token: Token = {
     value: '',
     type: 'unknown',
-    location: {} as Token['location'],
+    start: 0,
+    end: 0,
+    loc: {
+      start: { ln: 0, col: 0 },
+      end: { ln: 0, col: 0 },
+    },
     eq(_: string | RegExp) {
       if (_ instanceof RegExp) {
         switch (true) {
@@ -529,7 +537,16 @@ class Tokenizer {
     const print = () => {
       if ((this.debug.token || debug) && debug !== 'suppress') {
         let value = (this.Token.value || this.char.curr);
-        if (this.Token.type === 'newline') value = value.replace('\n', '"\\n"')
+        if (this.Token.type == 'newline') value = value.replace('\n', '"\\n"');
+        if (this.Token.type == 'string') {
+          let line = this.Token.loc.start.ln;
+          for (const ln of this.Token.value.split('\n')) {
+            // @ts-ignore
+            console.log(`${line}`.cyan() + ':' + `"${ln}"`.yellow());
+            ++line;
+          }
+          return;
+        }
         log(this.History.log(), this.Token.type + ';m', value)
       }
     }
@@ -538,8 +555,8 @@ class Tokenizer {
       // clean next token
       delete this.next_token.type;
       delete this.next_token.value;
+      delete this.next_token.loc;
       delete this.next_token.eq;
-      delete this.next_token.location;
     }
 
     if (this.History.shift()) {
@@ -665,9 +682,6 @@ class Tokenizer {
       }
 
     } catch (error: any) {
-
-      this.History.JSON(process.cwd() + '\\dist\\history.json')
-
 
       if ('message' in error) {
         const title = error.title || 'Error';
