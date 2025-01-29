@@ -597,44 +597,12 @@ class Tokenizer {
 
   parse_program = () => {
 
-    // this.debug.token = true;
+    this.debug.token = true;
     // this.debug.comment = true;
     // this.debug.newline = true;
 
 
     try {
-
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      // end subtembplate
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-      this.next();
-
-      // console.log(this.Token)
-
-
-      return;
 
       let max = 10;
       while (max > 0 && !this.source_end) {

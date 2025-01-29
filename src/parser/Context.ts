@@ -65,7 +65,9 @@ class Context {
   current?: string;
   buffer: context[] = [];
   curr_ctx?: context;
-  state: { [key: string]: any } = {}
+  state: { [key: string]: any } = {};
+
+  debug = false;
 
   tokenize?: () => any;
 
@@ -150,7 +152,7 @@ class Context {
 
       const ctx = this.new_ctx(Ctx) as context;
 
-      log('ctx:;c', ctx.name, this.buffer.length, this.Tokenizer.Token.value + ';g');
+      this.debug && log('ctx:;c', ctx.name, this.buffer.length, this.Tokenizer.Token.value + ';g');
 
       this.current = ctx.name;
       this.buffer.push(ctx);
@@ -184,7 +186,7 @@ class Context {
       this.update_tokenize();
     }
 
-    log('ctx end:;c', `${this.current || 'null'} <- ${prev}`, this.buffer.length, this.Tokenizer.Token.value + ';g');
+    this.debug && log('ctx end:;c', `${this.current || 'null'} <- ${prev}`, this.buffer.length, this.Tokenizer.Token.value + ';g');
 
     this.current = this.buffer.at(-1)?.name;
   }
@@ -232,7 +234,7 @@ class Context {
         ...state,
       }
 
-      log('ctx update;c');
+      this.debug && log('ctx update;c');
 
       if (this.curr_ctx!.tokenize) {
         Object.assign(this.curr_ctx!, this.state);
