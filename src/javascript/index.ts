@@ -88,8 +88,6 @@ export default (config: any) => {
       eat,
       appendNode,
       createNode,
-      createContext,
-      endContext,
       error,
       debug,
       $
@@ -234,12 +232,11 @@ export default (config: any) => {
           if (type) {
 
             const node = createNode(Expression, { group });
+            log('Expression ' + type + ';m')
 
             const end = () => {
 
               log('Expression end;m');
-
-              endContext();
 
               // if (node.expression.length === 1 && node.expression[0] instanceof Node) {
               //   if (append) {
@@ -252,6 +249,18 @@ export default (config: any) => {
                 appendNode(node);
               }
               return node;
+            }
+
+            switch (type) {
+              case 'literal':
+                return this.literal_expression(node, end);
+              case 'object':
+                return this.ObjectExpression();
+              case 'group':
+                next();
+                return this.Expression({ group: true, append });
+              case 'array':
+              case 'arrow':
             }
           }
 
@@ -386,7 +395,6 @@ export default (config: any) => {
         },
 
         literal_expression(node: Expression, end: () => void) {
-          log('literal expression;m');
 
           let type = token.type;
 
@@ -406,16 +414,14 @@ export default (config: any) => {
               }
           }
 
-          console.log(type)
-
           if (expected('operator')) {
             if (type === 'string') {
-              switch (nextToken.value) {
-                case '+':
-                // concat string
-                case '.':
-                // member access
+              if (nextToken.eq(/\+\+|--|-/)) {
+                return end();
+              }
 
+              if (nextToken.eq(/[+.&]/)) {
+                console.log(nextToken)
               }
 
 
@@ -726,6 +732,7 @@ export default (config: any) => {
               }
             })
 
+          console.log('after traverse', token)
           return this.Object(expected);
 
         },
@@ -945,8 +952,7 @@ export default (config: any) => {
 
             if (token.eq('${')) {
               next();
-              console.log('hey there', token)
-              node.expression.push(this.parse_expression());
+              node.expression.push(this.Expression());
               // ++loop;
             }
 

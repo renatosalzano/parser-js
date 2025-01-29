@@ -43,18 +43,20 @@ const comment = [
 ]
 
 class Ctx extends TokenContext {
-  expression = false;
+  state = {
+    expression: false
+  }
 }
 
 class ExpressionContainer extends Ctx {
   name = 'expression-container';
   start = ['{', '[', '(', '${'];
   end = ['}', ']', ')']
-  expression = true;
 
-  onEnd() {
-    this.expression = false;
+  state = {
+    expression: true
   }
+
 }
 
 
@@ -62,10 +64,23 @@ class TempateLiteral extends Ctx {
   name = 'template-literal';
   start = ['`'];
   end = ['`'];
-  expression = false;
+  state = {
+    expression: false
+  }
+
+  onStart() {
+    this.skipWhitespace(false);
+    if (this.char.curr === '`') {
+      this.increment();
+    }
+  }
+
+  onEnd() {
+    this.Token.type = 'string';
+  }
 
   tokenize() {
-    if (this.expression) {
+    if (this.state.expression) {
       // expected end
       this.Token.type = 'string';
     } else {

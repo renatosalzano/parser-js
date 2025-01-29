@@ -50,6 +50,7 @@ async function main() {
     Parser.parse(code)
 
   } catch (error) {
+    console.log('error go here')
     console.log(error)
   }
 

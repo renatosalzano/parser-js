@@ -72,7 +72,7 @@ class Tokenizer {
   async Parse(source: string) {
     this.source = source;
     log('start parse program;y');
-    await this.parse_program()
+    this.parse_program()
     log('end parse program;g')
   }
 
@@ -86,7 +86,6 @@ class Tokenizer {
     alpha: (sequence: string) => /^[a-z]*$/.test(sequence),
     number: (_: string) => /^\d+$/.test(_)
   }
-
 
   line = 1
   pos = 1;
@@ -116,21 +115,42 @@ class Tokenizer {
 
   expected_token: keyof Tokenizer['tokenize'] = 'token';
   skip_newline = true;
+  skip_whitespace = true;
 
   blocking_error = false;
 
   debug: DebugNext = {};
 
+  sync_ch = () => {
+    this.char.curr = this.source[this.index];
+    this.char.next = this.source[this.index + 1];
+  }
 
-  skip_whitespace = () => {
+  increment = (value: number) => {
+    console.log(this.char.curr, this.source[this.index])
+    while (value > 0) {
+      console.log('value', this.source[this.index])
+      ++this.index, ++this.pos;
+      // this.check_new_line();
+      this.sync_ch();
+      --value;
+    }
+  }
+
+  skip_ws = () => {
+
+    if (!this.skip_whitespace) {
+      this.skip_whitespace = true;
+      return;
+    }
 
     const skip_reg = this.skip_newline
       ? /\s/
       : / /;
 
     while (this.index < this.source.length) {
-      this.char.curr = this.source[this.index];
-      this.char.next = this.source[this.index + 1];
+
+      this.sync_ch();
 
       if (skip_reg.test(this.char.curr)) {
 
@@ -159,7 +179,7 @@ class Tokenizer {
     }
   }
 
-  check_token_type = () => {
+  tokenize_type = () => {
 
     switch (true) {
       case (this.is.nl(this.char.curr)): {
@@ -319,7 +339,7 @@ class Tokenizer {
         this.Token.type = token_type;
 
       } else {
-        this.error({ title: 'Unexpected token', message: 'unexpected token' });
+        this.error({ title: 'Unexpected token', message: `unexpected token from "${this.char.curr}"` });
       }
     },
     comment: () => {
@@ -333,8 +353,8 @@ class Tokenizer {
           if (this.debug.comment) log(this.line, this.Token.value + this.comment_type.end_token + ';g');
           this.Token.value = '';
           this.index += 2, this.pos += 2;
-          this.skip_whitespace();
-          this.check_token_type();
+          this.skip_ws();
+          this.tokenize_type();
 
           return "skip"
         }
@@ -347,8 +367,8 @@ class Tokenizer {
           if (this.debug.comment) log(this.line, this.Token.value + ';g');
           this.Token.value = '';
           // ++this.index; // skip \n
-          this.skip_whitespace();
-          this.check_token_type();
+          this.skip_ws();
+          this.tokenize_type();
 
           return "skip"
         }
@@ -367,12 +387,6 @@ class Tokenizer {
     // if (sequence !== this.next(breakReg)) {
     //   this.prev();
     // }
-  }
-
-  prev = () => {
-    // const len = this.sequence.length + 1;
-    // this.index -= len;
-    // this.pos -= len;
   }
 
   expected = (comparator?: string | ((token: Partial<Token>) => boolean), debug = false) => {
@@ -533,23 +547,27 @@ class Tokenizer {
       return this.Token;
     }
 
-    this.skip_whitespace();
+
+    this.Context.load();
+
+    let check_nl = !this.skip_whitespace;
+
+    this.skip_ws();
 
     this.History.set_token_start();
 
-    this.Context.check_tokenize();
-
-    this.check_token_type();
+    if (this.Context.tokenize == undefined) {
+      this.tokenize_type();
+    }
 
     while (this.index < this.source.length) {
 
-      this.char.curr = this.source[this.index];
-      this.char.next = this.source[this.index + 1];
+      this.sync_ch();
 
-      // if (this.check_new_line()) {
-      //   ++this.index, ++this.pos;
-      //   continue;
-      // }
+      if (check_nl && this.check_new_line()) {
+        ++this.index, ++this.pos;
+        continue;
+      }
 
       switch ((this.Context.tokenize || this.tokenize[this.expected_token])()) {
         case "next": {
@@ -562,10 +580,16 @@ class Tokenizer {
         }
         default: {
           // end tokenize
-          this.History.push();
-          this.Context.check();
+          this.sync_ch();
 
+          this.History.push();
           print();
+
+          if (this.Token.type === '') {
+            throw { title: 'Tokenizer Error:', message: 'Token.type miss', type: 'error' }
+          }
+
+          this.Context.check();
 
           return this.Token;
         }
@@ -575,6 +599,7 @@ class Tokenizer {
 
     if (this.index === this.source.length) {
       log('source end;y');
+
       this.source_end = true;
 
       if (this.pairs_buffer.length > 0) {
@@ -598,11 +623,18 @@ class Tokenizer {
   parse_program = () => {
 
     this.debug.token = true;
-    // this.debug.comment = true;
+    // this.debug.checkToken = true;
+    this.debug.comment = true;
     // this.debug.newline = true;
 
 
     try {
+
+      while (!this.source_end) {
+        this.next();
+      }
+
+      return;
 
       let max = 10;
       while (max > 0 && !this.source_end) {
@@ -634,8 +666,10 @@ class Tokenizer {
 
     } catch (error: any) {
 
+      this.History.JSON(process.cwd() + '\\dist\\history.json')
+
+
       if ('message' in error) {
-        console.log('error')
         const title = error.title || 'Error';
         const at = " at " + (error.at || this.History.log(true));
         switch (error.type) {
@@ -649,7 +683,6 @@ class Tokenizer {
             console.log(`${error.message}\n    at ${this.line}:${this.pos}`)
             return;
           case 'end': {
-            this.History.JSON(process.cwd() + '\\dist\\history.json')
             this.Program.toJSON(process.cwd() + '\\dist\\ast.json')
             this.Program.check_references();
             // console.log(this.Program.body)
@@ -658,7 +691,6 @@ class Tokenizer {
         }
       }
 
-      console.log(error);
     }
 
   }

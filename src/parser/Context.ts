@@ -26,6 +26,7 @@ export class TokenContext {
     public getKeyword: Get,
     public increment: (value?: number) => void,
     public currentContex: () => string | null,
+    public skipWhitespace: (skip?: boolean) => void,
     // public close: () => void
   ) {
 
@@ -34,11 +35,13 @@ export class TokenContext {
   name: string = '';
   start: string[] = [];
   end: string[] = [];
+  state: { [key: string]: any } = {};
 }
 
 type context = Omit<TokenContext, 'start' | 'end'> & {
   start: Set<string>;
   end: Set<string>;
+
 };
 
 
@@ -47,25 +50,19 @@ class Context {
 
   start_tokens = new Map<string, Ctor<TokenContext>>();
 
-  default_keys: Set<string>;
-
   ctx_state = new WeakMap();
 
-  end_token = '';
+  end_token?: string;
 
   constructor(public Tokenizer: Tokenizer) {
-    // @ts-ignore;
-    this.default_keys = new Set(Object.getOwnPropertyNames(new TokenContext));
-    this.default_keys
-      .add('onStart')
-      .add('onEnd')
-      .add('tokenize')
   };
 
   current?: string;
   buffer: context[] = [];
   curr_ctx?: context;
-  state: { [key: string]: any } = {};
+  ctx_to_load?: context;
+  skip_token?: string;
+
 
   debug = false;
 
@@ -78,10 +75,11 @@ class Context {
       () => this.Tokenizer.get_token(this.Tokenizer),
       () => this.Tokenizer.get_keyword(this.Tokenizer),
       // increment
-      (value = 1) => void (this.Tokenizer.index += value, this.Tokenizer.pos += value),
+      (value = 1) => this.Tokenizer.increment(value),
       // currentContex
       () => this.current,
-      // end
+      // skip whitespace
+      (skip = false) => void (this.Tokenizer.skip_whitespace = skip)
       // () => void (this.curr_ctx && (this.curr_ctx._end = true))
     ) as unknown as context;
 
@@ -107,95 +105,97 @@ class Context {
         log('invalid context;r')
       }
 
-      const properties = Object.getOwnPropertyNames(ctx) as (keyof typeof ctx)[];
-
-      const state: any = {}
-
-      for (const key of properties) {
-        if (!this.default_keys.has(key)) {
-          state[key] = ctx[key];
-        }
-      }
-
       for (const token of ctx.start) {
         // TODO more context with same start tokens?
         this.start_tokens.set(token, Ctx)
       }
 
-      this.ctx_state.set(Ctx, state);
+      Object.freeze(ctx.state);
 
+      this.ctx_state.set(Ctx, ctx.state);
     }
 
   }
 
 
-  check = (current_token = this.Tokenizer.Token.value) => {
+  check = (curr_token = this.Tokenizer.Token.value) => {
 
-    if (this.is_end_context(current_token)) {
+    if (this.skip_token && this.skip_token == curr_token) {
       return;
     }
 
-    if (this.end_token == current_token) {
+    if (this.is_end_context(curr_token)) {
       return;
     }
 
-    const Ctx = this.start_tokens.get(current_token);
+    const Ctx = this.start_tokens.get(curr_token);
 
     if (Ctx) {
-
-      const state = this.ctx_state.get(Ctx) || {};
-
-      this.state = {
-        ...this.state,
-        ...state,
-      }
-
       const ctx = this.new_ctx(Ctx) as context;
-
-      this.debug && log('ctx:;c', ctx.name, this.buffer.length, this.Tokenizer.Token.value + ';g');
-
       this.current = ctx.name;
       this.buffer.push(ctx);
-      this.curr_ctx = this.buffer.at(-1)!;
-
-      this.update_tokenize();
+      this.ctx_to_load = this.buffer.at(-1)!;
     }
+
   }
 
+  load = () => {
+
+    if (this.ctx_to_load) {
+
+      this.debug && log('ctx curr:;c', this.ctx_to_load.name, this.buffer.length);
+
+      this.curr_ctx = this.ctx_to_load;
+
+      if (this.curr_ctx.onStart) this.curr_ctx.onStart();
+
+      this.update_tokenize();
+
+      this.ctx_to_load = undefined;
+    }
+
+  }
+
+
+  prev_ctx_to_load?: context;
 
   end_context = () => {
 
-    if (this.buffer.length === 0) {
+    if (this.buffer.length === 0 || !this.curr_ctx) {
       this.Tokenizer.error({ message: 'unexpected end context' });
       return;
     }
 
-    if (this.curr_ctx && this.curr_ctx.onEnd) {
-      this.curr_ctx.onEnd();
-    }
+    (this.curr_ctx.onEnd && this.curr_ctx.onEnd());
 
     const prev = this.curr_ctx?.name;
-
     this.buffer.pop();
-
     this.current = this.buffer.at(-1)?.name;
     this.curr_ctx = this.buffer.at(-1);
 
     if (this.curr_ctx) {
-      Object.assign(this.curr_ctx!, this.ctx_state.get(this.curr_ctx.constructor));
-      this.update_tokenize();
+      Object.assign(this.curr_ctx.state, this.ctx_state.get(this.curr_ctx.constructor));
+      this.ctx_to_load = this.curr_ctx;
+    } else {
+      this.tokenize = undefined;
     }
 
     this.debug && log('ctx end:;c', `${this.current || 'null'} <- ${prev}`, this.buffer.length, this.Tokenizer.Token.value + ';g');
-
-    this.current = this.buffer.at(-1)?.name;
   }
 
 
   update_tokenize = () => {
 
+    if (!this.curr_ctx?.tokenize && !this.tokenize) {
+      return;
+    }
+
     if (this.curr_ctx?.tokenize) {
+
+      // log('ctx:;c', 'active tokenize;y')
+
       this.tokenize = () => {
+        // listen token while tokenize
         const next_token = this.get_next_token();
         if (next_token) this.check_next(next_token);
         if (this.curr_ctx?.tokenize) {
@@ -203,43 +203,39 @@ class Context {
         }
       }
     } else {
+      // log('ctx:;c', 'disable tokenize;y')
       this.tokenize = undefined;
     }
 
   }
 
   is_end_context(token: string) {
-    if (this.curr_ctx) {
-      if (this.curr_ctx.end.has(token)) {
-        this.end_token = token;
-        this.end_context();
-        return true;
-      }
+    if (this.curr_ctx && this.curr_ctx.end.has(token)) {
+      this.end_token = token;
+      this.end_context();
+      return true;
     }
   }
 
   check_next(next_token: string) {
 
     if (this.is_end_context(next_token)) {
+      this.debug && log('ctx;c', 'skip check;y', next_token + ';g')
+      this.skip_token = next_token;
       return;
     }
 
     const Ctx = this.start_tokens.get(next_token);
     if (Ctx) {
 
-      const state = this.ctx_state.get(Ctx) || {};
+      // this.debug && log('ctx update:;c', this.curr_ctx?.constructor.name + ";g", 'from', Ctx.name + ';g');
 
-      this.state = {
-        ...this.state,
-        ...state,
-      }
-
-      this.debug && log('ctx update;c');
-
-      if (this.curr_ctx!.tokenize) {
-        Object.assign(this.curr_ctx!, this.state);
-        this.curr_ctx!.tokenize();
-        this.tokenize = undefined;
+      if (this.curr_ctx) {
+        if (this.curr_ctx.tokenize) {
+          Object.assign(this.curr_ctx.state, this.ctx_state.get(Ctx));
+          this.curr_ctx.tokenize();
+          this.tokenize = undefined;
+        }
       }
 
     }
@@ -251,10 +247,6 @@ class Context {
 
 
   }
-
-  check_tokenize = () => {
-
-  };
 
 
   get_next_token = () => {
