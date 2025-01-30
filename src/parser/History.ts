@@ -8,6 +8,7 @@ class History {
 
   history: [number, number, number][] = [];
   current: [number, number, number];
+  list: string[] = [];
 
   tokens: token[] = [];
   tokens_buffer: number[] = [];
@@ -77,11 +78,8 @@ class History {
 
   shift = () => {
 
-    log('shift called', this.record, this.nested_record)
-
     if (this.record && this.nested_record) {
       // the legend of the phantom token
-      console.log('phantom', this.Tokenizer.Token)
       return false;
     }
 
@@ -151,10 +149,11 @@ class History {
     };
 
     const token_index = this.tokens.push({ value, type, start: start_index, end: index, loc }) - 1;
-    console.log('pushed', this.tokens.at(-1))
     if (this.record) {
       this.tokens_buffer.push(token_index);
     }
+
+    this.list.push(value);
   }
 
   compare = (a: [number, number, number], b?: [number, number, number]) => {
@@ -258,7 +257,8 @@ class History {
   }
 
   JSON = (path: string) => {
-    writeFileSync(path, JSON.stringify(this.tokens, null, 2))
+    writeFileSync(path, JSON.stringify(this.list, null, 2))
+    console.log('JSON')
   }
 
 }

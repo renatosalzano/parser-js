@@ -116,6 +116,8 @@ class Tokenizer {
     }
   }
 
+  Tokens: Token[] = [];
+
   next_token: Partial<Token> = {};
 
   expected_token: keyof Tokenizer['tokenize'] = 'token';
@@ -314,6 +316,7 @@ class Tokenizer {
 
         this.index += token.length;
         this.pos += token.length;
+        this.sync_ch();
 
         if (token_type === 'comment') {
 
@@ -366,16 +369,16 @@ class Tokenizer {
 
       } else {
 
-        if (this.char.curr !== '\n') {
+        if (/[\r\n]/.test(this.char.curr)) {
           return "next";
         } else {
           if (this.debug.comment) log(this.line, this.Token.value + ';g');
-          this.Token.value = '';
+          this.Token.type = 'comment'
           // ++this.index; // skip \n
-          this.skip_ws();
-          this.tokenize_type();
 
-          return "skip"
+          this.skip_ws();
+
+          return;
         }
 
       }
@@ -590,18 +593,18 @@ class Tokenizer {
       }
     }
 
-    if (this.next_token.type) {
-      // clean next token
-      delete this.next_token.type;
-      delete this.next_token.value;
-      delete this.next_token.loc;
-      delete this.next_token.eq;
-    }
+    // if (this.next_token.type) {
+    //   // clean next token
+    //   delete this.next_token.type;
+    //   delete this.next_token.value;
+    //   delete this.next_token.loc;
+    //   delete this.next_token.eq;
+    // }
 
-    if (this.History.shift()) {
-      // if cached return it
-      return this.Token;
-    }
+    // if (this.History.shift()) {
+    //   // if cached return it
+    //   return this.Token;
+    // }
 
     this.Context.load();
 
@@ -764,6 +767,22 @@ class Tokenizer {
     eat: this.eat,
     error: this.error,
     $: {} as { [key: string]: ParserObject }
+  }
+
+  start = (source: string) => {
+    this.source = source;
+    // this.debug.token = true;
+    try {
+
+      while (!this.source_end) {
+        this.next();
+      }
+
+      this.History.JSON(process.cwd() + '\\dist\\tokens.json');
+
+    } catch (error) {
+      console.log(error);
+    }
   }
 
 }

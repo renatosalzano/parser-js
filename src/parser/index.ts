@@ -65,6 +65,11 @@ class ParserConfig {
     instance ??= new this() as ParserConfig;
     await instance.Tokenizer.Parse(code)
   }
+
+  static tokenize = (code: string) => {
+    instance ??= new this() as ParserConfig;
+    instance.Tokenizer.start(code);
+  }
 }
 
 

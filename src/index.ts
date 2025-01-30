@@ -47,7 +47,7 @@ async function main() {
 
     const code = readFileSync(resolve(process.cwd(), './src/test/test.js'), 'utf-8');
 
-    Parser.parse(code)
+    Parser.tokenize(code)
 
   } catch (error) {
     console.log('error go here')
