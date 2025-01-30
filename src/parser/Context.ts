@@ -21,7 +21,7 @@ export class TokenContext {
 
   constructor(
     public char: Tokenizer['char'],
-    public Token: Tokenizer['Token'],
+    public Token: Tokenizer['token'],
     public getToken: Get,
     public getKeyword: Get,
     public increment: (value?: number) => void,
@@ -71,15 +71,15 @@ class Context {
   new_ctx = (Ctx: Ctor<TokenContext>) => {
     const ctx = new Ctx(
       this.Tokenizer.char,
-      this.Tokenizer.Token,
-      () => this.Tokenizer.get_token(this.Tokenizer),
-      () => this.Tokenizer.get_keyword(this.Tokenizer),
+      this.Tokenizer.token,
+      () => this.Tokenizer.get_token(),
+      () => this.Tokenizer.get_keyword(),
       // increment
-      (value = 1) => this.Tokenizer.increment(value),
+      (value = 1) => this.Tokenizer.advance(value),
       // currentContex
       () => this.current,
       // skip whitespace
-      (skip = false) => void (this.Tokenizer.skip_whitespace = skip)
+      (skip = false) => void (this.Tokenizer.skip_whitespace = skip),
       // () => void (this.curr_ctx && (this.curr_ctx._end = true))
     ) as unknown as context;
 
@@ -118,17 +118,19 @@ class Context {
   }
 
 
-  check = (curr_token = this.Tokenizer.Token.value) => {
+  check = (token: string) => {
 
-    if (this.skip_token && this.skip_token == curr_token) {
+    return;
+
+    if (this.skip_token && this.skip_token == token) {
       return;
     }
 
-    if (this.is_end_context(curr_token)) {
+    if (this.is_end_context(token)) {
       return;
     }
 
-    const Ctx = this.start_tokens.get(curr_token);
+    const Ctx = this.start_tokens.get(token);
 
     if (Ctx) {
       const ctx = this.new_ctx(Ctx) as context;
@@ -181,7 +183,7 @@ class Context {
       this.tokenize = undefined;
     }
 
-    this.debug && log('ctx end:;c', `${this.current || 'null'} <- ${prev}`, this.buffer.length, this.Tokenizer.Token.value + ';g');
+    this.debug && log('ctx end:;c', `${this.current || 'null'} <- ${prev}`, this.buffer.length, this.Tokenizer.token.value + ';g');
   }
 
 
@@ -244,11 +246,11 @@ class Context {
   }
 
   get_next_token = () => {
-    let next_token = this.Tokenizer.get_token(this.Tokenizer);
+    let next_token = this.Tokenizer.get_token();
     if (next_token) {
       return next_token;
     } else {
-      next_token = this.Tokenizer.get_keyword(this.Tokenizer);
+      next_token = this.Tokenizer.get_keyword();
       return next_token;
     }
   };

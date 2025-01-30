@@ -8,7 +8,7 @@ class History {
 
   history: [number, number, number][] = [];
   current: [number, number, number];
-  list: string[] = [];
+  list: any[] = [];
 
   tokens: token[] = [];
   tokens_buffer: number[] = [];
@@ -36,16 +36,16 @@ class History {
     end = 0,
     loc = { start: { ln: 0, col: 0 }, end: { ln: 0, col: 0 } }
   }: token = {} as token) => {
-    this.Tokenizer.Token.value = value;
-    this.Tokenizer.Token.type = type;
+    this.Tokenizer.token.value = value;
+    this.Tokenizer.token.type = type;
 
-    this.Tokenizer.Token.start = start;
-    this.Tokenizer.Token.end = end;
+    this.Tokenizer.token.start = start;
+    this.Tokenizer.token.end = end;
 
-    this.Tokenizer.Token.loc.start.ln = loc.start.ln;
-    this.Tokenizer.Token.loc.start.col = loc.start.col;
-    this.Tokenizer.Token.loc.end.ln = loc.end.ln;
-    this.Tokenizer.Token.loc.end.col = loc.end.col;
+    this.Tokenizer.token.loc.start.ln = loc.start.ln;
+    this.Tokenizer.token.loc.start.col = loc.start.col;
+    this.Tokenizer.token.loc.end.ln = loc.end.ln;
+    this.Tokenizer.token.loc.end.col = loc.end.col;
   }
 
   last_token = () => {
@@ -54,16 +54,16 @@ class History {
 
       const { value, type, start, end, loc } = last_token;
 
-      this.Tokenizer.Token.value = value;
-      this.Tokenizer.Token.type = type;
+      this.Tokenizer.token.value = value;
+      this.Tokenizer.token.type = type;
 
-      this.Tokenizer.Token.start = start;
-      this.Tokenizer.Token.end = end;
+      this.Tokenizer.token.start = start;
+      this.Tokenizer.token.end = end;
 
-      this.Tokenizer.Token.loc.start.ln = loc.start.ln;
-      this.Tokenizer.Token.loc.start.col = loc.start.col;
-      this.Tokenizer.Token.loc.end.ln = loc.end.ln;
-      this.Tokenizer.Token.loc.end.col = loc.end.col;
+      this.Tokenizer.token.loc.start.ln = loc.start.ln;
+      this.Tokenizer.token.loc.start.col = loc.start.col;
+      this.Tokenizer.token.loc.end.ln = loc.end.ln;
+      this.Tokenizer.token.loc.end.col = loc.end.col;
     }
   }
 
@@ -71,7 +71,7 @@ class History {
     const next_token_index = this.tokens_buffer[0];
     if (next_token_index !== undefined) {
       const { value, type, start, end, loc } = this.tokens[next_token_index] as Token;
-      const { eq } = this.Tokenizer.Token;
+      const { eq } = this.Tokenizer.token;
       return { value, type, start, end, loc, eq };
     }
   }
@@ -122,7 +122,7 @@ class History {
     const { index, line, pos } = this.Tokenizer;
 
     if (this.compare([index, line, pos])) {
-      console.log(this.Tokenizer.Token)
+      console.log(this.Tokenizer.token)
       this.Tokenizer.error({ title: "Tokenize Error", message: "terminated for preventing loop" });
     }
 
@@ -130,18 +130,21 @@ class History {
 
     this.current = [index, line, pos];
 
-    const { value, type } = this.Tokenizer.Token;
+    const { value, type } = this.Tokenizer.token;
     const { token_start: [start_index, start_line, start_pos] } = this;
 
     // add location
 
-    this.Tokenizer.Token.start = start_index;
-    this.Tokenizer.Token.end = index;
-
-    this.Tokenizer.Token.loc.start.ln = start_line;
-    this.Tokenizer.Token.loc.start.col = start_pos;
-    this.Tokenizer.Token.loc.end.ln = line;
-    this.Tokenizer.Token.loc.end.col = pos;
+    this.set_token({
+      value,
+      type,
+      start: start_index,
+      end: index,
+      loc: {
+        start: { ln: start_line, col: start_pos },
+        end: { ln: line, col: pos }
+      }
+    })
 
     const loc = {
       start: { ln: start_line, col: start_pos },
@@ -153,7 +156,7 @@ class History {
       this.tokens_buffer.push(token_index);
     }
 
-    this.list.push(value);
+    this.list.push(`${type} - ${value}`);
   }
 
   compare = (a: [number, number, number], b?: [number, number, number]) => {
@@ -176,16 +179,16 @@ class History {
       this.Tokenizer.line = loc.end.ln;
       this.Tokenizer.pos = loc.end.col;
 
-      this.Tokenizer.Token.value = value;
-      this.Tokenizer.Token.type = type;
+      this.Tokenizer.token.value = value;
+      this.Tokenizer.token.type = type;
 
-      this.Tokenizer.Token.start = start;
-      this.Tokenizer.Token.end = end;
+      this.Tokenizer.token.start = start;
+      this.Tokenizer.token.end = end;
 
-      this.Tokenizer.Token.loc.start.ln = loc.start.ln;
-      this.Tokenizer.Token.loc.start.col = loc.start.col;
-      this.Tokenizer.Token.loc.end.ln = loc.end.ln;
-      this.Tokenizer.Token.loc.end.col = loc.end.col;
+      this.Tokenizer.token.loc.start.ln = loc.start.ln;
+      this.Tokenizer.token.loc.start.col = loc.start.col;
+      this.Tokenizer.token.loc.end.ln = loc.end.ln;
+      this.Tokenizer.token.loc.end.col = loc.end.col;
 
       this.tokens_buffer = [];
       this.Tokenizer.next();

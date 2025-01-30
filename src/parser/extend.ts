@@ -2,7 +2,7 @@ import { log } from "utils";
 import Tokenizer from "./Tokenizer";
 import Program from "./Progam";
 import Context from "./Context";
-import { create_fast_get } from "./utils";
+import { create_token_finder } from "./utils";
 // import type { ParserMethod } from "./Tokenizer";
 
 export type ParserObject = {
@@ -21,8 +21,6 @@ export type Api<T> =
     createNode: Program['create_node'];
     isFnBody: Program['is_fn_body'];
 
-    createContext: Context['create_context'];
-    endContext: Context['end_context'];
   }
 
 let plugin_name: string;
@@ -68,17 +66,17 @@ function extend_tokens(this: Tokenizer, type: string, tokens: string[] | string[
 
       if (end) {
 
-        if (this.token.has(end)) {
-          log(`Duplicate token "${end}" found in ${this.token.get(end)};y`);
+        if (this.tokens.has(end)) {
+          log(`Duplicate token "${end}" found in ${this.tokens.get(end)};y`);
         } else {
-          this.token.set(end, 'comment');
+          this.tokens.set(end, 'comment');
         }
       }
 
-      if (this.token.has(start)) {
-        log(`Duplicate token "${start}" found in ${this.token.get(start)};y`);
+      if (this.tokens.has(start)) {
+        log(`Duplicate token "${start}" found in ${this.tokens.get(start)};y`);
       } else {
-        this.token.set(start, 'comment');
+        this.tokens.set(start, 'comment');
       }
 
       this.comment_token.set(start, {
@@ -93,25 +91,27 @@ function extend_tokens(this: Tokenizer, type: string, tokens: string[] | string[
 
   for (const token of tokens as string[]) {
 
-    if (this.token.has(token)) {
+    if (this.tokens.has(token)) {
       log(`warn: duplicate "${token}" found in ${type};y`);
     } else {
 
       if (this.is.alpha(token) || type === 'keyword') {
 
-        this.keyword.set(token, type);
+        this.keywords.set(token, type);
 
         if (token.length > this.max_len.keyword) {
           this.max_len.keyword = token.length;
-          this.get_keyword = create_fast_get('keyword', token.length);
+
+          this.get_keyword = create_token_finder(this, 'keywords', token.length);
         }
 
       } else {
-        this.token.set(token, type);
+        this.tokens.set(token, type);
 
         if (token.length > this.max_len.token) {
           this.max_len.token = token.length;
-          this.get_token = create_fast_get('token', token.length);
+
+          this.get_token = create_token_finder(this, 'tokens', token.length);
         }
       }
     }
@@ -148,7 +148,7 @@ function extend_parser(this: Tokenizer, program: { [key: string]: { [key: string
       for (const [token] of Parser.token) {
 
         if (this.is.alpha(token)) {
-          if (!this.keyword.has(token)) {
+          if (!this.keywords.has(token)) {
             // Parser.keyword.set(lexical, name);
             Parser_keyword.push(token)
           } else {

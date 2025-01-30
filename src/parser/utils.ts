@@ -2,7 +2,7 @@ import Tokenizer from "./Tokenizer";
 
 type GetToken = ((Tokenizer: Tokenizer) => string | undefined);
 
-export function create_fast_get(type: 'keyword' | 'token' | 'comment_token', max_length: number): GetToken {
+export function create_token_finder(Tokenizer: Tokenizer, type: 'keywords' | 'tokens', max_length: number) {
 
   const cases: string[] = [];
 
@@ -20,7 +20,9 @@ export function create_fast_get(type: 'keyword' | 'token' | 'comment_token', max
     + cases.join('\n') + '\n'
     + 'default:\n'
     + 'return undefined;'
-    + '}})()'
+    + '}})()';
 
-  return Function('parser', ret) as GetToken;
+  const finder = Function('parser', ret) as (Tokenizer: Tokenizer) => string | undefined;
+
+  return () => finder(Tokenizer);
 }
