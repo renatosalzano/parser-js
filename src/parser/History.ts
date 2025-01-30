@@ -11,8 +11,11 @@ class History {
 
   tokens: token[] = [];
   tokens_buffer: number[] = [];
+  tokens_to_spend: number[] = [];
 
   record = false;
+  nested_record = false;
+
   each_callback?: (token: Token) => void;
 
   constructor(public Tokenizer: Tokenizer) {
@@ -25,8 +28,23 @@ class History {
     this.token_start = [index, line, pos]
   }
 
-  set_token_loc = () => {
+  set_token = ({
+    value = '',
+    type = 'unknown',
+    start = 0,
+    end = 0,
+    loc = { start: { ln: 0, col: 0 }, end: { ln: 0, col: 0 } }
+  }: token = {} as token) => {
+    this.Tokenizer.Token.value = value;
+    this.Tokenizer.Token.type = type;
 
+    this.Tokenizer.Token.start = start;
+    this.Tokenizer.Token.end = end;
+
+    this.Tokenizer.Token.loc.start.ln = loc.start.ln;
+    this.Tokenizer.Token.loc.start.col = loc.start.col;
+    this.Tokenizer.Token.loc.end.ln = loc.end.ln;
+    this.Tokenizer.Token.loc.end.col = loc.end.col;
   }
 
   last_token = () => {
@@ -59,6 +77,23 @@ class History {
 
   shift = () => {
 
+    log('shift called', this.record, this.nested_record)
+
+    if (this.record && this.nested_record) {
+      // the legend of the phantom token
+      console.log('phantom', this.Tokenizer.Token)
+      return false;
+    }
+
+    if (this.record && this.tokens_to_spend.length > 0) {
+      // free token!
+      const token_index = this.tokens_to_spend.shift()!;
+      log('free token!!!;g', this.tokens[token_index])
+      const { value, type, start, end, loc } = this.tokens[token_index];
+      this.set_token({ value, type, start, end, loc });
+      return true;
+    }
+
     if (this.record) return false;
 
     const token_index = this.tokens_buffer.shift();
@@ -72,16 +107,14 @@ class History {
       this.Tokenizer.line = line;
       this.Tokenizer.pos = pos;
 
-      this.Tokenizer.Token.value = value;
-      this.Tokenizer.Token.type = type;
+      this.set_token({
+        value: value,
+        type: type,
+        start: start,
+        end: end,
+        loc: loc,
+      });
 
-      this.Tokenizer.Token.start = start;
-      this.Tokenizer.Token.end = end;
-
-      this.Tokenizer.Token.loc.start.ln = loc.start.ln;
-      this.Tokenizer.Token.loc.start.col = loc.start.col;
-      this.Tokenizer.Token.loc.end.ln = loc.end.ln;
-      this.Tokenizer.Token.loc.end.col = loc.end.col;
       return true;
     }
 
@@ -118,6 +151,7 @@ class History {
     };
 
     const token_index = this.tokens.push({ value, type, start: start_index, end: index, loc }) - 1;
+    console.log('pushed', this.tokens.at(-1))
     if (this.record) {
       this.tokens_buffer.push(token_index);
     }
@@ -178,9 +212,20 @@ class History {
   * start cache tokens
   */
   start(each_callback?: (token: Token) => void) {
+
+    if (this.record) {
+      this.nested_record = true;
+    }
+
     this.record = true;
+    this.tokens_to_spend = [...this.tokens_buffer];
+
     this.each_callback = each_callback;
-    this.tokens_buffer.push(this.tokens.length - 1);
+
+    if (this.tokens.length > 0) {
+      this.tokens_buffer.push(this.tokens.length - 1);
+    }
+
   }
   /**
   * stop cache tokens
@@ -188,7 +233,28 @@ class History {
   stop() {
     this.record = false;
     this.each_callback = undefined;
-    this.shift();
+
+    if (this.nested_record) {
+      this.nested_record = false;
+
+      if (this.tokens.length == 1) {
+        // empty token
+        this.Tokenizer.index = 0;
+        this.Tokenizer.line = 1;
+        this.Tokenizer.pos = 1;
+
+        this.set_token();
+      } else {
+        const token_index = this.tokens_buffer[0];
+        const { type, value, start, end, loc } = this.tokens[token_index]!;
+        this.set_token({ type, value, start, end, loc })
+      }
+      this.start();
+    } else {
+
+      this.shift();
+    }
+
   }
 
   JSON = (path: string) => {

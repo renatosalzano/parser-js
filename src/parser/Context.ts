@@ -63,10 +63,10 @@ class Context {
   ctx_to_load?: context;
   skip_token?: string;
 
-
   debug = false;
 
   tokenize?: () => any;
+
 
   new_ctx = (Ctx: Ctor<TokenContext>) => {
     const ctx = new Ctx(
@@ -138,6 +138,7 @@ class Context {
     }
 
   }
+
 
   load = () => {
 
@@ -242,13 +243,6 @@ class Context {
 
   }
 
-
-  create_context = <T>(Ctx: Ctor<T>) => {
-
-
-  }
-
-
   get_next_token = () => {
     let next_token = this.Tokenizer.get_token(this.Tokenizer);
     if (next_token) {
@@ -258,6 +252,15 @@ class Context {
       return next_token;
     }
   };
+
+
+  len = () => {
+    return this.buffer.length;
+  }
+
+  has = (token: string) => {
+    return this.start_tokens.has(token) || false;
+  }
 
 }
 

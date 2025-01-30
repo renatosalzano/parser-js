@@ -64,10 +64,7 @@ class Tokenizer {
     Object.assign(this.api, {
       isFnBody: this.Program.is_fn_body,
       createNode: this.Program.create_node,
-      appendNode: this.Program.append_node,
-      /* Context */
-      createContext: this.Context.create_context,
-      endContext: this.Context.end_context,
+      appendNode: this.Program.append_node
     });
   }
 
@@ -398,6 +395,7 @@ class Tokenizer {
   }
 
   expected = (comparator?: string | ((token: Partial<Token>) => boolean), debug = false) => {
+    this.debug.expected = true;
 
     const print = (message = 'get cached;y') => {
       if (this.debug.expected || debug) {
@@ -418,12 +416,14 @@ class Tokenizer {
     } else {
 
       this.History.start();
-      const { value, type, ...t } = this.next("suppress");
+      const { value, type, start, end, ...t } = this.next("suppress");
       this.History.stop();
 
       Object.assign(this.next_token, t);
       this.next_token.value = value;
       this.next_token.type = type;
+      this.next_token.start = start;
+      this.next_token.end = end;
 
       print('cache next token;y');
     }
@@ -452,14 +452,14 @@ class Tokenizer {
 
   traverse_tokens = (startToken: string, endToken: string) => {
 
-    const { History, next, recursive_next } = this;
+    const { History, next, init_recursive_next } = this;
     let then_pipe = false;
 
     function then(callback: () => any) {
 
       History.start();
       if (then_pipe) {
-        recursive_next(startToken, endToken);
+        init_recursive_next(startToken, endToken);
         next();
       }
       callback();
@@ -477,7 +477,7 @@ class Tokenizer {
     return ({
       eat: () => {
         History.start();
-        recursive_next(startToken, endToken);
+        init_recursive_next(startToken, endToken);
         History.stop();
         History.eat();
 
@@ -486,7 +486,7 @@ class Tokenizer {
       each: (callback: (token: Token) => void) => {
 
         History.start(callback);
-        recursive_next(startToken, endToken);
+        init_recursive_next(startToken, endToken);
         History.stop();
 
         return ({
@@ -502,31 +502,70 @@ class Tokenizer {
     })
   }
 
-  pairs_buffer: string[] = [];
-  pairs_end: string = '';
+  pairs_buffer: number[][] = [];
+  get_ref = () => this.Token.start;
 
-  recursive_next = (start_token: string, end_token: string, output: Token[] = []): Token[] => {
+  init_recursive_next = (ts: string, te: string) => {
 
-    let end_recursion = false;
-
-    this.next();
-    if (this.Token.value === start_token) {
-      this.pairs_buffer.push(this.Token.value);
+    if (!this.expected(ts)) {
+      this.error({ message: 'Invalid' });
     }
 
-    if (this.Token.value === end_token) {
-      this.pairs_buffer.pop();
+    if (this.Context.has(ts)) {
+      this.get_ref = () => this.Context.len();
+    }
 
-      if (this.pairs_buffer.length === 0) {
-        end_recursion = true;
+    console.log('after expected', this.Token)
+
+    this.recursive_next(ts, te);
+  }
+
+  recursive_next = (ts: string, te: string, layer = 0) => {
+
+    const t = this.Token;
+    let end_recursion = true;
+
+    this.pairs_buffer[layer] = [];
+
+    next: while (!this.source_end) {
+
+      this.next();
+
+      switch (true) {
+        case (t.value == ts && !this.pairs_buffer[layer][0]): {
+          console.log('ts found')
+          this.pairs_buffer[layer][0] = this.get_ref();
+          break;
+        }
+        case (t.value == ts && !!this.pairs_buffer[layer][0]): {
+          if (this.get_ref() !== this.pairs_buffer[layer][0]) {
+            console.log('new layer')
+          }
+        }
       }
+
     }
+
+
+    // if (t.value == ts && !this.pairs_buffer[layer][0]) {
+    //   this.pairs_buffer[layer][0] = t.start;
+    // }
+
+    // if (t.value == te && !this.pairs_buffer[layer][1]) {
+
+    //   this.pairs_buffer.pop();
+
+    //   if (this.pairs_buffer.length === 0) {
+    //     end_recursion = true;
+    //   }
+    // }
 
     if (!end_recursion) {
-      return this.recursive_next(start_token, end_token);
+      this.recursive_next(ts, te, layer);
+    } else {
+      this.pairs_buffer = [];
     }
 
-    return output;
   }
 
   next = (debug: boolean | 'suppress' = false) => {
@@ -563,7 +602,6 @@ class Tokenizer {
       // if cached return it
       return this.Token;
     }
-
 
     this.Context.load();
 
@@ -622,7 +660,7 @@ class Tokenizer {
       if (this.pairs_buffer.length > 0) {
         throw {
           title: 'Token not found',
-          message: `token '${this.pairs_end}' was not found before end of source'`,
+          message: `token '' was not found before end of source'`,
           at: 'Tokenizer.api.traverseTokens',
           type: 'error'
         }
@@ -647,9 +685,9 @@ class Tokenizer {
 
     try {
 
-      while (!this.source_end) {
-        this.next();
-      }
+      this.traverse_tokens('`', '`').then(() => {
+        console.log(this.Token)
+      })
 
       return;
 
@@ -704,6 +742,8 @@ class Tokenizer {
           }
         }
       }
+
+      console.log(error);
 
     }
 
