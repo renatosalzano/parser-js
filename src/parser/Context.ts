@@ -41,14 +41,13 @@ export class TokenContext {
 type context = Omit<TokenContext, 'start' | 'end'> & {
   start: Set<string>;
   end: Set<string>;
-
+  end_immediate: boolean;
 };
 
 
 
 class Context {
 
-  start_tokens = new Map<string, Ctor<TokenContext>>();
   token = {
     start: new Map<string, Ctor<TokenContext>>(),
     end: new Map<string, Ctor<TokenContext>>()
@@ -69,7 +68,7 @@ class Context {
 
   end_token?: string;
 
-  debug = true;
+  debug = false;
 
   tokenize?: () => any;
 
@@ -95,6 +94,7 @@ class Context {
 
     ctx.start = new Set(ctx.start);
     ctx.end = new Set(ctx.end);
+    ctx.end_immediate = ctx.end.size == 0;
     ctx.tokenize = tokenize;
     ctx.onStart = onStart;
     ctx.onEnd = onEnd;
@@ -109,7 +109,7 @@ class Context {
 
       if (!ctx.name || !ctx.start || ctx.start.size === 0) {
         log('invalid context;r')
-      }
+      };
 
       for (const token of ctx.start) {
         this.token.start.set(token, Ctx);
@@ -139,13 +139,23 @@ class Context {
     }
 
     if (this.is_end_context(token)) {
-      log('end from check;r')
+      this.debug && log('end from check;r');
+
+      if (this.prev_ctx && this.prev_ctx.onEnd) {
+        this.prev_ctx.onEnd()
+      }
+
       return;
     }
 
     const Ctx = this.token.start.get(token);
 
     if (Ctx) {
+
+      if (this.curr_ctx && this.curr_ctx.end_immediate) {
+        this.end_context();
+      }
+
       const ctx = this.new_ctx(Ctx) as context;
       this.current = ctx.name;
       this.buffer.push(ctx);
@@ -186,6 +196,9 @@ class Context {
       return;
     }
 
+    if (this.curr_ctx.end_immediate && this.curr_ctx.onEnd) {
+      this.curr_ctx.onEnd();
+    }
     // (this.curr_ctx.onEnd && this.curr_ctx.onEnd());
     this.prev_ctx = this.curr_ctx;
 
@@ -195,7 +208,8 @@ class Context {
     this.curr_ctx = this.buffer.at(-1);
 
     if (this.curr_ctx) {
-      Object.assign(this.curr_ctx.state, this.ctx_state.get(this.curr_ctx.constructor));
+      this.curr_ctx.state = { ...this.ctx_state.get(this.curr_ctx.constructor) };
+      // Object.assign(this.curr_ctx.state, this.ctx_state.get(this.curr_ctx.constructor));
       this.ctx_to_load = this.curr_ctx;
       this.ctx_reload = true;
     } else {
@@ -214,8 +228,6 @@ class Context {
 
     if (this.curr_ctx?.tokenize) {
 
-      // log('ctx:;c', 'active tokenize;y')
-
       this.tokenize = () => {
         // listen token while tokenize
         const next_token = this.get_next_token();
@@ -224,8 +236,8 @@ class Context {
           return this.curr_ctx.tokenize();
         }
       }
+
     } else {
-      // log('ctx:;c', 'disable tokenize;y')
       this.tokenize = undefined;
     }
 
@@ -241,8 +253,7 @@ class Context {
   check_next(next_token: string) {
 
     if (this.is_end_context(next_token)) {
-      this.debug && log('ctx;c', 'end token;y', next_token + ';g');
-      log('end from check next;r')
+      this.debug && log('ctx end:;c', 'next token;y', next_token + ';g');
       this.end_token = next_token;
       return;
     }
@@ -279,6 +290,10 @@ class Context {
 
   has = (token: string) => {
     return this.token.start.has(token) || this.token.end.has(token) || false;
+  }
+
+  test = () => {
+    console.log(this.buffer.length);
   }
 
 }

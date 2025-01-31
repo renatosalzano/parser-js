@@ -42,6 +42,19 @@ const comment = [
   ['/*', '*/']
 ]
 
+class Declarator extends TokenContext {
+  name = 'declarator';
+  start = ['var', 'const', 'let', 'function'];
+
+  onStart() {
+    this.token.type = 'declarator';
+  }
+
+  onEnd() {
+    console.log('end immediate')
+  }
+}
+
 class Ctx extends TokenContext {
   state = {
     expression: false
@@ -55,6 +68,14 @@ class ExpressionContainer extends Ctx {
 
   state = {
     expression: true
+  }
+
+  onStart() {
+    this.token.type = this.token.value == '${' ? 'template-expression-start' : 'bracket'
+  }
+
+  onEnd() {
+    this.token.type = 'porco dio'
   }
 }
 
@@ -76,7 +97,6 @@ class TempateLiteral extends Ctx {
   }
 
   onEnd() {
-    console.log('end template', this)
     this.token.type = 'template-end';
   }
 
@@ -111,6 +131,7 @@ export const tokens = {
   separator,
   specialToken,
   context: [
+    Declarator,
     ExpressionContainer,
     TempateLiteral
   ]
