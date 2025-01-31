@@ -12,6 +12,7 @@ export interface TokenContext {
   name: string;
   start: string[];
   end: string[];
+  onBefore?(cancel: () => void): any;
   onStart?(): any;
   onEnd?(): any;
   tokenize?(): 'next' | 'skip' | undefined;
@@ -25,7 +26,7 @@ export class TokenContext {
     public getToken: Get,
     public getKeyword: Get,
     public advance: (value?: number) => void,
-    public currentContext: () => string | null,
+    public currContext: () => string | null,
     public prevContext: () => string | null,
     public skipWhitespace: (skip?: boolean) => void,
   ) {
@@ -80,25 +81,22 @@ class Context {
       () => this.Tokenizer.get_keyword(),
       // advance
       (value = 1) => this.Tokenizer.advance(value),
-      // currentContex
+      // currContext
       () => this.curr_ctx?.name,
+      // prevContext
       () => this.prev_ctx?.name,
       // skip whitespace
       (skip = false) => void (this.Tokenizer.skip_whitespace = skip, this.Tokenizer.check_nl = !skip),
       // () => void (this.curr_ctx && (this.curr_ctx._end = true))
     ) as unknown as context;
 
-    // const tokenize = Ctx.prototype.tokenize;
-    // const onStart = Ctx.prototype.onStart;
-    // const onEnd = Ctx.prototype.onEnd;
-
     ctx.start = new Set(ctx.start);
     ctx.end = new Set(ctx.end);
     ctx.end_immediate = ctx.end.size == 0;
 
-    ctx.tokenize = Ctx.prototype.tokenize;
-    ctx.onStart = Ctx.prototype.onStart;
-    ctx.onEnd = Ctx.prototype.onEnd;
+    // ctx.tokenize = Ctx.prototype.tokenize;
+    // ctx.onStart = Ctx.prototype.onStart;
+    // ctx.onEnd = Ctx.prototype.onEnd;
     return ctx;
   }
 
@@ -158,6 +156,18 @@ class Context {
       }
 
       const ctx = this.new_ctx(Ctx) as context;
+
+      let cancel = false;
+
+      if (ctx.onBefore) ctx.onBefore(() => {
+        // abort mount ctx
+        log('cancel', ctx.name);
+        cancel = true;
+      });
+
+      if (cancel) {
+        return;
+      }
 
       this.buffer.push(ctx);
       this.ctx_to_load = this.buffer.at(-1)!;

@@ -46,8 +46,13 @@ class Declarator extends TokenContext {
   name = 'declarator';
   start = ['var', 'const', 'let', 'function'];
 
+  onBefore(cancel: () => void) {
+    // cancel();
+  }
+
   onStart() {
     this.token.type = 'declarator';
+
   }
 
 }
