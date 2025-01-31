@@ -48,6 +48,11 @@ class History {
     this.Tokenizer.token.loc.end.col = loc.end.col;
   }
 
+  get_token = (index: number) => {
+    const token = this.tokens[index];
+    this.set_token(token);
+  }
+
   last_token = () => {
     const last_token = this.tokens.at(-1);
     if (last_token) {
@@ -151,6 +156,10 @@ class History {
     writeFileSync(path, JSON.stringify(this.list, null, 2))
     console.log('JSON')
   }
+
+  // Parser
+
+
 
 }
 

@@ -1,9 +1,13 @@
 import { log } from "utils";
 import Tokenizer from "./Tokenizer";
 import Program from "./Progam";
-import Context from "./Context";
 import { create_token_finder } from "./utils";
+import Parser from "./Parser";
 // import type { ParserMethod } from "./Tokenizer";
+
+interface Ctor<T> {
+  new(...args: any): T
+}
 
 export type ParserObject = {
   name: string;
@@ -14,20 +18,20 @@ export type ParserObject = {
   start: (props?: any) => any;
 }
 
-export type Api<T> =
-  & Tokenizer['api']
-  & {
-    appendNode: Program['append_node'];
-    createNode: Program['create_node'];
-    isFnBody: Program['is_fn_body'];
+// export type Api<T> =
+//   & Tokenizer['api']
+//   & {
+//     appendNode: Program['append_node'];
+//     createNode: Program['create_node'];
+//     isFnBody: Program['is_fn_body'];
 
-  }
+//   }
 
 let plugin_name: string;
-export function extend(this: Tokenizer, name: string, program: any, tokens: any, parser: any) {
+export function extend(this: Tokenizer, name: string, tokens: any, parser: Ctor<Parser>) {
   plugin_name = name;
 
-  const { keyword = [], operator = [], bracket = [], separator = [], specialToken = [], comment = [], context = [] } = tokens;
+  const { context = [], keyword = [], operator = [], bracket = [], separator = [], specialToken = [], comment = [] } = tokens;
   extend_tokens.call(this, 'bracket', bracket);
   extend_tokens.call(this, 'keyword', keyword);
   extend_tokens.call(this, 'operator', operator);
@@ -37,25 +41,14 @@ export function extend(this: Tokenizer, name: string, program: any, tokens: any,
 
   this.Context.extend(context);
 
-  const keys_to_check = extend_parser.call(this, program);
+  log('extend parser;y');
 
-  parser = parser(this.api);
+  console.log(parser)
 
-  for (const key in parser) {
-    if (keys_to_check.has(key)) {
-      keys_to_check.delete(key);
-    }
-    if (this.parser[key]) {
-      log(`plugin '${name}' override method '${key}';y`)
-    }
-    this.parser[key] = parser[key];
-  }
+  extend_parser.call(this, parser);
 
-  if (keys_to_check.size) {
-    for (const invalid_key of keys_to_check) {
-      log(' Plugin Error ;R', `\n name: ${name}`, `\n '${invalid_key}' was defined in program, but not found in parser;r`);
-    }
-  }
+  // const keys_to_check = extend_parser.call(this, program);
+
 }
 
 function extend_tokens(this: Tokenizer, type: string, tokens: string[] | string[][]) {
@@ -119,85 +112,92 @@ function extend_tokens(this: Tokenizer, type: string, tokens: string[] | string[
 
 }
 
-function extend_parser(this: Tokenizer, program: { [key: string]: { [key: string]: any } }) {
-
-  const keys_to_check = new Set<string>();
-
-  for (const name of Object.keys(program)) {
-
-    if (!program[name]?.keyword && !program[name]?.token) {
-      log(`invalid Parser ${name};r`);
-      continue;
-    }
-
-    const key = program[name].hasOwnProperty('keyword') ? 'keyword' : 'token';
-
-    program[name].token = new Map(Object.entries(program[name][key]));
-
-    delete program[name].keyword;
-
-    const Parser = program[name] as ParserObject;
-
-    Parser.name = name;
-    Parser.props = Parser.props || {};
-
-    if (key === 'keyword') {
-
-      const Parser_keyword: string[] = []
-
-      for (const [token] of Parser.token) {
-
-        if (this.is.alpha(token)) {
-          if (!this.keywords.has(token)) {
-            // Parser.keyword.set(lexical, name);
-            Parser_keyword.push(token)
-          } else {
-            Parser.token.delete(token);
-            log(`duplicate keyword "${token}", found in Parser: ${name};r`);
-          }
-        } else {
-          Parser.token.delete(token);
-          log(`invalid "${token}", should be [a-z] found in Parser: ${name};r`);
-        }
-      }
-
-      extend_tokens.call(this, 'keyword', Parser_keyword);
-    }
-
-
-    Parser.has = (token: string, parse?: boolean) => {
-      const check = Parser.token.has(token);
-      if (check && parse) {
-        let props = Parser.token.get(token) || {};
-        this.parser[name]({ ...Parser.props, ...props });
-      }
-      return check;
-    }
-
-    Parser.start = (props = {}) => {
-      props = { ...Parser.props, ...props };
-      return this.parser[name](props);
-    }
-
-    for (const [token] of Parser.token) {
-      this.program.set(token, () => Parser.has(token, true))
-    }
-
-    if (Parser?.default) {
-      if (this.program.has('default')) {
-        log(`default Parser is setted to "${Parser.name}";y`)
-      }
-      this.program.set('default', Parser.start);
-    }
-
-    Object.freeze(Parser);
-
-    this.api.$[name] = Parser;
-
-    keys_to_check.add(name);
-
-  } // end for
-
-  return keys_to_check;
+function extend_parser(this: Tokenizer, Parser: Ctor<Parser>) {
+  this.Parser = new Parser(
+    this.api.token,
+    this.api.next
+  );
 }
+
+// function extend_parser(this: Tokenizer, program: { [key: string]: { [key: string]: any } }) {
+
+//   const keys_to_check = new Set<string>();
+
+//   for (const name of Object.keys(program)) {
+
+//     if (!program[name]?.keyword && !program[name]?.token) {
+//       log(`invalid Parser ${name};r`);
+//       continue;
+//     }
+
+//     const key = program[name].hasOwnProperty('keyword') ? 'keyword' : 'token';
+
+//     program[name].token = new Map(Object.entries(program[name][key]));
+
+//     delete program[name].keyword;
+
+//     const Parser = program[name] as ParserObject;
+
+//     Parser.name = name;
+//     Parser.props = Parser.props || {};
+
+//     if (key === 'keyword') {
+
+//       const Parser_keyword: string[] = []
+
+//       for (const [token] of Parser.token) {
+
+//         if (this.is.alpha(token)) {
+//           if (!this.keywords.has(token)) {
+//             // Parser.keyword.set(lexical, name);
+//             Parser_keyword.push(token)
+//           } else {
+//             Parser.token.delete(token);
+//             log(`duplicate keyword "${token}", found in Parser: ${name};r`);
+//           }
+//         } else {
+//           Parser.token.delete(token);
+//           log(`invalid "${token}", should be [a-z] found in Parser: ${name};r`);
+//         }
+//       }
+
+//       extend_tokens.call(this, 'keyword', Parser_keyword);
+//     }
+
+
+//     Parser.has = (token: string, parse?: boolean) => {
+//       const check = Parser.token.has(token);
+//       if (check && parse) {
+//         let props = Parser.token.get(token) || {};
+//         this.parser[name]({ ...Parser.props, ...props });
+//       }
+//       return check;
+//     }
+
+//     Parser.start = (props = {}) => {
+//       props = { ...Parser.props, ...props };
+//       return this.parser[name](props);
+//     }
+
+//     for (const [token] of Parser.token) {
+//       this.program.set(token, () => Parser.has(token, true))
+//     }
+
+//     if (Parser?.default) {
+//       if (this.program.has('default')) {
+//         log(`default Parser is setted to "${Parser.name}";y`)
+//       }
+//       this.program.set('default', Parser.start);
+//     }
+
+//     Object.freeze(Parser);
+
+//     this.api.$[name] = Parser;
+
+//     keys_to_check.add(name);
+
+//   } // end for
+
+//   return keys_to_check;
+// }
 

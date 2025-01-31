@@ -1,12 +1,12 @@
-import javascript from 'javascript';
+import javascript from 'javascript/index';
 import Tokenizer from './Tokenizer';
 import { log } from 'utils';
+import Parser from './Parser';
 
 namespace ParserConfig {
   export type Plugin = (prev: ParserStructure) => ParserStructure;
   export type ParserStructure = {
     name: string;
-    program: any;
     tokens?: {
       operator?: string[];
       bracket?: string[];
@@ -16,7 +16,7 @@ namespace ParserConfig {
       comment?: string[][];
       context?: Function[];
     }
-    parser: (api: any) => {}
+    parser: Parser
   }
 }
 
@@ -37,12 +37,13 @@ class ParserConfig {
 
   private extend_parser = (plugin: ParserConfig.Plugin | ParserConfig.ParserStructure) => {
 
-    const { name = '', program = {}, tokens = {}, parser } = typeof plugin === "function"
+    // TODO REWORK
+    const { name = '', tokens = {}, parser } = typeof plugin === "function"
       ? plugin(this.plugin)
       : plugin;
 
     log(`plugin: ${name};y`);
-    this.Tokenizer.extend(name, program, tokens, parser);
+    this.Tokenizer.extend(name, tokens, parser);
   }
 
   static config = (config: any) => {
@@ -63,12 +64,17 @@ class ParserConfig {
 
   static parse = async (code: string) => {
     instance ??= new this() as ParserConfig;
-    await instance.Tokenizer.Parse(code)
+    instance.Tokenizer.parse(code)
   }
 
   static tokenize = (code: string) => {
     instance ??= new this() as ParserConfig;
     instance.Tokenizer.start(code);
+    return {
+      parse: () => {
+        instance!.Tokenizer.parse(code);
+      }
+    }
   }
 }
 

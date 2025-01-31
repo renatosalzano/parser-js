@@ -4,6 +4,7 @@ import Program from "./Progam";
 import { create_token_finder } from "./utils";
 import { extend, ParserObject } from "./extend";
 import Context from "./Context";
+import Parser from "./Parser";
 
 export type TokenType<T> = 'string' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number' | 'special' | 'newline' | T;
 export type Token = {
@@ -40,6 +41,7 @@ class Tokenizer {
 
   source = '';
 
+  Parser = {} as Parser;
   Program: Program;
   History = new History(this);
   Context = new Context(this);
@@ -58,25 +60,23 @@ class Tokenizer {
 
   parser: { [key: string]: Function } = {};
 
+  token_index = 0;
+
+  api = {
+    token: {} as Token,
+    next: () => {
+      this.History.get_token(this.token_index);
+      ++this.token_index;
+    }
+  }
+
   constructor() {
     this.Program = new Program();
-
-    Object.assign(this.api, {
-      isFnBody: this.Program.is_fn_body,
-      createNode: this.Program.create_node,
-      appendNode: this.Program.append_node
-    });
+    this.api.token = this.token;
   }
 
-  async Parse(source: string) {
-    this.source = source;
-    log('start parse program;y');
-    // this.parse_program();
-    this.History.JSON(process.cwd() + '\\dist\\history.json')
-    log('end parse program;g')
-  }
 
-  extend = (...plugin: [string, any, any, any]) => extend.apply(this, plugin);
+  extend = (...plugin: [string, any, any]) => extend.apply(this, plugin);
 
   is = {
     quote: (char: string) => /['|"]/.test(char),
@@ -122,8 +122,6 @@ class Tokenizer {
   check_nl = false;
   skip_newline = true;
   skip_whitespace = true;
-
-  blocking_error = false;
 
   debug: DebugNext = {};
 
@@ -652,11 +650,11 @@ class Tokenizer {
   }
 
   source_end = false;
-  parser_run = false;
 
   start = (source: string) => {
+    log('tokenize start;y');
     this.source = source;
-    this.debug.token = true;
+    // this.debug.token = true;
     try {
 
       while (!this.source_end) {
@@ -668,7 +666,18 @@ class Tokenizer {
     }
 
     this.History.JSON(process.cwd() + '\\dist\\tokens.json');
+
+    log('tokenize end;g');
   }
+
+  parse(source: string) {
+    if (!this.source_end) {
+      this.start(source);
+    }
+    log('parser start;y');
+    this.Parser.Program();
+  }
+
 
   // parse_program = () => {
 
@@ -747,21 +756,6 @@ class Tokenizer {
   error = (error: Error) => {
     throw { type: 'error', ...error };
   }
-
-  api = {
-    // char: this.char,
-    // token: this.token,
-    // nextToken: this.next_token as Token,
-    // debug: this.debug,
-    // next: this.next,
-    // expected: this.expected,
-    // traverseTokens: this.traverse_tokens,
-    // eat: this.eat,
-    // error: this.error,
-    $: {} as { [key: string]: ParserObject }
-  }
-
-
 
 }
 
