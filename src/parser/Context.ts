@@ -25,9 +25,9 @@ export class TokenContext {
     public getToken: Get,
     public getKeyword: Get,
     public advance: (value?: number) => void,
-    public currentContex: () => string | null,
+    public currentContext: () => string | null,
+    public prevContext: () => string | null,
     public skipWhitespace: (skip?: boolean) => void,
-    // public close: () => void
   ) {
 
   }
@@ -58,7 +58,6 @@ class Context {
   constructor(public Tokenizer: Tokenizer) {
   };
 
-  current?: string;
   buffer: context[] = [];
 
   curr_ctx?: context;
@@ -82,22 +81,24 @@ class Context {
       // advance
       (value = 1) => this.Tokenizer.advance(value),
       // currentContex
-      () => this.current,
+      () => this.curr_ctx?.name,
+      () => this.prev_ctx?.name,
       // skip whitespace
       (skip = false) => void (this.Tokenizer.skip_whitespace = skip, this.Tokenizer.check_nl = !skip),
       // () => void (this.curr_ctx && (this.curr_ctx._end = true))
     ) as unknown as context;
 
-    const tokenize = Ctx.prototype.tokenize;
-    const onStart = Ctx.prototype.onStart;
-    const onEnd = Ctx.prototype.onEnd;
+    // const tokenize = Ctx.prototype.tokenize;
+    // const onStart = Ctx.prototype.onStart;
+    // const onEnd = Ctx.prototype.onEnd;
 
     ctx.start = new Set(ctx.start);
     ctx.end = new Set(ctx.end);
     ctx.end_immediate = ctx.end.size == 0;
-    ctx.tokenize = tokenize;
-    ctx.onStart = onStart;
-    ctx.onEnd = onEnd;
+
+    ctx.tokenize = Ctx.prototype.tokenize;
+    ctx.onStart = Ctx.prototype.onStart;
+    ctx.onEnd = Ctx.prototype.onEnd;
     return ctx;
   }
 
@@ -139,7 +140,7 @@ class Context {
     }
 
     if (this.is_end_context(token)) {
-      this.debug && log('end from check;r');
+      this.debug && log('cxt end from check;c');
 
       if (this.prev_ctx && this.prev_ctx.onEnd) {
         this.prev_ctx.onEnd()
@@ -157,7 +158,7 @@ class Context {
       }
 
       const ctx = this.new_ctx(Ctx) as context;
-      this.current = ctx.name;
+
       this.buffer.push(ctx);
       this.ctx_to_load = this.buffer.at(-1)!;
 
@@ -204,7 +205,6 @@ class Context {
 
     const prev = this.curr_ctx?.name;
     this.buffer.pop();
-    this.current = this.buffer.at(-1)?.name;
     this.curr_ctx = this.buffer.at(-1);
 
     if (this.curr_ctx) {
@@ -216,7 +216,7 @@ class Context {
       this.tokenize = undefined;
     }
 
-    this.debug && log('ctx end:;c', `${this.current || 'null'} <- ${prev}`, this.buffer.length);
+    this.debug && log('ctx end:;c', `${this.curr_ctx?.name || 'null'} <- ${prev}`, this.buffer.length);
   }
 
 
@@ -260,8 +260,6 @@ class Context {
 
     const Ctx = this.token.start.get(next_token);
     if (Ctx) {
-
-      // this.debug && log('ctx update:;c', this.curr_ctx?.constructor.name + ";g", 'from', Ctx.name + ';g');
 
       if (this.curr_ctx) {
         if (this.curr_ctx.tokenize) {

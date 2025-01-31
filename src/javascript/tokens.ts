@@ -50,9 +50,6 @@ class Declarator extends TokenContext {
     this.token.type = 'declarator';
   }
 
-  onEnd() {
-    console.log('end immediate')
-  }
 }
 
 class Ctx extends TokenContext {
@@ -71,12 +68,9 @@ class ExpressionContainer extends Ctx {
   }
 
   onStart() {
-    this.token.type = this.token.value == '${' ? 'template-expression-start' : 'bracket'
+    console.log(this.prevContext())
   }
 
-  onEnd() {
-    this.token.type = 'porco dio'
-  }
 }
 
 class TempateLiteral extends Ctx {

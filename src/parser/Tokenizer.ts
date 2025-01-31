@@ -262,12 +262,12 @@ class Tokenizer {
 
                 if (this.is.space(this.char.curr) || this.tokens.has(this.char.curr)) {
                   // is kw
+                  this.token.type = 'keyword';
 
                   if (this.Context.has(kw)) {
                     this.Context.check(kw);
                   }
 
-                  this.token.type = 'keyword';
                   return this.token;
                 }
 
