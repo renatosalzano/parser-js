@@ -68,19 +68,22 @@ class TempateLiteral extends Ctx {
 
   onStart() {
     this.skipWhitespace(false);
-    if (this.char.curr === '`') {
-      this.increment();
+    if (this.token.eq('`')) {
+      this.token.type = 'template-start';
+    } else {
+      this.token.type = 'string';
     }
   }
 
   onEnd() {
-    this.Token.type = 'string';
+    console.log('end template', this)
+    this.token.type = 'template-end';
   }
 
   tokenize() {
-    if (this.state.expression) {
+    if (this.state.expression || this.char.curr == '`') {
       // expected end
-      this.Token.type = 'string';
+      this.token.type = 'string';
     } else {
       return 'next';
     }

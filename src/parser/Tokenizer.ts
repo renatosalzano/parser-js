@@ -184,7 +184,9 @@ class Tokenizer {
 
   tokenize_type = () => {
 
-    // check active context
+    if (this.Context.active()) {
+      return;
+    };
 
     switch (true) {
       case (this.is.nl(this.char.curr)): {
@@ -259,6 +261,12 @@ class Tokenizer {
                 this.token.value += kw;
 
                 if (this.is.space(this.char.curr) || this.tokens.has(this.char.curr)) {
+                  // is kw
+
+                  if (this.Context.has(kw)) {
+                    this.Context.check(kw);
+                  }
+
                   this.token.type = 'keyword';
                   return this.token;
                 }
@@ -636,15 +644,6 @@ class Tokenizer {
       log('source end;y');
 
       this.source_end = true;
-
-      // if (this.pairs_buffer.length > 0) {
-      //   throw {
-      //     title: 'Token not found',
-      //     message: `token '' was not found before end of source'`,
-      //     at: 'Tokenizer.api.traverseTokens',
-      //     type: 'error'
-      //   }
-      // }
 
       this.History.last_token();
     }

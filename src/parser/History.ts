@@ -54,68 +54,8 @@ class History {
 
       const { value, type, start, end, loc } = last_token;
 
-      this.Tokenizer.token.value = value;
-      this.Tokenizer.token.type = type;
-
-      this.Tokenizer.token.start = start;
-      this.Tokenizer.token.end = end;
-
-      this.Tokenizer.token.loc.start.ln = loc.start.ln;
-      this.Tokenizer.token.loc.start.col = loc.start.col;
-      this.Tokenizer.token.loc.end.ln = loc.end.ln;
-      this.Tokenizer.token.loc.end.col = loc.end.col;
-    }
-  }
-
-  get_next = (): Token | undefined => {
-    const next_token_index = this.tokens_buffer[0];
-    if (next_token_index !== undefined) {
-      const { value, type, start, end, loc } = this.tokens[next_token_index] as Token;
-      const { eq } = this.Tokenizer.token;
-      return { value, type, start, end, loc, eq };
-    }
-  }
-
-  shift = () => {
-
-    if (this.record && this.nested_record) {
-      // the legend of the phantom token
-      return false;
-    }
-
-    if (this.record && this.tokens_to_spend.length > 0) {
-      // free token!
-      const token_index = this.tokens_to_spend.shift()!;
-      log('free token!!!;g', this.tokens[token_index])
-      const { value, type, start, end, loc } = this.tokens[token_index];
       this.set_token({ value, type, start, end, loc });
-      return true;
     }
-
-    if (this.record) return false;
-
-    const token_index = this.tokens_buffer.shift();
-
-    if (token_index !== undefined) {
-      const { value, type, start, end, loc } = this.tokens[token_index];
-
-      const [index, line, pos] = this.history[token_index];
-
-      this.Tokenizer.index = index;
-      this.Tokenizer.line = line;
-      this.Tokenizer.pos = pos;
-
-      this.set_token({
-        value: value,
-        type: type,
-        start: start,
-        end: end,
-        loc: loc,
-      });
-
-      return true;
-    }
-
   }
 
   push = () => {
@@ -151,12 +91,9 @@ class History {
       end: { ln: line, col: pos },
     };
 
-    const token_index = this.tokens.push({ value, type, start: start_index, end: index, loc }) - 1;
-    if (this.record) {
-      this.tokens_buffer.push(token_index);
-    }
+    this.tokens.push({ value, type, start: start_index, end: index, loc });
 
-    this.list.push(`${type} - ${value}`);
+    this.list.push(`${start_line}:${line} ${type} - ${value}`);
   }
 
   compare = (a: [number, number, number], b?: [number, number, number]) => {
@@ -208,55 +145,6 @@ class History {
     if (error) return `${loc.end.ln}:${start}`
     // @ts-ignore
     return `${loc.end.ln}`.cyan() + `:${start},${end}`;
-  }
-
-  /**
-  * start cache tokens
-  */
-  start(each_callback?: (token: Token) => void) {
-
-    if (this.record) {
-      this.nested_record = true;
-    }
-
-    this.record = true;
-    this.tokens_to_spend = [...this.tokens_buffer];
-
-    this.each_callback = each_callback;
-
-    if (this.tokens.length > 0) {
-      this.tokens_buffer.push(this.tokens.length - 1);
-    }
-
-  }
-  /**
-  * stop cache tokens
-  */
-  stop() {
-    this.record = false;
-    this.each_callback = undefined;
-
-    if (this.nested_record) {
-      this.nested_record = false;
-
-      if (this.tokens.length == 1) {
-        // empty token
-        this.Tokenizer.index = 0;
-        this.Tokenizer.line = 1;
-        this.Tokenizer.pos = 1;
-
-        this.set_token();
-      } else {
-        const token_index = this.tokens_buffer[0];
-        const { type, value, start, end, loc } = this.tokens[token_index]!;
-        this.set_token({ type, value, start, end, loc })
-      }
-      this.start();
-    } else {
-
-      this.shift();
-    }
-
   }
 
   JSON = (path: string) => {
