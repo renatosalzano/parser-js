@@ -6,7 +6,7 @@ import { extend } from "./extend";
 import Context from "./Context";
 import Parser from "./Parser";
 
-export type TokenType = 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'special' | 'newline' | 'statement' | 'comment' | '';
+export type TokenType = 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'special' | 'statement' | 'comment' | '';
 export type Token = {
   value: string;
   type: TokenType;
@@ -185,16 +185,19 @@ class Tokenizer {
         if (this.char.curr === '\r') {
           this.advance(1);
         }
+        this.token.type = 'literal';
         this.expected_token = 'newline';
         break;
       };
       case this.is.quote(this.char.curr): {
         this.end_quote = this.char.curr;
         this.advance(1);
+        this.token.type = 'literal';
         this.expected_token = 'string';
         break;
       }
       case this.is.number(this.char.curr): {
+        this.token.type = 'literal';
         this.expected_token = 'number';
         break;
       }
@@ -365,7 +368,7 @@ class Tokenizer {
       }
     },
     newline: () => {
-      this.token.type = 'newline';
+      this.token.subtype = 'newline';
       this.token.value = '\n';
       ++this.index, ++this.pos;
     }
@@ -381,15 +384,16 @@ class Tokenizer {
       if ((this.debug.token || debug) && debug !== 'suppress') {
         let value = (this.token.value || this.char.curr);
         switch (this.token.type) {
-          case 'newline':
-            value = value.replace('\n', '"\\n"');
-            break;
           case 'comment': {
             // @ts-ignore
             console.log(`${this.token.loc.start.ln}`.cyan() + this.token.value.green());
             return;
           }
           case 'literal': {
+            if (this.token.subtype == 'newline') {
+              value = value.replace('\n', '"\\n"');
+              break;
+            }
             if (this.token.subtype == 'string') {
               let line = this.token.loc.start.ln;
               for (const ln of this.token.value.split('\n')) {

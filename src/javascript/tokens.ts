@@ -99,6 +99,7 @@ class TempateLiteral extends Ctx {
     if (this.token.eq('`')) {
       this.token.subtype = 'template-start';
     } else {
+      this.token.type = 'literal';
       this.token.subtype = 'string';
     }
   }
@@ -110,6 +111,7 @@ class TempateLiteral extends Ctx {
   tokenize() {
     if (this.state.expression || this.char.curr == '`') {
       // expected end
+      this.token.type = 'literal';
       this.token.subtype = 'string';
     } else {
       return 'next';

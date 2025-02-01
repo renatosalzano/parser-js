@@ -108,7 +108,6 @@ class History {
     this.tokens.push({ value, type, subtype, start: start_index, end: index, loc });
 
     this.list.push(`${start_line}:${line} ${type} - ${value}`);
-    console.log(this.Tokenizer.Context.curr_ctx?.name, value == ' ')
   }
 
 
