@@ -1,7 +1,7 @@
 import Tokenizer from "./Tokenizer";
 
 
-export function create_token_finder(Tokenizer: Tokenizer, type: 'keywords' | 'tokens', max_length: number) {
+export function create_token_finder(Tokenizer: Tokenizer, type: 'keywords' | 'tokens' | 'identifiers', max_length: number) {
 
   const cases: string[] = [];
 

@@ -11,9 +11,11 @@ namespace ParserConfig {
       operator?: string[];
       bracket?: string[];
       keyword?: string[];
+      statement?: string[];
       separator?: string[];
       specialToken?: string[];
       comment?: string[][];
+      builtIn?: string[];
       context?: Function[];
     }
     parser: Parser

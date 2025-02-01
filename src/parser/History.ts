@@ -17,8 +17,6 @@ class History {
   record = false;
   nested_record = false;
 
-  each_callback?: (token: Token) => void;
-
   constructor(public Tokenizer: Tokenizer) {
     this.current = [0, 1, 1];
   }
@@ -140,10 +138,6 @@ class History {
     writeFileSync(path, JSON.stringify(this.list, null, 2))
     console.log('JSON')
   }
-
-  // Parser
-
-
 
 }
 

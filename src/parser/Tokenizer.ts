@@ -51,11 +51,14 @@ class Tokenizer {
 
   tokens = new Map<string, TokenType>();
 
-  max_len = { token: 1, keyword: 1 };
+  max_len = { token: 1, keyword: 1, identifier: 1 };
   get_token = create_token_finder(this, 'tokens', 1);
 
-  keywords = new Map<string, string>();
+  keywords = new Map<string, TokenType>();
   get_keyword = create_token_finder(this, 'keywords', 1);
+
+  identifiers = new Set<string>();
+  get_identifier = create_token_finder(this, 'identifiers', 1);
 
   comment_token = new Map<string, { multiline: boolean, end_token: string }>();
 
@@ -258,7 +261,7 @@ class Tokenizer {
 
                 if (this.is.space(this.char.curr) || this.tokens.has(this.char.curr)) {
                   // is kw
-                  this.token.type = 'keyword';
+                  this.token.type = this.keywords.get(kw) || 'keyword';
 
                   if (this.Context.has(kw)) {
                     this.Context.check(kw);
@@ -405,8 +408,7 @@ class Tokenizer {
             }
           }
         }
-
-        log(this.History.log(), this.token.type + ';m', value)
+        log(this.History.log(), this.token.type + ';m', value, (this.token.subtype || '') + ';g')
       }
     }
 

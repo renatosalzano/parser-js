@@ -30,21 +30,33 @@ export type ParserObject = {
 
 let plugin_name: string;
 export function extend(this: Tokenizer, name: string, tokens: any, parser: Ctor<Parser>) {
+
   plugin_name = name;
 
-  const { context = [], keyword = [], operator = [], bracket = [], separator = [], specialToken = [], comment = [] } = tokens;
+  const {
+    context = [],
+    statement = [],
+    keyword = [],
+    operator = [],
+    bracket = [],
+    separator = [],
+    specialToken = [],
+    comment = [],
+    builtIn = []
+  } = tokens;
+
   extend_tokens.call(this, 'bracket', bracket);
   extend_tokens.call(this, 'keyword', keyword);
   extend_tokens.call(this, 'operator', operator);
   extend_tokens.call(this, 'separator', separator);
+  extend_tokens.call(this, 'statement', statement);
   extend_tokens.call(this, 'special', specialToken);
   extend_tokens.call(this, 'comment', comment);
+  extend_tokens.call(this, 'built-in', builtIn);
 
   this.Context.extend(context);
 
   log('extend parser;y');
-
-  console.log(parser)
 
   extend_parser.call(this, parser);
 
@@ -52,7 +64,9 @@ export function extend(this: Tokenizer, name: string, tokens: any, parser: Ctor<
 
 }
 
-function extend_tokens(this: Tokenizer, type: TokenType, tokens: string[] | string[][]) {
+function extend_tokens(this: Tokenizer, type: TokenType | 'built-in', tokens: string[] | string[][]) {
+
+  const warn = (token: string) => log(`duplicate "${token}" in;y`, `${plugin_name};g`, `> ${type};y`)
 
   if (type === 'comment') {
 
@@ -85,11 +99,28 @@ function extend_tokens(this: Tokenizer, type: TokenType, tokens: string[] | stri
 
   for (const token of tokens as string[]) {
 
-    if (this.tokens.has(token)) {
-      log(`warn: duplicate "${token}" found in ${type};y`);
-    } else {
+    switch (true) {
+      case (type == 'built-in'): {
 
-      if (this.is.alpha(token) || type === 'keyword') {
+        if (this.identifiers.has(token)) {
+          warn(token);
+        }
+
+        this.identifiers.add(token);
+
+        if (token.length > this.max_len.identifier) {
+          this.max_len.identifier = token.length;
+
+          this.get_identifier = create_token_finder(this, 'identifiers', token.length);
+        }
+
+        break;
+      }
+      case (type == 'keyword' || this.is.alpha(token)): {
+
+        if (this.keywords.has(token)) {
+          warn(token);
+        }
 
         this.keywords.set(token, type);
 
@@ -99,7 +130,14 @@ function extend_tokens(this: Tokenizer, type: TokenType, tokens: string[] | stri
           this.get_keyword = create_token_finder(this, 'keywords', token.length);
         }
 
-      } else {
+        break;
+      }
+      default: {
+
+        if (this.tokens.has(token)) {
+          warn(token);
+        }
+
         this.tokens.set(token, type);
 
         if (token.length > this.max_len.token) {
@@ -107,11 +145,15 @@ function extend_tokens(this: Tokenizer, type: TokenType, tokens: string[] | stri
 
           this.get_token = create_token_finder(this, 'tokens', token.length);
         }
+
       }
-    }
+
+    } // end
+
   }
 
 }
+
 
 //
 

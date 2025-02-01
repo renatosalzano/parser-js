@@ -1,4 +1,4 @@
-import { TokenContext } from "parser/Context";
+import { TokenContext } from 'parser/Context';
 
 const operator = [
   '+', '-', '*', '/', '%', '**',
@@ -40,11 +40,11 @@ const keyword = ['true', 'false', 'null', 'this', 'super', 'yield', 'async'];
 const statement = [
   'var', 'const', 'let', 'function',
   'if', 'else',
-  'switch', 'for', 'while',
-  'return',
+  'switch', 'for', 'while', 'do',
+  'return', 'continue', 'break',
   'try', 'catch', 'throw',
+  'import', 'export', 'default',
   'with', // deprecated
-  'import', 'export', 'default'
 ]
 
 const specialToken = ['=>', '...', '?.', '`', '${'];
@@ -52,6 +52,21 @@ const specialToken = ['=>', '...', '?.', '`', '${'];
 const comment = [
   ['//'],
   ['/*', '*/']
+]
+
+const builtIn = [
+  'eval', 'isFinite', 'isNaN', 'parseFloat', 'parseInt', 'decodeURI', 'decodeURIComponent', 'encodeURI', 'encodeURIComponent', 'escape', 'unescape',
+  'Object', 'Function', 'Boolean', 'Symbol',
+  'Error', 'AggregateError', 'EvalError', 'RangeError', 'ReferenceError', 'SyntaxError', 'TypeError', 'URIError', 'InternalError',
+  'Number', 'BigInt', 'Math', 'Date', 'Temporal', 'String', 'RegExp',
+  'Array', 'Int8Array', 'Uint8Array', 'Uint8ClampedArray', 'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array', 'BigInt64Array', 'BigUint64Array', 'Float16Array', 'Float32Array', 'Float64Array',
+  'Map', 'Set', 'WeakMap', 'WeakSet',
+  'prototype', 'constructor',
+  'ArrayBuffer', 'SharedArrayBuffer', 'DataView', 'Atomics', 'JSON',
+  'WeakRef', 'FinalizationRegistry',
+  'Iterator', 'AsyncIterator', 'Promise', 'GeneratorFunction', 'AsyncGeneratorFunction', 'Generator', 'AsyncGenerator', 'AsyncFunction',
+  'Reflect', 'Proxy',
+  'Intl',
 ]
 
 class Declarator extends TokenContext {
@@ -133,6 +148,7 @@ class TagStart extends Ctx {
 }
 
 export const tokens = {
+  builtIn,
   bracket,
   comment,
   keyword,
