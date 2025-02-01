@@ -8,9 +8,12 @@ export default (config: any) => {
     tokens,
     parser: class extends Parser {
       Program() {
-        console.log('program from js')
-        console.log(this.token);
-        console.log(this.nextToken);
+        console.log('before', this.token)
+        this.traverse('{', '{').then(() => {
+          console.log(this.token)
+        });
+
+        console.log('after traverse', this.token)
       }
     }
   }

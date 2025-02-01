@@ -475,7 +475,7 @@ class Tokenizer {
   start = (source: string) => {
     log('tokenize start;y');
     this.source = source;
-    this.debug.token = true;
+    // this.debug.token = true;
     try {
 
       while (!this.source_end) {
@@ -497,7 +497,16 @@ class Tokenizer {
     }
     log('parser start;y');
     this.Parser.next();
-    this.Parser.Program();
+
+    try {
+      this.Parser.Program();
+    } catch (error: any) {
+
+      if (error.type && error.message) {
+        log(` ${error.title || 'Unexpected error'} ;R`, `\n  ${error.message};r`);
+      }
+
+    }
   }
 
 

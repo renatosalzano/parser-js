@@ -168,8 +168,11 @@ function next(this: Tokenizer) {
 
 function traverse_tokens(this: Tokenizer, startToken: string, endToken: string) {
 
-  this.temp = { buffer: [], same_token: startToken == endToken };
+  if (startToken == endToken) {
+    this.error({ title: 'Error', message: 'start and end tokens must be different' });
+  };
 
+  this.temp = { buffer: [] };
 
   const that = this;
   const start_index = this.token_index;
@@ -183,9 +186,9 @@ function traverse_tokens(this: Tokenizer, startToken: string, endToken: string) 
       next_token();
     }
     callback();
+    that.History.get_token(start_index);
     return ({
       eat: () => {
-        that.token_index
       }
     })
   }
@@ -197,7 +200,6 @@ function traverse_tokens(this: Tokenizer, startToken: string, endToken: string) 
   return ({
     eat: () => {
       recursive_next.call(that, startToken, endToken, next_token);
-
       return ({ then });
     },
     each: (callback: (token: Token) => void) => {
@@ -216,14 +218,10 @@ function traverse_tokens(this: Tokenizer, startToken: string, endToken: string) 
 }
 
 
-function recursive_next(this: Tokenizer, ts: string, te: string, next: () => void, each?: (token: Token) => void, layer = 0) {
 
-  let end_recursion = false;
+function recursive_next(this: Tokenizer, ts: string, te: string, next: () => void, each?: (token: Token) => void) {
 
-  this.temp.buffer[layer] = [];
-  const pair = this.temp.buffer[layer][0] && this.temp.buffer[layer][1];
-
-  while (pair) {
+  while (!this.tokens_end) {
 
     next();
 
@@ -231,25 +229,19 @@ function recursive_next(this: Tokenizer, ts: string, te: string, next: () => voi
       each(this.token);
     }
 
-  }
-
-
-
-  if (this.token.value == ts) {
-    this.temp.buffer.push(this.token);
-    recursive_next.call(this, ts, te, next, each);
-    return;
-  }
-
-  if (this.token.value == te) {
-    if (this.temp.same_token && this.token.type != this.temp.buffer.at(-1)?.type) {
-
+    if (this.token.value == ts) {
+      this.temp.buffer.push(0);
+      continue;
     }
-    this.temp.push(this.token);
-  }
 
-  if (!end_recursion) {
-    recursive_next.call(this, ts, te, next, each)
+    if (this.token.value == te) {
+      this.temp.buffer.shift();
+      if (this.temp.buffer.length == 0) {
+        this.temp = undefined;
+        return;
+      }
+    }
+
   }
 
 }
@@ -348,3 +340,4 @@ function extend_parser(this: Tokenizer, Parser: Ctor<Parser>) {
 //   return keys_to_check;
 // }
 
+export type TraverseTokens = ReturnType<typeof traverse_tokens>;

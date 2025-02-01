@@ -1,3 +1,4 @@
+import { TraverseTokens } from "./extend";
 import { Token } from "./Tokenizer";
 
 interface Api {
@@ -12,21 +13,13 @@ class Parser {
     public nextToken: Partial<Token> & { eq: Token['eq'] },
     public next: () => Token,
     public extected: () => boolean,
-    public traverse: () => any
+    public traverse: (startToken: string, endToken: string) => TraverseTokens
   ) {
 
   }
 
   Program() {
 
-  }
-
-  parse() {
-    try {
-
-    } catch (error) {
-      console.error(error);
-    }
   }
 
 

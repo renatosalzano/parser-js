@@ -2,6 +2,7 @@ import { log } from 'utils';
 import Parser from './parser/index';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
+import { TokenContext } from 'parser/Context';
 
 function plugin(config?: any) {
 
@@ -9,11 +10,19 @@ function plugin(config?: any) {
     console.log(prev)
     return {
       name: 'test',
-      parser: () => ({
-        parse_expression() {
-          console.log('override')
-        }
-      })
+      token: {
+        context: [
+          class TagStart extends TokenContext {
+            start = ['<'];
+            end = ['>', '/>']
+
+            onStart() {
+
+            }
+
+          }
+        ]
+      }
     }
   }
 
