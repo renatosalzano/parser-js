@@ -1,6 +1,5 @@
 import Tokenizer from "./Tokenizer";
 
-type GetToken = ((Tokenizer: Tokenizer) => string | undefined);
 
 export function create_token_finder(Tokenizer: Tokenizer, type: 'keywords' | 'tokens', max_length: number) {
 
@@ -11,8 +10,6 @@ export function create_token_finder(Tokenizer: Tokenizer, type: 'keywords' | 'to
     cases.push(`case ${type}.has(${source_slice}):\nreturn ${source_slice}`)
     --max_length;
   }
-
-  // case num:{source}
 
   const ret = 'return (() => {'
     + `const {source,index,${type}} = parser;\n`
@@ -26,3 +23,4 @@ export function create_token_finder(Tokenizer: Tokenizer, type: 'keywords' | 'to
 
   return () => finder(Tokenizer);
 }
+

@@ -3,6 +3,7 @@ import Tokenizer from "./Tokenizer";
 import Program from "./Progam";
 import { create_token_finder } from "./utils";
 import Parser from "./Parser";
+import type { Token, TokenType } from "./Tokenizer";
 // import type { ParserMethod } from "./Tokenizer";
 
 interface Ctor<T> {
@@ -51,7 +52,7 @@ export function extend(this: Tokenizer, name: string, tokens: any, parser: Ctor<
 
 }
 
-function extend_tokens(this: Tokenizer, type: string, tokens: string[] | string[][]) {
+function extend_tokens(this: Tokenizer, type: TokenType, tokens: string[] | string[][]) {
 
   if (type === 'comment') {
 
@@ -112,10 +113,114 @@ function extend_tokens(this: Tokenizer, type: string, tokens: string[] | string[
 
 }
 
+//
+
+function next(this: Tokenizer) {
+  if (this.token_index > this.History.tokens.length - 1) {
+    this.tokens_end = true;
+  }
+  this.History.get_token(this.token_index);
+  ++this.token_index;
+}
+
+
+function traverse_tokens(this: Tokenizer, startToken: string, endToken: string) {
+
+  this.temp = { buffer: [], same_token: startToken == endToken };
+
+
+  const that = this;
+  const start_index = this.token_index;
+
+  const next_token = () => next.call(this);
+  let then_pipe = false;
+
+  function then(callback: () => any) {
+    if (then_pipe) {
+      recursive_next.call(that, startToken, endToken, next_token);
+      next_token();
+    }
+    callback();
+    return ({
+      eat: () => {
+        that.token_index
+      }
+    })
+  }
+
+  function eat(this: Tokenizer) {
+    return ({ then })
+  };
+
+  return ({
+    eat: () => {
+      recursive_next.call(that, startToken, endToken, next_token);
+
+      return ({ then });
+    },
+    each: (callback: (token: Token) => void) => {
+      recursive_next.call(that, startToken, endToken, next_token, callback);
+      return ({
+        eat,
+        then
+      })
+    },
+    then: (callback: () => any) => {
+      then_pipe = true;
+      return then(callback);
+    },
+    catch() { }
+  })
+}
+
+
+function recursive_next(this: Tokenizer, ts: string, te: string, next: () => void, each?: (token: Token) => void, layer = 0) {
+
+  let end_recursion = false;
+
+  this.temp.buffer[layer] = [];
+  const pair = this.temp.buffer[layer][0] && this.temp.buffer[layer][1];
+
+  while (pair) {
+
+    next();
+
+    if (each) {
+      each(this.token);
+    }
+
+  }
+
+
+
+  if (this.token.value == ts) {
+    this.temp.buffer.push(this.token);
+    recursive_next.call(this, ts, te, next, each);
+    return;
+  }
+
+  if (this.token.value == te) {
+    if (this.temp.same_token && this.token.type != this.temp.buffer.at(-1)?.type) {
+
+    }
+    this.temp.push(this.token);
+  }
+
+  if (!end_recursion) {
+    recursive_next.call(this, ts, te, next, each)
+  }
+
+}
+
+
 function extend_parser(this: Tokenizer, Parser: Ctor<Parser>) {
   this.Parser = new Parser(
-    this.api.token,
-    this.api.next
+    this.token,
+    this.next_token,
+    () => next.call(this),
+    () => true,
+    (s: string, e: string) => traverse_tokens.call(this, s, e)
+
   );
 }
 

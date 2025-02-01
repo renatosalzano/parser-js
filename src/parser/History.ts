@@ -31,36 +31,44 @@ class History {
 
   set_token = ({
     value = '',
-    type = 'unknown',
+    type = '',
+    subtype = '',
     start = 0,
     end = 0,
     loc = { start: { ln: 0, col: 0 }, end: { ln: 0, col: 0 } }
-  }: token = {} as token) => {
-    this.Tokenizer.token.value = value;
-    this.Tokenizer.token.type = type;
+  }: token = {} as token, token: 'token' | 'next_token' = 'token') => {
+    this.Tokenizer[token].value = value;
+    this.Tokenizer[token].type = type;
 
-    this.Tokenizer.token.start = start;
-    this.Tokenizer.token.end = end;
+    if (subtype) {
+      this.Tokenizer[token].subtype = subtype;
+    }
 
-    this.Tokenizer.token.loc.start.ln = loc.start.ln;
-    this.Tokenizer.token.loc.start.col = loc.start.col;
-    this.Tokenizer.token.loc.end.ln = loc.end.ln;
-    this.Tokenizer.token.loc.end.col = loc.end.col;
+    this.Tokenizer[token].start = start;
+    this.Tokenizer[token].end = end;
+
+    if (this.Tokenizer[token].loc) {
+      this.Tokenizer[token].loc.start.ln = loc.start.ln;
+      this.Tokenizer[token].loc.start.col = loc.start.col;
+      this.Tokenizer[token].loc.end.ln = loc.end.ln;
+      this.Tokenizer[token].loc.end.col = loc.end.col;
+    }
+
   }
 
   get_token = (index: number) => {
     const token = this.tokens[index];
     this.set_token(token);
+
+    if (this.tokens[index + 1]) {
+      this.set_token(this.tokens[index + 1], 'next_token');
+    }
+
   }
 
   last_token = () => {
     const last_token = this.tokens.at(-1);
-    if (last_token) {
-
-      const { value, type, start, end, loc } = last_token;
-
-      this.set_token({ value, type, start, end, loc });
-    }
+    if (last_token) this.set_token(last_token);
   }
 
   push = () => {
@@ -75,7 +83,7 @@ class History {
 
     this.current = [index, line, pos];
 
-    const { value, type } = this.Tokenizer.token;
+    const { value, type, subtype } = this.Tokenizer.token;
     const { token_start: [start_index, start_line, start_pos] } = this;
 
     // add location
@@ -83,6 +91,7 @@ class History {
     this.set_token({
       value,
       type,
+      subtype,
       start: start_index,
       end: index,
       loc: {
@@ -96,10 +105,12 @@ class History {
       end: { ln: line, col: pos },
     };
 
-    this.tokens.push({ value, type, start: start_index, end: index, loc });
+    this.tokens.push({ value, type, subtype, start: start_index, end: index, loc });
 
     this.list.push(`${start_line}:${line} ${type} - ${value}`);
+    console.log(this.Tokenizer.Context.curr_ctx?.name, value == ' ')
   }
+
 
   compare = (a: [number, number, number], b?: [number, number, number]) => {
     if (b) {
@@ -110,32 +121,6 @@ class History {
     }
   }
 
-  eat = () => {
-    const last_token_index = this.tokens_buffer.at(-1);
-    if (last_token_index !== undefined) {
-      log('eat called')
-
-      const { value, type, start, end, loc } = this.tokens[last_token_index];
-
-      this.Tokenizer.index = end;
-      this.Tokenizer.line = loc.end.ln;
-      this.Tokenizer.pos = loc.end.col;
-
-      this.Tokenizer.token.value = value;
-      this.Tokenizer.token.type = type;
-
-      this.Tokenizer.token.start = start;
-      this.Tokenizer.token.end = end;
-
-      this.Tokenizer.token.loc.start.ln = loc.start.ln;
-      this.Tokenizer.token.loc.start.col = loc.start.col;
-      this.Tokenizer.token.loc.end.ln = loc.end.ln;
-      this.Tokenizer.token.loc.end.col = loc.end.col;
-
-      this.tokens_buffer = [];
-      this.Tokenizer.next();
-    }
-  }
 
   location = () => {
     const [i, l, p] = this.history.at(-1) || this.current;

@@ -15,7 +15,9 @@ const operator = [
   '|=', '&=', '^=',
 
   '&', '|', '^', '~', '<<', '>>', '>>>', '>>>=',
-  'new', 'typeof', 'delete', 'void'
+  'new', 'typeof', 'delete', 'void',
+
+  'await'
 ];
 
 export const op = {
@@ -33,7 +35,17 @@ const bracket = ['(', ')', '[', ']', '{', '}'];
 
 const separator = [',', ':', ';', '\n'];
 
-const keyword = ['true', 'false', 'null', 'this', 'super', 'yield'];
+const keyword = ['true', 'false', 'null', 'this', 'super', 'yield', 'async'];
+
+const statement = [
+  'var', 'const', 'let', 'function',
+  'if', 'else',
+  'switch', 'for', 'while',
+  'return',
+  'try', 'catch', 'throw',
+  'with', // deprecated
+  'import', 'export', 'default'
+]
 
 const specialToken = ['=>', '...', '?.', '`', '${'];
 
@@ -46,13 +58,13 @@ class Declarator extends TokenContext {
   name = 'declarator';
   start = ['var', 'const', 'let', 'function'];
 
-  onBefore(cancel: () => void) {
-    // cancel();
-  }
+  // onBefore(cancel: () => void) {
+  //   // cancel();
+  // }
 
   onStart() {
-    this.token.type = 'declarator';
-
+    this.token.subtype = 'declarator';
+    console.log(this.token)
   }
 
 }
@@ -72,10 +84,6 @@ class ExpressionContainer extends Ctx {
     expression: true
   }
 
-  onStart() {
-    console.log(this.prevContext())
-  }
-
 }
 
 class TempateLiteral extends Ctx {
@@ -89,20 +97,20 @@ class TempateLiteral extends Ctx {
   onStart() {
     this.skipWhitespace(false);
     if (this.token.eq('`')) {
-      this.token.type = 'template-start';
+      this.token.subtype = 'template-start';
     } else {
-      this.token.type = 'string';
+      this.token.subtype = 'string';
     }
   }
 
   onEnd() {
-    this.token.type = 'template-end';
+    this.token.subtype = 'template-end';
   }
 
   tokenize() {
     if (this.state.expression || this.char.curr == '`') {
       // expected end
-      this.token.type = 'string';
+      this.token.subtype = 'string';
     } else {
       return 'next';
     }
@@ -128,6 +136,7 @@ export const tokens = {
   keyword,
   operator,
   separator,
+  statement,
   specialToken,
   context: [
     Declarator,

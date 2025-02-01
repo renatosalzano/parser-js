@@ -9,11 +9,8 @@ export default (config: any) => {
     parser: class extends Parser {
       Program() {
         console.log('program from js')
-        this.next();
-        this.next();
-        this.next();
-        this.next();
         console.log(this.token);
+        console.log(this.nextToken);
       }
     }
   }

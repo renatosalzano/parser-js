@@ -2,14 +2,15 @@ import { log } from "utils";
 import History from "./History";
 import Program from "./Progam";
 import { create_token_finder } from "./utils";
-import { extend, ParserObject } from "./extend";
+import { extend } from "./extend";
 import Context from "./Context";
 import Parser from "./Parser";
 
-export type TokenType<T> = 'string' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'number' | 'special' | 'newline' | T;
+export type TokenType = 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'special' | 'newline' | 'statement' | 'comment' | '';
 export type Token = {
   value: string;
-  type: string;
+  type: TokenType;
+  subtype?: string;
   start: number;
   end: number;
   loc: { start: { ln: number; col: number }; end: { ln: number; col: number } };
@@ -48,7 +49,7 @@ class Tokenizer {
 
   program = new Map<string, Function>();
 
-  tokens = new Map<string, string>();
+  tokens = new Map<string, TokenType>();
 
   max_len = { token: 1, keyword: 1 };
   get_token = create_token_finder(this, 'tokens', 1);
@@ -62,20 +63,11 @@ class Tokenizer {
 
   token_index = 0;
 
-  api = {
-    token: {} as Token,
-    next: () => {
-      this.History.get_token(this.token_index);
-      ++this.token_index;
-    }
-  }
-
   constructor() {
     this.Program = new Program();
-    this.api.token = this.token;
   }
 
-
+  temp: any;
   extend = (...plugin: [string, any, any]) => extend.apply(this, plugin);
 
   is = {
@@ -95,7 +87,7 @@ class Tokenizer {
 
   token: Token = {
     value: '',
-    type: 'unknown',
+    type: '',
     start: 0,
     end: 0,
     loc: {
@@ -104,19 +96,21 @@ class Tokenizer {
     },
     eq(_: string | RegExp) {
       if (_ instanceof RegExp) {
-        switch (true) {
-          case (_.test(this.value)):
-            return true;
-          case (_.test(this.type)):
-            return true;
-        }
-        return false;
+        return _.test(this.value) || _.test(this.type);
       }
       return this.value === _ || this.type === _;
     }
   }
 
-  next_token: Partial<Token> = {};
+  next_token: Partial<Token> = {
+    eq(_: string | RegExp) {
+      if (!this.value || !this.type) return false;
+      if (_ instanceof RegExp) {
+        return _.test(this.value) || _.test(this.type);
+      }
+      return this.value === _ || this.type === _;
+    }
+  };
 
   expected_token: keyof Tokenizer['tokenize'] = 'token';
   check_nl = false;
@@ -226,6 +220,7 @@ class Tokenizer {
 
                   if (multiline) {
                     this.expected_token = 'comment_ml';
+                    this.token.subtype = 'multiline';
                   } else {
                     this.expected_token = 'comment';
                   }
@@ -289,7 +284,6 @@ class Tokenizer {
     if (this.debug.checkToken) log('check token;c', 'expected:;g', this.expected_token);
   }
 
-  comment_type = { multiline: false, end_token: '' };
 
   end_quote = '';
   end_token = '';
@@ -300,7 +294,7 @@ class Tokenizer {
         return "next";
       } else {
         // end
-        this.token.type = 'number';
+        this.token.subtype = 'number';
       }
     },
     // keyword: () => {
@@ -337,7 +331,7 @@ class Tokenizer {
         default: {
           // end "string"
           this.end_quote = '';
-          this.token.type = 'string';
+          this.token.subtype = 'string';
           this.advance(1)
           return;
         }
@@ -377,191 +371,11 @@ class Tokenizer {
     }
   }
 
-  // eat = (from: string, to?: string) => {
-
-  //   // if (sequence !== this.next(breakReg)) {
-  //   //   this.prev();
-  //   // }
-  // }
-
-  // expected = (comparator?: string | ((token: Partial<Token>) => boolean), debug = false) => {
-  //   this.debug.expected = true;
-
-  //   const print = (message = 'get cached;y') => {
-  //     if (this.debug.expected || debug) {
-  //       log(this.History.log(), message, this.next_token.type + ';m', this.next_token.value);
-  //     }
-  //   }
-
-  //   const next_token_cached = this.History.get_next();
-
-  //   if (next_token_cached) {
-
-  //     if (Object.values(this.next_token).length === 0) {
-  //       Object.assign(this.next_token, next_token_cached);
-  //     }
-
-  //     print();
-
-  //   } else {
-
-  //     this.History.start();
-  //     const { value, type, start, end, ...t } = this.next("suppress");
-  //     this.History.stop();
-
-  //     Object.assign(this.next_token, t);
-  //     this.next_token.value = value;
-  //     this.next_token.type = type;
-  //     this.next_token.start = start;
-  //     this.next_token.end = end;
-
-  //     print('cache next token;y');
-  //   }
-
-  //   let expected = false;
-
-  //   if (comparator) {
-
-  //     if (typeof comparator === 'function') {
-  //       expected = comparator(this.next_token);
-
-  //       if (this.debug.expected || debug) {
-  //         log('expected test:;c', this.next_token.value, this.next_token.type, '=>;m', expected);
-  //       }
-  //     } else {
-  //       expected = this.next_token.value === comparator || this.next_token.type === comparator;
-
-  //       if (this.debug.expected || debug) {
-  //         log('expected test:;c', comparator, 'eq;m', this.next_token.value, '|;m', this.next_token.type, expected);
-  //       }
-  //     }
-  //   }
-
-  //   return expected;
-  // }
-
-  // traverse_tokens = (startToken: string, endToken: string) => {
-
-  //   const { History, next, init_recursive_next } = this;
-  //   let then_pipe = false;
-
-  //   function then(callback: () => any) {
-
-  //     History.start();
-  //     if (then_pipe) {
-  //       init_recursive_next(startToken, endToken);
-  //       next();
-  //     }
-  //     callback();
-  //     History.stop();
-
-  //     return ({ eat: () => { History.eat() } })
-  //   }
-
-  //   function eat(this: Tokenizer) {
-  //     History.eat();
-  //     return ({ then })
-  //   };
-
-
-  //   return ({
-  //     eat: () => {
-  //       History.start();
-  //       init_recursive_next(startToken, endToken);
-  //       History.stop();
-  //       History.eat();
-
-  //       return ({ then });
-  //     },
-  //     each: (callback: (token: Token) => void) => {
-
-  //       History.start(callback);
-  //       init_recursive_next(startToken, endToken);
-  //       History.stop();
-
-  //       return ({
-  //         eat,
-  //         then
-  //       })
-  //     },
-  //     then: (callback: () => any) => {
-  //       then_pipe = true;
-  //       return then(callback);
-  //     },
-  //     catch() { }
-  //   })
-  // }
-
-  // pairs_buffer: number[][] = [];
-  // get_ref = () => this.token.start;
-
-  // init_recursive_next = (ts: string, te: string) => {
-
-  //   if (!this.expected(ts)) {
-  //     this.error({ message: 'Invalid' });
-  //   }
-
-  //   if (this.Context.has(ts)) {
-  //     this.get_ref = () => this.Context.len();
-  //   }
-
-  //   console.log('after expected', this.Token)
-
-  //   this.recursive_next(ts, te);
-  // }
-
-  // recursive_next = (ts: string, te: string, layer = 0) => {
-
-  //   const t = this.token;
-  //   let end_recursion = true;
-
-  //   this.pairs_buffer[layer] = [];
-
-  //   next: while (!this.source_end) {
-
-  //     this.next();
-
-  //     switch (true) {
-  //       case (t.value == ts && !this.pairs_buffer[layer][0]): {
-  //         console.log('ts found')
-  //         this.pairs_buffer[layer][0] = this.get_ref();
-  //         break;
-  //       }
-  //       case (t.value == ts && !!this.pairs_buffer[layer][0]): {
-  //         if (this.get_ref() !== this.pairs_buffer[layer][0]) {
-  //           console.log('new layer')
-  //         }
-  //       }
-  //     }
-
-  //   }
-
-
-  //   // if (t.value == ts && !this.pairs_buffer[layer][0]) {
-  //   //   this.pairs_buffer[layer][0] = t.start;
-  //   // }
-
-  //   // if (t.value == te && !this.pairs_buffer[layer][1]) {
-
-  //   //   this.pairs_buffer.pop();
-
-  //   //   if (this.pairs_buffer.length === 0) {
-  //   //     end_recursion = true;
-  //   //   }
-  //   // }
-
-  //   if (!end_recursion) {
-  //     this.recursive_next(ts, te, layer);
-  //   } else {
-  //     this.pairs_buffer = [];
-  //   }
-
-  // }
-
   next = (debug: boolean | 'suppress' = false) => {
 
     this.token.value = '';
     this.token.type = '';
+    delete this.token.subtype;
 
     const print = () => {
       if ((this.debug.token || debug) && debug !== 'suppress') {
@@ -575,22 +389,22 @@ class Tokenizer {
             console.log(`${this.token.loc.start.ln}`.cyan() + this.token.value.green());
             return;
           }
-          case 'string': {
-            let line = this.token.loc.start.ln;
-            for (const ln of this.token.value.split('\n')) {
-              // @ts-ignore
-              console.log(`${line}`.cyan() + ':' + `"${ln}"`.yellow());
-              ++line;
+          case 'literal': {
+            if (this.token.subtype == 'string') {
+              let line = this.token.loc.start.ln;
+              for (const ln of this.token.value.split('\n')) {
+                // @ts-ignore
+                console.log(`${line}`.cyan() + ':' + `"${ln}"`.yellow());
+                ++line;
+              }
+              return;
             }
-            return;
           }
         }
 
         log(this.History.log(), this.token.type + ';m', value)
       }
     }
-
-    // this.Context.load();
 
     this.skip_ws();
 
@@ -626,7 +440,7 @@ class Tokenizer {
           this.History.push();
           print();
 
-          if (this.token.type === '') {
+          if (this.token.type == '') {
             throw { title: 'Tokenizer Error:', message: 'token.type miss', type: 'error' }
           }
 
@@ -650,11 +464,12 @@ class Tokenizer {
   }
 
   source_end = false;
+  tokens_end = false;
 
   start = (source: string) => {
     log('tokenize start;y');
     this.source = source;
-    // this.debug.token = true;
+    this.debug.token = true;
     try {
 
       while (!this.source_end) {
@@ -675,6 +490,7 @@ class Tokenizer {
       this.start(source);
     }
     log('parser start;y');
+    this.Parser.next();
     this.Parser.Program();
   }
 
@@ -758,7 +574,6 @@ class Tokenizer {
   }
 
 }
-
 
 
 export default Tokenizer

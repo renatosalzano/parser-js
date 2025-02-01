@@ -121,6 +121,7 @@ class Context {
       Object.freeze(ctx.state);
 
       this.ctx_state.set(Ctx, ctx.state);
+
     }
 
   }
@@ -171,7 +172,6 @@ class Context {
 
       this.buffer.push(ctx);
       this.ctx_to_load = this.buffer.at(-1)!;
-
       if (ctx.onStart) ctx.onStart();
     }
   }
