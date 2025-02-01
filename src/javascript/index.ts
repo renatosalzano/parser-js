@@ -8,12 +8,30 @@ export default (config: any) => {
     tokens,
     parser: class extends Parser {
       Program() {
-        console.log('before', this.token)
-        this.traverse('{', '{').then(() => {
-          console.log(this.token)
-        });
+        switch (this.token.type) {
+          case "statement": {
+            switch (this.token.value) {
+              case 'const':
+              case 'let':
+              case 'var':
+                this.Variable(this.token.value);
+                break;
+            }
+            break;
+          }
+          case "literal":
+          case "operator":
+          case "bracket":
+          case "keyword":
+          case "separator":
+          case "identifier":
+          case "special":
+          case "comment":
+        }
+      }
 
-        console.log('after traverse', this.token)
+      Variable(kind: string, implicit = false) {
+        console.log('variable')
       }
     }
   }

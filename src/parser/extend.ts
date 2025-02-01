@@ -64,6 +64,7 @@ export function extend(this: Tokenizer, name: string, tokens: any, parser: Ctor<
 
 }
 
+
 function extend_tokens(this: Tokenizer, type: TokenType | 'built-in', tokens: string[] | string[][]) {
 
   const warn = (token: string) => log(`duplicate "${token}" in;y`, `${plugin_name};g`, `> ${type};y`)
@@ -155,14 +156,25 @@ function extend_tokens(this: Tokenizer, type: TokenType | 'built-in', tokens: st
 }
 
 
-//
+// PARSER API
 
 function next(this: Tokenizer) {
+
   if (this.token_index > this.History.tokens.length - 1) {
     this.tokens_end = true;
+    this.History.last_token();
+    return;
   }
+
   this.History.get_token(this.token_index);
   ++this.token_index;
+
+  if (this.skip_comment && this.token.type == 'comment') {
+    next.call(this);
+  } else {
+    console.log('after cccal', this.token)
+  }
+
 }
 
 
@@ -218,7 +230,6 @@ function traverse_tokens(this: Tokenizer, startToken: string, endToken: string) 
 }
 
 
-
 function recursive_next(this: Tokenizer, ts: string, te: string, next: () => void, each?: (token: Token) => void) {
 
   while (!this.tokens_end) {
@@ -248,96 +259,16 @@ function recursive_next(this: Tokenizer, ts: string, te: string, next: () => voi
 
 
 function extend_parser(this: Tokenizer, Parser: Ctor<Parser>) {
+
   this.Parser = new Parser(
     this.token,
     this.next_token,
     () => next.call(this),
     () => true,
-    (s: string, e: string) => traverse_tokens.call(this, s, e)
-
+    (s: string, e: string) => traverse_tokens.call(this, s, e),
+    (skip_comment = true) => this.skip_comment = skip_comment
   );
 }
 
-// function extend_parser(this: Tokenizer, program: { [key: string]: { [key: string]: any } }) {
-
-//   const keys_to_check = new Set<string>();
-
-//   for (const name of Object.keys(program)) {
-
-//     if (!program[name]?.keyword && !program[name]?.token) {
-//       log(`invalid Parser ${name};r`);
-//       continue;
-//     }
-
-//     const key = program[name].hasOwnProperty('keyword') ? 'keyword' : 'token';
-
-//     program[name].token = new Map(Object.entries(program[name][key]));
-
-//     delete program[name].keyword;
-
-//     const Parser = program[name] as ParserObject;
-
-//     Parser.name = name;
-//     Parser.props = Parser.props || {};
-
-//     if (key === 'keyword') {
-
-//       const Parser_keyword: string[] = []
-
-//       for (const [token] of Parser.token) {
-
-//         if (this.is.alpha(token)) {
-//           if (!this.keywords.has(token)) {
-//             // Parser.keyword.set(lexical, name);
-//             Parser_keyword.push(token)
-//           } else {
-//             Parser.token.delete(token);
-//             log(`duplicate keyword "${token}", found in Parser: ${name};r`);
-//           }
-//         } else {
-//           Parser.token.delete(token);
-//           log(`invalid "${token}", should be [a-z] found in Parser: ${name};r`);
-//         }
-//       }
-
-//       extend_tokens.call(this, 'keyword', Parser_keyword);
-//     }
-
-
-//     Parser.has = (token: string, parse?: boolean) => {
-//       const check = Parser.token.has(token);
-//       if (check && parse) {
-//         let props = Parser.token.get(token) || {};
-//         this.parser[name]({ ...Parser.props, ...props });
-//       }
-//       return check;
-//     }
-
-//     Parser.start = (props = {}) => {
-//       props = { ...Parser.props, ...props };
-//       return this.parser[name](props);
-//     }
-
-//     for (const [token] of Parser.token) {
-//       this.program.set(token, () => Parser.has(token, true))
-//     }
-
-//     if (Parser?.default) {
-//       if (this.program.has('default')) {
-//         log(`default Parser is setted to "${Parser.name}";y`)
-//       }
-//       this.program.set('default', Parser.start);
-//     }
-
-//     Object.freeze(Parser);
-
-//     this.api.$[name] = Parser;
-
-//     keys_to_check.add(name);
-
-//   } // end for
-
-//   return keys_to_check;
-// }
 
 export type TraverseTokens = ReturnType<typeof traverse_tokens>;

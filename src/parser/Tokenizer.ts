@@ -6,10 +6,10 @@ import { extend } from "./extend";
 import Context from "./Context";
 import Parser from "./Parser";
 
-export type TokenType = 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'special' | 'statement' | 'comment' | '';
+export type TokenType = 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'special' | 'statement' | 'comment';
 export type Token = {
   value: string;
-  type: TokenType;
+  type: TokenType | '';
   subtype?: string;
   start: number;
   end: number;
@@ -43,11 +43,8 @@ class Tokenizer {
   source = '';
 
   Parser = {} as Parser;
-  Program: Program;
   History = new History(this);
   Context = new Context(this);
-
-  program = new Map<string, Function>();
 
   tokens = new Map<string, TokenType>();
 
@@ -62,12 +59,10 @@ class Tokenizer {
 
   comment_token = new Map<string, { multiline: boolean, end_token: string }>();
 
-  parser: { [key: string]: Function } = {};
-
   token_index = 0;
 
   constructor() {
-    this.Program = new Program();
+
   }
 
   temp: any;
@@ -116,9 +111,11 @@ class Tokenizer {
   };
 
   expected_token: keyof Tokenizer['tokenize'] = 'token';
+
   check_nl = false;
-  skip_newline = true;
+  skip_newline = false;
   skip_whitespace = true;
+  skip_comment = true;
 
   debug: DebugNext = {};
 
@@ -127,6 +124,7 @@ class Tokenizer {
     this.char.next = this.source[this.index + 1];
   }
 
+
   advance = (value: number) => {
     while (value > 0) {
       ++this.index, ++this.pos;
@@ -134,6 +132,7 @@ class Tokenizer {
       --value;
     }
   }
+
 
   skip_ws = () => {
 
@@ -165,6 +164,7 @@ class Tokenizer {
 
   }
 
+
   check_new_line() {
     if (/[\r\n]/.test(this.char.curr)) {
 
@@ -176,6 +176,7 @@ class Tokenizer {
       if (this.debug.newline) log('Ln:;c', this.line);
     }
   }
+
 
   tokenize_type = () => {
 
@@ -303,29 +304,6 @@ class Tokenizer {
         this.token.subtype = 'number';
       }
     },
-    // keyword: () => {
-
-    //   const keyword = this.get_keyword(this);
-
-    //   if (!keyword) {
-    //     this.Token.type = 'identifier';
-    //     this.expected_token = 'identifier';
-    //     return "next";
-    //   }
-
-    //   this.index += keyword.length;
-    //   this.pos += keyword.length;
-    //   this.Token.value += keyword;
-
-    //   const next_char = this.source[this.index];
-    //   if (this.is.identifier(keyword + next_char)) {
-    //     this.Token.type = 'identifier';
-    //     this.expected_token = 'identifier';
-    //     return "next";
-    //   }
-
-    //   this.Token.type = 'keyword';
-    // },
     string: () => {
 
       switch (true) {
@@ -349,6 +327,7 @@ class Tokenizer {
         return "next";
       } else {
         this.token.type = 'identifier';
+        return;
       }
     },
     comment: () => {
@@ -362,6 +341,7 @@ class Tokenizer {
 
     },
     comment_ml: () => {
+
       if (!(this.get_token() != this.end_token)) {
         return 'next';
       } else {
@@ -369,11 +349,13 @@ class Tokenizer {
         this.end_token = '';
         return;
       }
+
     },
     newline: () => {
       this.token.subtype = 'newline';
       this.token.value = '\n';
       ++this.index, ++this.pos;
+      return;
     }
   }
 
@@ -414,7 +396,7 @@ class Tokenizer {
 
     this.skip_ws();
 
-    this.History.set_token_start();
+    this.History.set_token_start()
 
     if (this.tokenize_type()) {
       this.History.push();
@@ -449,8 +431,6 @@ class Tokenizer {
           if (this.token.type == '') {
             throw { title: 'Tokenizer Error:', message: 'token.type miss', type: 'error' }
           }
-
-          // this.Context.check();
 
           return this.token;
         }
@@ -508,81 +488,6 @@ class Tokenizer {
 
     }
   }
-
-
-  // parse_program = () => {
-
-  //   this.debug.token = true;
-  //   // this.debug.checkToken = true;
-  //   this.debug.comment = true;
-  //   // this.debug.newline = true;
-
-
-  //   try {
-
-  //     this.traverse_tokens('`', '`').then(() => {
-  //       console.log(this.Token)
-  //     })
-
-  //     return;
-
-  //     let max = 10;
-  //     while (max > 0 && !this.source_end) {
-
-  //       // TODO check multiple traverse tokens called
-
-  //       if (this.index === 0) this.next();
-
-  //       log('Program token:;g', this.Token.value);
-
-  //       this.parser_run = true;
-  //       const parser = this.program.get(this.Token.value) || this.program.get('default');
-
-  //       if (parser) {
-  //         // @ts-ignore
-  //         parser();
-  //       }
-
-  //       this.parser_run = false;
-
-  //       --max;
-
-  //       if (this.source_end) {
-  //         log('source end;g')
-  //         throw { message: 'end program', type: 'end' };
-  //       }
-
-  //     }
-
-  //   } catch (error: any) {
-
-  //     if ('message' in error) {
-  //       const title = error.title || 'Error';
-  //       const at = " at " + (error.at || this.History.log(true));
-  //       switch (error.type) {
-  //         case 'error':
-  //           log(` ${title} ;R`, `\n  ${error.message}${at};r`);
-  //           return;
-  //         case 'warn':
-  //           log(`${error.message};y`)
-  //           return;
-  //         case 'info':
-  //           console.log(`${error.message}\n    at ${this.line}:${this.pos}`)
-  //           return;
-  //         case 'end': {
-  //           this.Program.toJSON(process.cwd() + '\\dist\\ast.json')
-  //           this.Program.check_references();
-  //           // console.log(this.Program.body)
-  //           return;
-  //         }
-  //       }
-  //     }
-
-  //     console.log(error);
-
-  //   }
-
-  // }
 
   error = (error: Error) => {
     throw { type: 'error', ...error };

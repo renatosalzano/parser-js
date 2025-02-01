@@ -79,21 +79,23 @@ class Declarator extends TokenContext {
 
   onStart() {
     this.token.subtype = 'declarator';
-    console.log(this.token)
   }
-
 }
 
-class Ctx extends TokenContext {
+class Expression extends TokenContext {
   state = {
     expression: false
   }
 }
 
-class ExpressionContainer extends Ctx {
+class Operator extends Expression {
+
+}
+
+class ExpressionContainer extends Expression {
   name = 'expression-container';
   start = ['{', '[', '(', '${'];
-  end = ['}', ']', ')']
+  end = ['}', ']', ')'];
 
   state = {
     expression: true
@@ -101,10 +103,11 @@ class ExpressionContainer extends Ctx {
 
 }
 
-class TempateLiteral extends Ctx {
+class TempateLiteral extends Expression {
   name = 'template-literal';
   start = ['`'];
   end = ['`'];
+
   state = {
     expression: false
   }
@@ -134,7 +137,7 @@ class TempateLiteral extends Ctx {
   }
 }
 
-class TagStart extends Ctx {
+class TagStart extends Expression {
   name = 'tag';
   start = ['<'];
 
