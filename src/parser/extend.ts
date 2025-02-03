@@ -46,28 +46,20 @@ export function extend(this: Tokenizer, name: string, tokens: any, parser: Ctor<
     builtIn = []
   } = tokens;
 
-  try {
+  extend_tokens.call(this, 'bracket', bracket);
+  extend_tokens.call(this, 'keyword', keyword);
+  extend_tokens.call(this, 'operator', operator);
+  extend_tokens.call(this, 'separator', separator);
+  extend_tokens.call(this, 'statement', statement);
+  extend_tokens.call(this, 'special', specialToken);
+  extend_tokens.call(this, 'comment', comment);
+  extend_tokens.call(this, 'built-in', builtIn);
 
-    extend_tokens.call(this, 'bracket', bracket);
-    extend_tokens.call(this, 'keyword', keyword);
-    extend_tokens.call(this, 'operator', operator);
-    extend_tokens.call(this, 'separator', separator);
-    extend_tokens.call(this, 'statement', statement);
-    extend_tokens.call(this, 'special', specialToken);
-    extend_tokens.call(this, 'comment', comment);
-    extend_tokens.call(this, 'built-in', builtIn);
+  this.Context.extend(context);
 
-    this.Context.extend(context);
+  log('extend parser;y');
 
-    log('extend parser;y');
-
-    extend_parser.call(this, parser);
-
-  } catch (err) {
-    console.log(err)
-  }
-
-  // const keys_to_check = extend_parser.call(this, program);
+  extend_parser.call(this, parser);
 
 }
 
@@ -133,6 +125,7 @@ function extend_tokens(this: Tokenizer, type: TokenType | 'built-in', tokens: st
           warn(token)
         }
 
+        this.tokens.set(token, type);
         this.brackets.set(token, bracket_type[0]);
         bracket_type.shift();
 

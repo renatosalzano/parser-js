@@ -263,12 +263,14 @@ class Tokenizer {
               switch (token_type) {
                 case 'bracket': {
                   const bracket_type = this.brackets.get(token);
+
                   if (bracket_type) {
                     this.token.type = bracket_type;
                   } else {
                     this.error({ title: 'Unexpected error', message: 'bracket type not found' })
                   }
                   break;
+
                 }
                 case 'comment': {
                   const comment = this.comment_token.get(token)!;
@@ -414,6 +416,10 @@ class Tokenizer {
     this.token.value = '';
     this.token.type = '';
     delete this.token.subtype;
+
+    for (const prop of this.token_prop) {
+      delete this.token[prop];
+    }
 
     const print = () => {
       if ((this.debug.token || debug) && debug !== 'suppress') {

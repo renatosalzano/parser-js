@@ -138,17 +138,18 @@ class Context {
         this.prev_ctx.onEnd()
       }
       this.end_token = undefined;
-      return;
-    }
 
-    if (this.is_end_context(token)) {
+      return;
+
+    } else if (this.is_end_context(token)) {
+
       this.debug && log('cxt end from check;c');
 
       if (this.prev_ctx && this.prev_ctx.onEnd) {
         this.prev_ctx.onEnd()
       }
 
-      return;
+      // return;
     }
 
     const Ctx = this.token.start.get(token);
@@ -164,8 +165,6 @@ class Context {
       let cancel = false;
 
       if (ctx.onBefore) ctx.onBefore(() => {
-        // abort mount ctx
-        log('cancel', ctx.name);
         cancel = true;
       });
 

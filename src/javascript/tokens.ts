@@ -28,30 +28,7 @@ const operator = [
   T('.', { binary }),
   T(['&', '|', '^', '<<', '>>', '>>>'], { bitwise, binary }),
   T(['|=', '&=', '^=', '<<=', '>>=', '>>>='], { bitwise, assignment })
-
-
-]/* [
-  subtype('binary', ['+', '-', '*', '/', '%', '**']),
-  subtype('binary', ['+', '-', '*', '/', '%', '**']),
-
-  
-  '.', '!', '?',
-
-  '==', '!=', '>', '>=', '<', '<=', '===', '!==', 'instanceof', 'in',
-
-  '++', '--',
-  '||', '&&', '??',
-
-  '=',
-  '+=', '-=', '/=', '%=', '*=', '**=',
-  '&&=', '||=', '??=',
-  '|=', '&=', '^=',
-
-  '&', '|', '^', '~', '<<', '>>', '>>>', '>>>=',
-  'new', 'typeof', 'delete', 'void',
-
-  'await'
-]; */
+]
 
 export const op = {
 
@@ -131,9 +108,8 @@ class PlusNegation extends Expression {
   onBefore(cancel: () => void) {
 
     if (this.prevToken.type != 'literal' && this.prevToken.type != 'bracket-close') {
-      this.token.subtype = 'unary';
-    } else {
-      this.token.subtype = 'binary';
+      this.token.prefix = true;
+      delete this.token.binary;
     }
 
     cancel();
