@@ -83,6 +83,7 @@ class Tokenizer {
 
   }
 
+  token_prop: (keyof TokenProperties)[] = [];
   temp: any;
   extend = (...plugin: [string, any, any]) => extend.apply(this, plugin);
 
@@ -244,6 +245,17 @@ class Tokenizer {
             const token_type = this.tokens.get(token);
 
             if (token_type) {
+
+              // SET TOKEN PROPERTIES
+              const tokens_prop = this.tokens_prop.get(token);
+              if (tokens_prop) {
+
+                this.token_prop = Object.keys(tokens_prop) as (keyof TokenProperties)[];
+
+                for (const prop of this.token_prop) {
+                  this.token[prop] = true;
+                }
+              }
 
               this.token.type = token_type;
               this.advance(token.length);
@@ -493,7 +505,8 @@ class Tokenizer {
   start = (source: string) => {
     log('tokenize start;y');
     this.source = source;
-    // this.debug.token = true;
+    this.debug.token = true;
+
     try {
 
       while (!this.source_end) {

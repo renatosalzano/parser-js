@@ -46,20 +46,26 @@ export function extend(this: Tokenizer, name: string, tokens: any, parser: Ctor<
     builtIn = []
   } = tokens;
 
-  extend_tokens.call(this, 'bracket', bracket);
-  extend_tokens.call(this, 'keyword', keyword);
-  extend_tokens.call(this, 'operator', operator);
-  extend_tokens.call(this, 'separator', separator);
-  extend_tokens.call(this, 'statement', statement);
-  extend_tokens.call(this, 'special', specialToken);
-  extend_tokens.call(this, 'comment', comment);
-  extend_tokens.call(this, 'built-in', builtIn);
+  try {
 
-  this.Context.extend(context);
+    extend_tokens.call(this, 'bracket', bracket);
+    extend_tokens.call(this, 'keyword', keyword);
+    extend_tokens.call(this, 'operator', operator);
+    extend_tokens.call(this, 'separator', separator);
+    extend_tokens.call(this, 'statement', statement);
+    extend_tokens.call(this, 'special', specialToken);
+    extend_tokens.call(this, 'comment', comment);
+    extend_tokens.call(this, 'built-in', builtIn);
 
-  log('extend parser;y');
+    this.Context.extend(context);
 
-  extend_parser.call(this, parser);
+    log('extend parser;y');
+
+    extend_parser.call(this, parser);
+
+  } catch (err) {
+    console.log(err)
+  }
 
   // const keys_to_check = extend_parser.call(this, program);
 
@@ -232,23 +238,31 @@ function extend_ternary(this: Tokenizer, tokens: string[]) {
 
   const [t, f] = tokens;
 
-  console.log('extend ternary')
-
+  extend_tokens.call(this, 'operator', [t]);
 
   class Ternary extends TokenContext {
     name = 'ternary';
-    start = [t, f];
+    start = [t];
     end = [f];
+
+    onStart() {
+      this.token.subtype = 'daniel-ternary-start'
+    }
 
     onBefore(cancel: () => void) {
       if (this.currContext() == 'ternary' && this.token.value == ':') {
         console.log('false')
       }
     }
+
+    onEnd() {
+      this.token.type = 'operator';
+      this.token.subtype = 'daniel-ternary-before-new-ternary'
+      console.log('porco dio')
+    }
   }
 
-  this.Context.extend([Ternary])
-
+  this.Context.extend([Ternary]);
 }
 
 
