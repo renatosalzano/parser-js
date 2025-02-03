@@ -93,9 +93,12 @@ function extend_tokens(this: Tokenizer, type: TokenType | 'built-in', tokens: st
 
       if (end) {
         if (this.tokens.has(end)) warn(end);
+        this.tokens.set(end, 'comment');
       }
 
       if (this.tokens.has(start)) warn(start);
+
+      this.tokens.set(start, 'comment');
 
       this.comment_token.set(start, {
         multiline: end !== undefined,

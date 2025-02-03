@@ -220,123 +220,120 @@ class Tokenizer {
         }
         this.token.type = 'literal';
         this.expected_token = 'newline';
-        break;
+        return;
       };
       case this.is.quote(this.char.curr): {
         this.end_quote = this.char.curr;
         this.advance(1);
         this.token.type = 'literal';
         this.expected_token = 'string';
-        break;
+        return;
       }
       case this.is.number(this.char.curr): {
         this.token.type = 'literal';
         this.expected_token = 'number';
-        break;
+        return;
       }
-      default: {
+    }
 
-        this.History.prev_token();
-        const token = this.get_token();
+    this.History.prev_token();
+    const token = this.get_token();
 
-        switch (true) {
-          case !!token: {
+    switch (true) {
+      case !!token: {
 
-            const token_type = this.tokens.get(token);
+        const token_type = this.tokens.get(token);
 
-            if (token_type) {
+        if (token_type) {
 
-              // SET TOKEN PROPERTIES
-              const tokens_prop = this.tokens_prop.get(token);
-              if (tokens_prop) {
+          // SET TOKEN PROPERTIES
+          const tokens_prop = this.tokens_prop.get(token);
+          if (tokens_prop) {
 
-                this.token_prop = Object.keys(tokens_prop) as (keyof TokenProperties)[];
+            this.token_prop = Object.keys(tokens_prop) as (keyof TokenProperties)[];
 
-                for (const prop of this.token_prop) {
-                  this.token[prop] = true;
-                }
+            for (const prop of this.token_prop) {
+              this.token[prop] = true;
+            }
+          }
+
+          this.token.type = token_type;
+          this.advance(token.length);
+
+          switch (token_type) {
+            case 'bracket': {
+              const bracket_type = this.brackets.get(token);
+
+              if (bracket_type) {
+                this.token.type = bracket_type;
+              } else {
+                this.error({ title: 'Unexpected error', message: 'bracket type not found' })
               }
+              break;
 
-              this.token.type = token_type;
-              this.advance(token.length);
+            }
+            case 'comment': {
+              const comment = this.comment_token.get(token)!;
+              const { multiline, end_token } = comment;
+              this.end_token = end_token;
 
-              switch (token_type) {
-                case 'bracket': {
-                  const bracket_type = this.brackets.get(token);
-
-                  if (bracket_type) {
-                    this.token.type = bracket_type;
-                  } else {
-                    this.error({ title: 'Unexpected error', message: 'bracket type not found' })
-                  }
-                  break;
-
-                }
-                case 'comment': {
-                  const comment = this.comment_token.get(token)!;
-                  const { multiline, end_token } = comment;
-                  this.end_token = end_token;
-
-                  if (multiline) {
-                    this.expected_token = 'comment_ml';
-                    this.token.subtype = 'multiline';
-                  } else {
-                    this.expected_token = 'comment';
-                  }
-
-                  this.check_nl = true;
-                  return;
-                }
+              if (multiline) {
+                this.expected_token = 'comment_ml';
+                this.token.subtype = 'multiline';
+                this.check_nl = true;
+              } else {
+                this.expected_token = 'comment';
               }
+              return;
+            }
+          }
 
-              this.token.value += token;
+          this.token.value += token;
 
-              if (this.Context.has(token)) {
-                this.Context.check(token)
+          if (this.Context.has(token)) {
+            this.Context.check(token)
+          }
+
+          return this.token;
+
+        } else {
+          this.error({ title: 'Unexpected error', message: 'token type not found' })
+        }
+
+      };
+      case this.is.identifier(this.char.curr): {
+
+        if (this.is.alpha(this.char.curr)) {
+
+          const kw = this.get_keyword();
+
+          if (kw) {
+            this.advance(kw.length);
+            this.token.value += kw;
+
+            if (this.is.space(this.char.curr) || this.tokens.has(this.char.curr)) {
+              // is kw
+              this.token.type = this.keywords.get(kw) || 'keyword';
+
+              if (this.Context.has(kw)) {
+                this.Context.check(kw);
               }
 
               return this.token;
-
-            } else {
-              this.error({ title: 'Unexpected error', message: 'token type not found' })
             }
 
-          };
-          case this.is.identifier(this.char.curr): {
-
-            if (this.is.alpha(this.char.curr)) {
-
-              const kw = this.get_keyword();
-
-              if (kw) {
-                this.advance(kw.length);
-                this.token.value += kw;
-
-                if (this.is.space(this.char.curr) || this.tokens.has(this.char.curr)) {
-                  // is kw
-                  this.token.type = this.keywords.get(kw) || 'keyword';
-
-                  if (this.Context.has(kw)) {
-                    this.Context.check(kw);
-                  }
-
-                  return this.token;
-                }
-
-                if (this.is.identifier(this.char.curr)) {
-                  this.token.value += this.char.curr;
-                  this.advance(1);
-                  this.expected_token = 'identifier';
-                  break;
-                }
-              }
-
-            } // end check if is kw
-
-            this.expected_token = 'identifier';
-            return;
+            if (this.is.identifier(this.char.curr)) {
+              this.token.value += this.char.curr;
+              this.advance(1);
+              this.expected_token = 'identifier';
+              break;
+            }
           }
-        }
+
+        } // end check if is kw
+
+        this.expected_token = 'identifier';
+        return;
       }
     }
 
@@ -413,9 +410,15 @@ class Tokenizer {
 
   next = (debug: boolean | 'suppress' = false) => {
 
+    if (this.is.nl(this.token.value)) {
+      ++this.line;
+    }
+
     this.token.value = '';
     this.token.type = '';
     delete this.token.subtype;
+
+    this.check_nl = false;
 
     for (const prop of this.token_prop) {
       delete this.token[prop];
@@ -466,6 +469,7 @@ class Tokenizer {
 
       if (this.check_nl && this.check_new_line()) {
         ++this.index, ++this.pos;
+        console.log('new line bitch', this.expected_token)
         continue;
       }
 
