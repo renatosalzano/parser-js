@@ -1,7 +1,40 @@
 import { TokenContext } from 'parser/Context';
+import { TokenProp as T } from 'parser/extend';
+
+const
+  prefix = true,
+  postfix = true,
+  bitwise = true,
+  binary = true,
+  ternary = true,
+  logical = true,
+  assignment = true,
+  comparison = true,
+  arithmetic = true
 
 const operator = [
-  '+', '-', '*', '/', '%', '**',
+  T(['+', '-', '*', '/', '%', '**'], { binary, arithmetic }),
+  T(['+=', '-=', '/=', '%=', '*=', '**='], { assignment, arithmetic }),
+  T('=', { assignment }),
+  T('!', { prefix, logical }),
+  T('~', { prefix, bitwise }),
+  T(['?', ':'], { ternary }),
+  T(['==', '!=', '>', '>=', '<', '<=', '===', '!=='], { comparison, binary }),
+  T('typeof', { prefix, comparison }),
+  T('instanceof', { binary, comparison }),
+  T(['||', '&&', '??'], { binary, logical }),
+  T(['await', 'new', 'delete', 'void'], { prefix }),
+  T(['++', '--'], { prefix, postfix, arithmetic }),
+  T('.', { binary }),
+  T(['&', '|', '^', '<<', '>>', '>>>'], { bitwise, binary }),
+  T(['|=', '&=', '^=', '<<=', '>>=', '>>>='], { bitwise, assignment })
+
+
+]/* [
+  subtype('binary', ['+', '-', '*', '/', '%', '**']),
+  subtype('binary', ['+', '-', '*', '/', '%', '**']),
+
+  
   '.', '!', '?',
 
   '==', '!=', '>', '>=', '<', '<=', '===', '!==', 'instanceof', 'in',
@@ -18,7 +51,7 @@ const operator = [
   'new', 'typeof', 'delete', 'void',
 
   'await'
-];
+]; */
 
 export const op = {
 
@@ -31,7 +64,7 @@ export const op = {
   }
 }
 
-const bracket = ['(', ')', '[', ']', '{', '}'];
+const bracket = [['(', ')'], ['[', ']'], ['{', '}']];
 
 const separator = [',', ':', ';', '\n'];
 
@@ -67,7 +100,10 @@ const builtIn = [
   'Iterator', 'AsyncIterator', 'Promise', 'GeneratorFunction', 'AsyncGeneratorFunction', 'Generator', 'AsyncGenerator', 'AsyncFunction',
   'Reflect', 'Proxy',
   'Intl',
+  'window', 'console',
 ]
+
+
 
 class Declarator extends TokenContext {
   name = 'declarator';
@@ -88,8 +124,20 @@ class Expression extends TokenContext {
   }
 }
 
-class Operator extends Expression {
+class PlusNegation extends Expression {
+  name = 'plus-negation'
+  start = ['+', '-'];
 
+  onBefore(cancel: () => void) {
+
+    if (this.prevToken.type != 'literal' && this.prevToken.type != 'bracket-close') {
+      this.token.subtype = 'unary';
+    } else {
+      this.token.subtype = 'binary';
+    }
+
+    cancel();
+  }
 }
 
 class ExpressionContainer extends Expression {
@@ -161,6 +209,7 @@ export const tokens = {
   specialToken,
   context: [
     Declarator,
+    PlusNegation,
     ExpressionContainer,
     TempateLiteral
   ]

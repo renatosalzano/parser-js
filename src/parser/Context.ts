@@ -23,6 +23,7 @@ export class TokenContext {
   constructor(
     public char: Tokenizer['char'],
     public token: Tokenizer['token'],
+    public prevToken: Tokenizer['prev_token'],
     public getToken: Get,
     public getKeyword: Get,
     public advance: (value?: number) => void,
@@ -74,9 +75,11 @@ class Context {
 
 
   new_ctx = (Ctx: Ctor<TokenContext>) => {
+
     const ctx = new Ctx(
       this.Tokenizer.char,
       this.Tokenizer.token,
+      this.Tokenizer.prev_token,
       () => this.Tokenizer.get_token(),
       () => this.Tokenizer.get_keyword(),
       // advance
@@ -107,7 +110,7 @@ class Context {
       const ctx = this.new_ctx(Ctx);
 
       if (!ctx.name || !ctx.start || ctx.start.size === 0) {
-        log('invalid context;r')
+        log('invalid context;r', ctx.name)
       };
 
       for (const token of ctx.start) {

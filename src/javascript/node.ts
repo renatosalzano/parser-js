@@ -1,6 +1,6 @@
-import { Block, Declarator, Fn, Identifier, Node } from "parser/Progam";
+import { Block, Identifier, Node } from "parser/Progam";
 
-class Variable extends Declarator {
+class Variable extends Node {
   tag = 'variable'
   kind?: 'var' | 'const' | 'let';
   id = {} as Node;
@@ -16,7 +16,7 @@ class Variable extends Declarator {
   }
 }
 
-class Function extends Fn {
+class Function extends Node {
   tag = 'function';
   id?: Identifier;
   expression?: boolean;

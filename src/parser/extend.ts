@@ -1,9 +1,9 @@
 import { log } from "utils";
 import Tokenizer from "./Tokenizer";
-import Program from "./Progam";
 import { create_token_finder } from "./utils";
 import Parser from "./Parser";
-import type { Token, TokenType } from "./Tokenizer";
+import type { Token, TokenProperties, TokenType } from "./Tokenizer";
+import { TokenContext } from "./Context";
 // import type { ParserMethod } from "./Tokenizer";
 
 interface Ctor<T> {
@@ -19,14 +19,15 @@ export type ParserObject = {
   start: (props?: any) => any;
 }
 
-// export type Api<T> =
-//   & Tokenizer['api']
-//   & {
-//     appendNode: Program['append_node'];
-//     createNode: Program['create_node'];
-//     isFnBody: Program['is_fn_body'];
 
-//   }
+export function TokenProp(token: string | string[], properties: TokenProperties) {
+
+  return {
+    tokens: Array.isArray(token) ? token : [token],
+    properties: properties
+  }
+}
+
 
 let plugin_name: string;
 export function extend(this: Tokenizer, name: string, tokens: any, parser: Ctor<Parser>) {
@@ -65,28 +66,38 @@ export function extend(this: Tokenizer, name: string, tokens: any, parser: Ctor<
 }
 
 
-function extend_tokens(this: Tokenizer, type: TokenType | 'built-in', tokens: string[] | string[][]) {
+function extend_tokens(this: Tokenizer, type: TokenType | 'built-in', tokens: string[] | string[][], prop?: TokenProperties) {
 
-  const warn = (token: string) => log(`duplicate "${token}" in;y`, `${plugin_name};g`, `> ${type};y`)
+  const that = this;
+
+  function check(token: string | ReturnType<typeof TokenProp>) {
+    if (typeof token == 'string') {
+      return;
+    } else {
+      const { tokens, properties } = token;
+
+      if (properties.ternary) {
+        console.log('skip ternary')
+        extend_ternary.call(that, tokens)
+        return true;
+      }
+
+      extend_tokens.call(that, type, tokens, properties);
+      return true;
+    }
+  }
+
+  const warn = (token: string) => log(`override "${token}" in;y`, `${plugin_name};g`, `> ${type};y`)
 
   if (type === 'comment') {
 
     for (const [start, end] of tokens as string[][]) {
 
       if (end) {
-
-        if (this.tokens.has(end)) {
-          log(`Duplicate token "${end}" found in ${this.tokens.get(end)};y`);
-        } else {
-          this.tokens.set(end, 'comment');
-        }
+        if (this.tokens.has(end)) warn(end);
       }
 
-      if (this.tokens.has(start)) {
-        log(`Duplicate token "${start}" found in ${this.tokens.get(start)};y`);
-      } else {
-        this.tokens.set(start, 'comment');
-      }
+      if (this.tokens.has(start)) warn(start);
 
       this.comment_token.set(start, {
         multiline: end !== undefined,
@@ -98,10 +109,51 @@ function extend_tokens(this: Tokenizer, type: TokenType | 'built-in', tokens: st
     return;
   }
 
+  if (type == 'bracket') {
+    for (const brackets of tokens as string[][]) {
+      const bracket_type = ['bracket-open', 'bracket-close'] as `bracket-${'open' | 'close'}`[];
+
+      for (const token of brackets) {
+
+        if (check(token)) {
+          continue;
+        }
+
+        if (prop) {
+          this.tokens_prop.set(token, prop)
+        }
+
+        if (this.tokens.has(token)) {
+          warn(token)
+        }
+
+        this.brackets.set(token, bracket_type[0]);
+        bracket_type.shift();
+
+        if (token.length > this.max_len.token) {
+          this.max_len.token = token.length;
+
+          this.get_token = create_token_finder(this, 'tokens', token.length);
+        }
+
+      }
+    };
+
+    return;
+  }
+
   for (const token of tokens as string[]) {
 
     switch (true) {
       case (type == 'built-in'): {
+
+        if (check(token)) {
+          continue;
+        }
+
+        if (prop) {
+          this.tokens_prop.set(token, prop);
+        }
 
         if (this.identifiers.has(token)) {
           warn(token);
@@ -119,6 +171,14 @@ function extend_tokens(this: Tokenizer, type: TokenType | 'built-in', tokens: st
       }
       case (type == 'keyword' || this.is.alpha(token)): {
 
+        if (check(token)) {
+          continue;
+        }
+
+        if (prop) {
+          this.tokens_prop.set(token, prop);
+        }
+
         if (this.keywords.has(token)) {
           warn(token);
         }
@@ -134,6 +194,14 @@ function extend_tokens(this: Tokenizer, type: TokenType | 'built-in', tokens: st
         break;
       }
       default: {
+
+        if (check(token)) {
+          continue;
+        }
+
+        if (prop) {
+          this.tokens_prop.set(token, prop);
+        }
 
         if (this.tokens.has(token)) {
           warn(token);
@@ -156,6 +224,34 @@ function extend_tokens(this: Tokenizer, type: TokenType | 'built-in', tokens: st
 }
 
 
+function extend_ternary(this: Tokenizer, tokens: string[]) {
+
+  if (tokens.length > 2) {
+    this.error({ title: 'Invalid ternary', message: 'porco dio e la madonna' });
+  }
+
+  const [t, f] = tokens;
+
+  console.log('extend ternary')
+
+
+  class Ternary extends TokenContext {
+    name = 'ternary';
+    start = [t, f];
+    end = [f];
+
+    onBefore(cancel: () => void) {
+      if (this.currContext() == 'ternary' && this.token.value == ':') {
+        console.log('false')
+      }
+    }
+  }
+
+  this.Context.extend([Ternary])
+
+}
+
+
 // PARSER API
 
 function next(this: Tokenizer) {
@@ -171,8 +267,6 @@ function next(this: Tokenizer) {
 
   if (this.skip_comment && this.token.type == 'comment') {
     next.call(this);
-  } else {
-    console.log('after cccal', this.token)
   }
 
 }
@@ -258,6 +352,19 @@ function recursive_next(this: Tokenizer, ts: string, te: string, next: () => voi
 }
 
 
+function eat(this: Tokenizer, t: string, m = false) {
+  if (this.token.value == t) {
+    next.call(this);
+  } else {
+    return;
+  }
+  while (this.token.value == t) {
+    next.call(this);
+    if (!m) { return }
+  }
+}
+
+
 function extend_parser(this: Tokenizer, Parser: Ctor<Parser>) {
 
   this.Parser = new Parser(
@@ -266,7 +373,12 @@ function extend_parser(this: Tokenizer, Parser: Ctor<Parser>) {
     () => next.call(this),
     () => true,
     (s: string, e: string) => traverse_tokens.call(this, s, e),
-    (skip_comment = true) => this.skip_comment = skip_comment
+    (skip_comment = true) => this.skip_comment = skip_comment,
+    (token: string, multiple = false) => eat.call(this, token, multiple),
+    this.error,
+    // Program
+    this.Program.create_node,
+    this.Program.append_node
   );
 }
 

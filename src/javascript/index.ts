@@ -1,5 +1,8 @@
 import Parser from "parser/Parser";
 import { tokens } from './tokens';
+import { Variable } from "./node";
+import { log } from "utils";
+import errors from "./errors";
 
 export default (config: any) => {
 
@@ -14,25 +17,89 @@ export default (config: any) => {
               case 'const':
               case 'let':
               case 'var':
-                this.Variable(this.token.value);
+                this.variable(this.token.value);
+                break;
+              case 'import':
+              case 'export':
+                break;
+              case 'function':
                 break;
             }
             break;
           }
-          case "literal":
-          case "operator":
-          case "bracket":
-          case "keyword":
-          case "separator":
-          case "identifier":
-          case "special":
-          case "comment":
+          default: {
+            this.expression()
+          }
         }
       }
 
-      Variable(kind: string, implicit = false) {
-        console.log('variable')
+      expression(append = true) {
+
       }
+
+      variable(kind: 'const' | 'let' | 'const' | 'var') {
+        const node = this.createNode(Variable, { tag: kind, kind });
+        const expected_init = kind === 'const';
+
+        this.variableID(node); // parse id
+
+        log('Variable;m', 'ID done;g', node.id);
+
+        if (expected_init && !this.token.eq('=')) {
+          this.error({ message: errors.variable.expected_init });
+        }
+
+        if (this.token.eq('=')) {
+          this.next(); // over "="
+
+          if (expected_init && /[,;]/.test(this.token.value)) {
+            this.error({ message: errors.variable.expected_init });
+          }
+
+          this.variableInit(node);
+          log('Variable;m', 'init done;y');
+        }
+
+        this.appendNode(node);
+
+        if (this.token.eq(/[,;]/)) {
+
+          if (this.token.eq(';')) {
+            this.eat(this.token.value, true);
+            this.next();
+          }
+
+          if (this.token.eq(',')) {
+            this.variable(kind);
+          }
+        }
+
+        log('Variable end;m')
+      }
+
+      variableID(node: Variable) {
+        node.id = this.expression(false);
+      }
+
+      variableInit(node: Variable) {
+
+      }
+
+      object(type?: 'expression' | 'pattern') {
+
+        if (!type) {
+          this.traverse('{', '}').then(() => {
+            if (this.token.eq('=')) {
+              type = 'pattern';
+            }
+          })
+        }
+
+
+
+      }
+
+      array(type?: 'expression' | 'pattern') { }
     }
   }
 }

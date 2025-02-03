@@ -6,7 +6,21 @@ import { extend } from "./extend";
 import Context from "./Context";
 import Parser from "./Parser";
 
-export type TokenType = 'literal' | 'operator' | 'bracket' | 'keyword' | 'separator' | 'identifier' | 'special' | 'statement' | 'comment';
+export type TokenType = 'literal' | 'operator' | 'bracket' | 'bracket-open' | 'bracket-close' | 'keyword' | 'separator' | 'identifier' | 'special' | 'statement' | 'comment';
+
+export type TokenProperties = {
+  arithmetic?: boolean;
+  assignment?: boolean;
+  comparison?: boolean;
+  logical?: boolean;
+  bitwise?: boolean;
+  binary?: boolean;
+  conditional?: boolean;
+  postfix?: boolean;
+  prefix?: boolean;
+  ternary?: boolean;
+}
+
 export type Token = {
   value: string;
   type: TokenType | '';
@@ -15,7 +29,7 @@ export type Token = {
   end: number;
   loc: { start: { ln: number; col: number }; end: { ln: number; col: number } };
   eq(comparator: string | RegExp): boolean;
-}
+} & TokenProperties;
 
 export type DebugNext = {
   comment?: boolean;
@@ -36,17 +50,19 @@ export type Error = {
   at?: string;
 }
 
-type Tokenize = { [key: string]: () => "next" | "skip" | void }
+type Tokenize = { [key: string]: () => "next" | "skip" | void };
 
 class Tokenizer {
 
   source = '';
 
   Parser = {} as Parser;
+  Program = new Program()
   History = new History(this);
   Context = new Context(this);
 
   tokens = new Map<string, TokenType>();
+  tokens_prop = new Map<string, TokenProperties>();
 
   max_len = { token: 1, keyword: 1, identifier: 1 };
   get_token = create_token_finder(this, 'tokens', 1);
@@ -56,6 +72,8 @@ class Tokenizer {
 
   identifiers = new Set<string>();
   get_identifier = create_token_finder(this, 'identifiers', 1);
+
+  brackets = new Map<string, `bracket-${'open' | 'close'}`>();
 
   comment_token = new Map<string, { multiline: boolean, end_token: string }>();
 
@@ -99,6 +117,16 @@ class Tokenizer {
       return this.value === _ || this.type === _;
     }
   }
+
+  prev_token: Partial<Token> = {
+    eq(_: string | RegExp) {
+      if (!this.value || !this.type) return false;
+      if (_ instanceof RegExp) {
+        return _.test(this.value) || _.test(this.type);
+      }
+      return this.value === _ || this.type === _;
+    }
+  };
 
   next_token: Partial<Token> = {
     eq(_: string | RegExp) {
@@ -207,6 +235,7 @@ class Tokenizer {
       }
       default: {
 
+        this.History.prev_token();
         const token = this.get_token();
 
         switch (true) {
@@ -220,6 +249,15 @@ class Tokenizer {
               this.advance(token.length);
 
               switch (token_type) {
+                case 'bracket': {
+                  const bracket_type = this.brackets.get(token);
+                  if (bracket_type) {
+                    this.token.type = bracket_type;
+                  } else {
+                    this.error({ title: 'Unexpected error', message: 'bracket type not found' })
+                  }
+                  break;
+                }
                 case 'comment': {
                   const comment = this.comment_token.get(token)!;
                   const { multiline, end_token } = comment;

@@ -1,5 +1,6 @@
 import { TraverseTokens } from "./extend";
-import { Token } from "./Tokenizer";
+import Program from "./Progam";
+import Tokenizer, { Token } from "./Tokenizer";
 
 interface Api {
   next(): Token;
@@ -20,7 +21,11 @@ class Parser {
      * traverse tokens
      */
     public traverse: (startToken: string, endToken: string) => TraverseTokens,
-    public skipComment: (skipComment?: boolean) => void
+    public skipComment: (skipComment?: boolean) => void,
+    public eat: (token: string, multiple?: boolean) => void,
+    public error: Tokenizer['error'],
+    public createNode: Program['create_node'],
+    public appendNode: Program['append_node']
   ) {
 
   }

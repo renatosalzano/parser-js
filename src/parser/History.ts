@@ -2,7 +2,9 @@ import { log } from "utils";
 import Tokenizer, { Token } from "./Tokenizer";
 import { writeFileSync } from "fs";
 
-type token = Omit<Token, 'eq'>;
+type token = Omit<Token, 'eq' | 'loc'> & {
+  loc?: Token['loc']
+};
 
 class History {
 
@@ -11,11 +13,7 @@ class History {
   list: any[] = [];
 
   tokens: token[] = [];
-  tokens_buffer: number[] = [];
-  tokens_to_spend: number[] = [];
-
-  record = false;
-  nested_record = false;
+  current_token?: token;
 
   constructor(public Tokenizer: Tokenizer) {
     this.current = [0, 1, 1];
@@ -34,12 +32,15 @@ class History {
     start = 0,
     end = 0,
     loc = { start: { ln: 0, col: 0 }, end: { ln: 0, col: 0 } }
-  }: token = {} as token, token: 'token' | 'next_token' = 'token') => {
+  }: token = {} as token, token: 'token' | 'prev_token' | 'next_token' = 'token') => {
+
     this.Tokenizer[token].value = value;
     this.Tokenizer[token].type = type;
 
     if (subtype) {
       this.Tokenizer[token].subtype = subtype;
+    } else {
+      delete this.Tokenizer[token].subtype
     }
 
     this.Tokenizer[token].start = start;
@@ -55,6 +56,7 @@ class History {
   }
 
   get_token = (index: number) => {
+
     const token = this.tokens[index];
     this.set_token(token);
 
@@ -64,12 +66,22 @@ class History {
 
   }
 
+  prev_token = () => {
+    const prev_token = this.tokens.at(-1);
+    if (prev_token) {
+      this.set_token(prev_token, 'prev_token');
+    }
+  }
+
   last_token = () => {
+
     const last_token = this.tokens.at(-1);
     if (last_token) this.set_token(last_token);
+
   }
 
   push = () => {
+
     const { index, line, pos } = this.Tokenizer;
 
     if (this.compare([index, line, pos])) {
@@ -105,7 +117,7 @@ class History {
 
     this.tokens.push({ value, type, subtype, start: start_index, end: index, loc });
 
-    this.list.push(`${value}`);
+    this.list.push(`${type}, ${subtype || ''} ${value}`);
   }
 
 
