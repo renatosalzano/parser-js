@@ -1,5 +1,5 @@
 import { log } from "utils";
-import Tokenizer from "./Tokenizer";
+import Tokenizer, { Token, TokenProperties } from "./Tokenizer";
 
 interface Ctor<T> {
   new(...args: any): T
@@ -7,6 +7,7 @@ interface Ctor<T> {
 
 type Get = () => string | undefined;
 
+const token_prop_keys = new Set(['arithmetic', 'assignment', 'comparison', 'logical', 'bitwise', 'binary', 'conditional', 'postfix', 'prefix', 'ternary'])
 
 export interface TokenContext {
   name: string;
@@ -77,9 +78,22 @@ class Context {
 
   new_ctx = (Ctx: Ctor<TokenContext>) => {
 
+    const Tokenizer = this.Tokenizer;
+
+    const token = new Proxy(this.Tokenizer.token, {
+
+      set(t, p: keyof Token, v) {
+        if (token_prop_keys.has(p)) {
+          // if token prop changed by ctx notify to tokenizer
+          Tokenizer.token_prop.push(p as any);
+        }
+        return Reflect.set(t, p, v)
+      }
+    });
+
     const ctx = new Ctx(
       this.Tokenizer.char,
-      this.Tokenizer.token,
+      token,
       this.Tokenizer.prev_token,
       () => this.Tokenizer.get_token(),
       () => this.Tokenizer.get_keyword(),

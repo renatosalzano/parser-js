@@ -246,6 +246,7 @@ class Tokenizer {
 
           // SET TOKEN PROPERTIES
           const tokens_prop = this.tokens_prop.get(token);
+
           if (tokens_prop) {
 
             this.token_prop = Object.keys(tokens_prop) as (keyof TokenProperties)[];
@@ -458,7 +459,8 @@ class Tokenizer {
     this.History.set_token_start()
 
     if (this.tokenize_type()) {
-      this.History.push();
+      this.token.value == '+' && console.log(this.token)
+      this.History.push(this.token);
       print();
       return;
     }
@@ -481,13 +483,13 @@ class Tokenizer {
         default: {
           // end tokenize
           this.sync_ch();
-          this.History.push();
-          print();
 
           if (this.token.type == '') {
             throw { title: 'Tokenizer Error:', message: 'token.type miss', type: 'error' }
           }
 
+          this.History.push(this.token);
+          print();
           return this.token;
         }
 
@@ -524,6 +526,7 @@ class Tokenizer {
       console.log(error);
     }
 
+    this.History.is_parsing = true;
     this.History.JSON(process.cwd() + '\\dist\\tokens.json');
 
     log('tokenize end;g');

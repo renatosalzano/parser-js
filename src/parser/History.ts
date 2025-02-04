@@ -1,5 +1,5 @@
 import { log } from "utils";
-import Tokenizer, { Token } from "./Tokenizer";
+import Tokenizer, { Token, TokenProperties } from "./Tokenizer";
 import { writeFileSync } from "fs";
 
 type token = Omit<Token, 'eq' | 'loc'> & {
@@ -13,7 +13,9 @@ class History {
   list: any[] = [];
 
   tokens: token[] = [];
+  token_props = new Map<string, TokenProperties>();
   current_token?: token;
+  is_parsing = false;
 
   constructor(public Tokenizer: Tokenizer) {
     this.current = [0, 1, 1];
@@ -53,6 +55,15 @@ class History {
       this.Tokenizer[token].loc.end.col = loc.end.col;
     }
 
+    if (this.is_parsing) {
+      const props = this.token_props.get(value);
+      if (props) {
+        for (const key in props) {
+          // @ts-ignore
+          this.Tokenizer[token][key] = props[key];
+        }
+      }
+    }
   }
 
   get_token = (index: number) => {
@@ -80,7 +91,7 @@ class History {
 
   }
 
-  push = () => {
+  push = (token: Token) => {
 
     const { index, line, pos } = this.Tokenizer;
 
@@ -93,14 +104,11 @@ class History {
 
     this.current = [index, line, pos];
 
-    const { value, type, subtype } = this.Tokenizer.token;
-    const props = this.Tokenizer.token_prop;
+    const { value, type, subtype, start, end, loc, eq, ...props } = token;
 
     const { token_start: [start_index, start_line, start_pos] } = this;
 
-    // add location
-
-    this.set_token({
+    const copy = {
       value,
       type,
       subtype,
@@ -109,15 +117,23 @@ class History {
       loc: {
         start: { ln: start_line, col: start_pos },
         end: { ln: line, col: pos }
+      },
+      ...props
+    } as token;
+
+
+    this.set_token(copy);
+
+    // merge multiple nl
+    if (copy.value == '\n') {
+      const prev_token = this.tokens.at(-1);
+      if (prev_token && prev_token.value == '\n') {
+        return;
       }
-    })
+    }
 
-    const loc = {
-      start: { ln: start_line, col: start_pos },
-      end: { ln: line, col: pos },
-    };
-
-    this.tokens.push({ value, type, subtype, start: start_index, end: index, loc });
+    this.tokens.push(copy);
+    this.token_props.set(value, props);
 
     this.list.push(`${type}, ${subtype || ''} ${value}`);
   }
@@ -149,7 +165,7 @@ class History {
   }
 
   JSON = (path: string) => {
-    writeFileSync(path, JSON.stringify(this.list, null, 2))
+    writeFileSync(path, JSON.stringify(this.tokens, null, 2))
     console.log('JSON')
   }
 

@@ -242,7 +242,7 @@ function extend_ternary(this: Tokenizer, tokens: string[]) {
     end = [f];
 
     onStart() {
-      this.token.subtype = 'daniel-ternary-start'
+      this.token.subtype = 'ternary-true';
     }
 
     onBefore(cancel: () => void) {
@@ -253,7 +253,7 @@ function extend_ternary(this: Tokenizer, tokens: string[]) {
 
     onEnd() {
       this.token.type = 'operator';
-      this.token.subtype = 'daniel-ternary-before-new-ternary'
+      this.token.subtype = 'ternary-false';
       console.log('porco dio')
     }
   }
