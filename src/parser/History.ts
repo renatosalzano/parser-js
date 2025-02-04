@@ -94,6 +94,8 @@ class History {
     this.current = [index, line, pos];
 
     const { value, type, subtype } = this.Tokenizer.token;
+    const props = this.Tokenizer.token_prop;
+
     const { token_start: [start_index, start_line, start_pos] } = this;
 
     // add location

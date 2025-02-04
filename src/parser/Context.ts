@@ -44,6 +44,7 @@ type context = Omit<TokenContext, 'start' | 'end'> & {
   start: Set<string>;
   end: Set<string>;
   end_immediate: boolean;
+  skip_whitespace?: boolean;
 };
 
 
@@ -89,17 +90,15 @@ class Context {
       // prevContext
       () => this.prev_ctx?.name,
       // skip whitespace
-      (skip = false) => void (this.Tokenizer.skip_whitespace = skip, this.Tokenizer.check_nl = !skip),
+      (skip = false) => void (ctx.skip_whitespace = skip, this.Tokenizer.skip_whitespace = skip, this.Tokenizer.check_nl = !skip),
       // () => void (this.curr_ctx && (this.curr_ctx._end = true))
     ) as unknown as context;
 
     ctx.start = new Set(ctx.start);
     ctx.end = new Set(ctx.end);
     ctx.end_immediate = ctx.end.size == 0;
+    ctx.skip_whitespace = true;
 
-    // ctx.tokenize = Ctx.prototype.tokenize;
-    // ctx.onStart = Ctx.prototype.onStart;
-    // ctx.onEnd = Ctx.prototype.onEnd;
     return ctx;
   }
 
@@ -190,6 +189,11 @@ class Context {
       if (this.ctx_reload) {
         if (this.curr_ctx.onStart) this.curr_ctx.onStart();
         this.ctx_reload = false;
+      }
+
+      if (!this.curr_ctx.skip_whitespace) {
+        this.Tokenizer.skip_whitespace = false;
+        this.Tokenizer.check_nl = true;
       }
 
       this.update_tokenize();

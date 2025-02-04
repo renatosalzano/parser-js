@@ -79,9 +79,7 @@ class Tokenizer {
 
   token_index = 0;
 
-  constructor() {
-
-  }
+  constructor() { }
 
   token_prop: (keyof TokenProperties)[] = [];
   temp: any;
@@ -195,10 +193,10 @@ class Tokenizer {
 
 
   check_new_line() {
-    if (/[\r\n]/.test(this.char.curr)) {
+    if (this.check_nl && /[\r\n]/.test(this.char.curr)) {
 
       if (this.char.curr === '\r') {
-        return "next";
+        this.advance(1);
       }
 
       this.pos = 1, ++this.line;
@@ -291,7 +289,7 @@ class Tokenizer {
           this.token.value += token;
 
           if (this.Context.has(token)) {
-            this.Context.check(token)
+            this.Context.check(token);
           }
 
           return this.token;
@@ -410,7 +408,7 @@ class Tokenizer {
 
   next = (debug: boolean | 'suppress' = false) => {
 
-    if (this.is.nl(this.token.value)) {
+    if (this.is.nl(this.char.curr)) {
       ++this.line;
     }
 
@@ -423,6 +421,8 @@ class Tokenizer {
     for (const prop of this.token_prop) {
       delete this.token[prop];
     }
+
+    this.token_prop = [];
 
     const print = () => {
       if ((this.debug.token || debug) && debug !== 'suppress') {
@@ -467,11 +467,7 @@ class Tokenizer {
 
       this.sync_ch();
 
-      if (this.check_nl && this.check_new_line()) {
-        ++this.index, ++this.pos;
-        console.log('new line bitch', this.expected_token)
-        continue;
-      }
+      this.check_new_line();
 
       switch ((this.Context.tokenize || this.tokenize[this.expected_token])()) {
         case "next": {
@@ -516,6 +512,7 @@ class Tokenizer {
     log('tokenize start;y');
     this.source = source;
     this.debug.token = true;
+    this.debug.newline = true;
 
     try {
 

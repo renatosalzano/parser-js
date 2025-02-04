@@ -138,6 +138,7 @@ class TempateLiteral extends Expression {
 
   onStart() {
     this.skipWhitespace(false);
+
     if (this.token.eq('`')) {
       this.token.subtype = 'template-start';
     } else {
