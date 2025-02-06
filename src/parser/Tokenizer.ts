@@ -9,13 +9,9 @@ import Parser from "./Parser";
 export type TokenType = 'literal' | 'operator' | 'bracket' | 'bracket-open' | 'bracket-close' | 'keyword' | 'separator' | 'identifier' | 'special' | 'statement' | 'comment';
 
 export type TokenProperties = {
-  arithmetic?: boolean;
   assignment?: boolean;
-  comparison?: boolean;
-  logical?: boolean;
   bitwise?: boolean;
   binary?: boolean;
-  conditional?: boolean;
   postfix?: boolean;
   prefix?: boolean;
   ternary?: boolean;
@@ -143,6 +139,8 @@ class Tokenizer {
   skip_newline = false;
   skip_whitespace = true;
   skip_comment = true;
+
+  err?: Error;
 
   debug: DebugNext = {};
 
@@ -459,7 +457,6 @@ class Tokenizer {
     this.History.set_token_start()
 
     if (this.tokenize_type()) {
-      this.token.value == '+' && console.log(this.token)
       this.History.push(this.token);
       print();
       return;
@@ -513,16 +510,21 @@ class Tokenizer {
   start = (source: string) => {
     log('tokenize start;y');
     this.source = source;
-    this.debug.token = true;
-    this.debug.newline = true;
+    // this.debug.token = true;
+    // this.debug.newline = true;
 
     try {
 
-      while (!this.source_end) {
+      while (!this.source_end && !this.err) {
         this.next();
       }
 
-    } catch (error) {
+      if (this.err) throw this.err;
+
+    } catch (error: any) {
+      if (error.type && error.message) {
+        log(` ${error.title || 'Error'} ;R`, `\n  ${error.message};r`);
+      }
       console.log(error);
     }
 
@@ -533,25 +535,32 @@ class Tokenizer {
   }
 
   parse(source: string) {
+
     if (!this.source_end) {
       this.start(source);
     }
+
+    if (this.err) return;
+
     log('parser start;y');
     this.Parser.next();
 
     try {
+
       this.Parser.Program();
+
     } catch (error: any) {
 
       if (error.type && error.message) {
-        log(` ${error.title || 'Unexpected error'} ;R`, `\n  ${error.message};r`);
+        log(` ${error.title || 'Error'} ;R`, `\n  ${error.message};r`);
       }
 
     }
   }
 
   error = (error: Error) => {
-    throw { type: 'error', ...error };
+    this.err = { type: 'error', ...error };
+    throw this.err;
   }
 
 }

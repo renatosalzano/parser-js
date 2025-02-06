@@ -7,24 +7,21 @@ const
   bitwise = true,
   binary = true,
   ternary = true,
-  logical = true,
-  assignment = true,
-  comparison = true,
-  arithmetic = true
+  assignment = true
 
 const operator = [
-  T(['+', '-', '*', '/', '%', '**'], { binary, arithmetic }),
-  T(['+=', '-=', '/=', '%=', '*=', '**='], { assignment, arithmetic }),
+  T(['+', '-', '*', '/', '%', '**'], { binary }),
+  T(['+=', '-=', '/=', '%=', '*=', '**='], { assignment }),
   T('=', { assignment }),
-  T('!', { prefix, logical }),
+  T('!', { prefix }),
   T('~', { prefix, bitwise }),
   T(['?', ':'], { ternary }),
-  T(['==', '!=', '>', '>=', '<', '<=', '===', '!=='], { comparison, binary }),
-  T('typeof', { prefix, comparison }),
-  T('instanceof', { binary, comparison }),
-  T(['||', '&&', '??'], { binary, logical }),
+  T(['==', '!=', '>', '>=', '<', '<=', '===', '!=='], { binary }),
+  T('typeof', { prefix }),
+  T('instanceof', { binary }),
+  T(['||', '&&', '??'], { binary }),
   T(['await', 'new', 'delete', 'void'], { prefix }),
-  T(['++', '--'], { prefix, postfix, arithmetic }),
+  T(['++', '--'], { prefix, postfix }),
   T('.', { binary }),
   T(['&', '|', '^', '<<', '>>', '>>>'], { bitwise, binary }),
   T(['|=', '&=', '^=', '<<=', '>>=', '>>>='], { bitwise, assignment })
@@ -107,7 +104,7 @@ class PlusNegation extends Expression {
 
   onBefore(cancel: () => void) {
 
-    if (this.prevToken.type != 'literal' && this.prevToken.type != 'bracket-close') {
+    if (this.prevToken.type != 'literal' && this.prevToken.type != 'bracket-close' && !this.prevToken.postfix) {
       this.token.prefix = true;
       delete this.token.binary;
     }
@@ -115,6 +112,25 @@ class PlusNegation extends Expression {
     cancel();
   }
 }
+
+
+class IncDecr extends Expression {
+  name = 'increment/decrement'
+  start = ['++', '--'];
+
+  onBefore(cancel: () => void) {
+
+    console.log(this.prevToken)
+
+    if (this.prevToken.value == '++' || this.prevToken.value == '--') {
+      // TODO ERROR BLOCKING
+      this.error({ message: 'expected expression' });
+    }
+
+    cancel();
+  }
+}
+
 
 class ExpressionContainer extends Expression {
   name = 'expression-container';
@@ -185,6 +201,7 @@ export const tokens = {
   statement,
   specialToken,
   context: [
+    IncDecr,
     Declarator,
     PlusNegation,
     ExpressionContainer,

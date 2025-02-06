@@ -37,28 +37,10 @@ class Function extends Node {
 
 
 class Expression extends Node {
-  tag = 'expression';
   group = false;
   expression: (Node | string)[] = [];
-  id: Identifier[] = []
 
   add(node: Node | string) {
-
-    if (node instanceof Node && node.id) {
-      switch (node.id.constructor) {
-        case Array:
-          this.id = this.id.concat(node.id as Array<Identifier>);
-          break;
-        case Identifier:
-          this.id.push(node.id as Identifier);
-          break;
-      }
-    }
-
-    if (node instanceof Identifier) {
-      this.id.push(node);
-    }
-
     this.expression.push(node);
   }
 
@@ -81,7 +63,12 @@ class Expression extends Node {
 class ObjectExpression extends Node {
   tag = 'object'
   type: 'expression' | 'pattern' = 'expression';
-  properties = new Map<string, Property>();
+  properties = new Map<string, Node | undefined>();
+
+  set = (key: string, value?: Node) => {
+    this.properties.set(key, value);
+  }
+
   toString() {
 
     const properties: string[] = [];
@@ -109,15 +96,8 @@ class Property {
 class ArrayExpression extends Node {
   tag = 'array'
   type: 'expression' | 'pattern' = 'expression';
-  id: Node[] = [];
   items: (Node | undefined)[] = [];
   add(node?: Node) {
-    if (node instanceof Identifier) {
-      this.id.push(node);
-    }
-    if (node?.id) {
-      console.log(node)
-    }
     this.items.push(node);
   }
   toString(): string {
@@ -136,29 +116,35 @@ class ArrayExpression extends Node {
 class Primitive extends Node {
   type?: string;
   value?: boolean | string | number | null;
-  constructor({ value, type }: { value: string, type: 'keyword' | 'string' | 'number' }) {
+  constructor({ value, type, subtype }: { value: string, type: 'keyword' | 'literal', subtype: string }) {
     super({});
     switch (type) {
       case 'keyword':
         switch (value) {
           case 'true':
           case 'false':
-            this.tag = 'boolean';
+            this.type = 'boolean';
             this.value = value === 'true' ? true : false;
             break;
           case 'null':
-            this.tag = 'null';
+            this.type = 'null';
             this.value = null;
             break;
         }
         break;
-      case 'string':
-        this.tag = 'string';
-        this.value = value;
-        break;
-      case 'number':
-        this.tag = 'number';
-        this.value = Number(value);
+      case 'literal':
+        switch (subtype) {
+          case 'string': {
+            this.type = 'string';
+            this.value = value;
+            break;
+          }
+          case 'number': {
+            this.type = 'number';
+            this.value = Number(value);
+            break;
+          }
+        }
         break;
     }
   }

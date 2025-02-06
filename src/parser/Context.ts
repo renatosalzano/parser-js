@@ -1,5 +1,5 @@
 import { log } from "utils";
-import Tokenizer, { Token, TokenProperties } from "./Tokenizer";
+import Tokenizer, { Error, Token, TokenProperties } from "./Tokenizer";
 
 interface Ctor<T> {
   new(...args: any): T
@@ -31,6 +31,7 @@ export class TokenContext {
     public currContext: () => string | null,
     public prevContext: () => string | null,
     public skipWhitespace: (skip?: boolean) => void,
+    public error: Tokenizer['error']
   ) {
 
   }
@@ -95,8 +96,8 @@ class Context {
       this.Tokenizer.char,
       token,
       this.Tokenizer.prev_token,
-      () => this.Tokenizer.get_token(),
-      () => this.Tokenizer.get_keyword(),
+      this.Tokenizer.get_token,
+      this.Tokenizer.get_keyword,
       // advance
       (value = 1) => this.Tokenizer.advance(value),
       // currContext
@@ -106,6 +107,7 @@ class Context {
       // skip whitespace
       (skip = false) => void (ctx.skip_whitespace = skip, this.Tokenizer.skip_whitespace = skip, this.Tokenizer.check_nl = !skip),
       // () => void (this.curr_ctx && (this.curr_ctx._end = true))
+      this.Tokenizer.error
     ) as unknown as context;
 
     ctx.start = new Set(ctx.start);

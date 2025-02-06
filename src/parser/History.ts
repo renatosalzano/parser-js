@@ -13,7 +13,7 @@ class History {
   list: any[] = [];
 
   tokens: token[] = [];
-  token_props = new Map<string, TokenProperties>();
+  token_props: TokenProperties[] = [];
   current_token?: token;
   is_parsing = false;
 
@@ -34,7 +34,9 @@ class History {
     start = 0,
     end = 0,
     loc = { start: { ln: 0, col: 0 }, end: { ln: 0, col: 0 } }
-  }: token = {} as token, token: 'token' | 'prev_token' | 'next_token' = 'token') => {
+  }: token = {} as token,
+    token: 'token' | 'prev_token' | 'next_token' = 'token'
+  ) => {
 
     this.Tokenizer[token].value = value;
     this.Tokenizer[token].type = type;
@@ -54,33 +56,57 @@ class History {
       this.Tokenizer[token].loc.end.ln = loc.end.ln;
       this.Tokenizer[token].loc.end.col = loc.end.col;
     }
-
-    if (this.is_parsing) {
-      const props = this.token_props.get(value);
-      if (props) {
-        for (const key in props) {
-          // @ts-ignore
-          this.Tokenizer[token][key] = props[key];
-        }
-      }
-    }
   }
 
   get_token = (index: number) => {
 
+    if (this.token_props[index - 1]) {
+      this.del_props('token', this.token_props[index - 1]);
+    }
+
     const token = this.tokens[index];
-    this.set_token(token);
+    this.set_token(token, 'token');
+
+    for (const prop in this.token_props[index]) {
+      // @ts-ignore
+      this.Tokenizer.token[prop] = this.token_props[index][prop];
+      // @ts-ignore
+      delete this.Tokenizer.next_token[prop]
+    }
 
     if (this.tokens[index + 1]) {
+
       this.set_token(this.tokens[index + 1], 'next_token');
+      this.set_props('next_token', this.token_props[index + 1]);
     }
 
   }
 
+
+  set_props = (token: 'token' | 'prev_token' | 'next_token', props: TokenProperties) => {
+    for (const prop in props) {
+      // @ts-ignore
+      this.Tokenizer[token][prop] = props[prop];
+    }
+  }
+
+
+  del_props = (token: 'token' | 'prev_token' | 'next_token', props: TokenProperties) => {
+    for (const prop in props) {
+      // @ts-ignore
+      delete this.Tokenizer[token][prop];
+    }
+  }
+
+
   prev_token = () => {
+
+    this.del_props('prev_token', this.token_props.at(-2) || {});
+
     const prev_token = this.tokens.at(-1);
     if (prev_token) {
       this.set_token(prev_token, 'prev_token');
+      this.set_props('prev_token', this.token_props.at(-1) || {});
     }
   }
 
@@ -124,7 +150,7 @@ class History {
 
     this.set_token(copy);
 
-    // merge multiple nl
+    // skip multiple nl
     if (copy.value == '\n') {
       const prev_token = this.tokens.at(-1);
       if (prev_token && prev_token.value == '\n') {
@@ -133,7 +159,7 @@ class History {
     }
 
     this.tokens.push(copy);
-    this.token_props.set(value, props);
+    this.token_props.push(props);
 
     this.list.push(`${type}, ${subtype || ''} ${value}`);
   }

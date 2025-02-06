@@ -1,11 +1,7 @@
+import { TokenType } from "acorn";
 import { TraverseTokens } from "./extend";
 import Program from "./Progam";
 import Tokenizer, { Token } from "./Tokenizer";
-
-interface Api {
-  next(): Token;
-}
-
 
 class Parser {
 
