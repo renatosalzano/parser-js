@@ -264,7 +264,7 @@ function extend_ternary(this: Tokenizer, tokens: string[]) {
 
 // PARSER API
 
-function next(this: Tokenizer) {
+function next(this: Tokenizer, debug = false) {
 
   if (this.token_index > this.History.tokens.length - 1) {
     this.tokens_end = true;
@@ -272,10 +272,19 @@ function next(this: Tokenizer) {
     return;
   }
 
+  if (debug) {
+    console.log('debug', this.token_index)
+    console.log(this.History.tokens[this.token_index]);
+  }
+
   this.History.get_token(this.token_index);
   ++this.token_index;
 
   if (this.skip_comment && this.token.type == 'comment') {
+    next.call(this);
+  }
+
+  if (this.skip_newline && this.token.eq('\n')) {
     next.call(this);
   }
 
@@ -291,7 +300,7 @@ function traverse_tokens(this: Tokenizer, startToken: string, endToken: string) 
   this.temp = { buffer: [] };
 
   const that = this;
-  const start_index = this.token_index;
+  const start_index = this.token_index - 1;
 
   const next_token = () => next.call(this);
   let then_pipe = false;
@@ -303,6 +312,7 @@ function traverse_tokens(this: Tokenizer, startToken: string, endToken: string) 
     }
     callback();
     that.History.get_token(start_index);
+    that.token_index = start_index + 1;
     return ({
       eat: () => {
       }
@@ -380,10 +390,11 @@ function extend_parser(this: Tokenizer, Parser: Ctor<Parser>) {
   this.Parser = new Parser(
     this.token,
     this.next_token,
-    () => next.call(this),
+    (debug = false) => next.call(this, debug),
     () => true,
     (s: string, e: string) => traverse_tokens.call(this, s, e),
     (skip_comment = true) => this.skip_comment = skip_comment,
+    (skip_newline = true) => this.skip_newline = skip_newline,
     (token: string, multiple = false) => eat.call(this, token, multiple),
     this.error,
     // Program

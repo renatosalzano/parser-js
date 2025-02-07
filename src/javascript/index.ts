@@ -1,6 +1,6 @@
 import Parser from "parser/Parser";
 import { op, tokens } from './tokens';
-import { Expression, Identifier, ObjectExpression, Primitive, TemplateLiteral, Variable } from "./node";
+import { ArrayExpression, Expression, Identifier, ObjectExpression, Primitive, Property, TemplateLiteral, Variable } from "./node";
 import { log } from "utils";
 import errors from "./errors";
 
@@ -27,6 +27,12 @@ export default (config: any) => {
             }
             break;
           }
+          case "literal":
+            if (this.token.eq('\n')) {
+              this.next();
+              this.Program();
+            }
+            break;
           default: {
             this.expression()
           }
@@ -155,24 +161,6 @@ export default (config: any) => {
 
       }
 
-      expressionGroup() {
-        const node = this.createNode(Expression, { group: true });
-
-      }
-
-      operator(node: Expression) {
-        switch (true) {
-          case this.token.binary:
-            node.add(this.token.value);
-            this.next();
-            return true;
-          case this.token.postfix:
-            node.add(this.token.value);
-            this.next();
-
-
-        }
-      }
 
       literalExpression(node: Expression) {
         let parse
@@ -180,6 +168,7 @@ export default (config: any) => {
       }
 
       variable(kind: 'const' | 'let' | 'const' | 'var') {
+        log('variable;m');
         const node = this.createNode(Variable, { tag: kind, kind });
         const expected_init = kind === 'const';
 
@@ -250,27 +239,63 @@ export default (config: any) => {
 
       object(type?: 'expression' | 'pattern') {
 
+        log('object expression;m')
+
         if (!type) {
+
+          type = 'expression';
+
           this.traverse('{', '}').then(() => {
             if (this.token.eq('=')) {
               type = 'pattern';
             }
-          })
+          });
         }
 
         const node = this.createNode(ObjectExpression, { type });
 
         if (this.token.eq('{')) this.next();
 
-        const property: [] = []
+        let parse_object = true;
+
+        while (parse_object) {
+
+          const { key, alias } = this.objectKey(type);
+          let value: Expression | Node | undefined = undefined;
+
+          if (type == 'expression') {
+            if (this.token.eq(':')) {
+              this.next();
+              value = this.objectValue();
+            }
+          } else {
+            if (this.token.eq('=')) {
+              this.next();
+              value = this.objectValue();
+            }
+          }
+
+          if (this.token.eq(',')) {
+            node.set(key, this.createNode(Property, { key, alias, value }));
+            continue;
+          }
+
+          if (this.token.eq('}')) {
+            parse_object = false;
+            if (key) {
+              node.set(key, this.createNode(Property, { key, alias, value }));
+            }
+            this.next();
+          }
+        }
 
         return node;
       }
 
       objectKey(type: 'expression' | 'pattern') {
 
-        let key: string;
-        let node: Node;
+        let key = '';
+        let alias: string | undefined = undefined;
 
         switch (this.token.type) {
           case "identifier":
@@ -293,16 +318,44 @@ export default (config: any) => {
         }
 
         this.next();
+
         if (type == 'pattern' && this.token.eq(':')) {
           // alias;
+          this.next();
+          if (this.token.eq('identifier')) {
+            alias = this.token.value;
+          }
 
         }
 
+        return { key, alias };
+
       }
 
-      objectValue() { }
+      objectValue() {
+        const value = this.expression(false);
+        return value;
+      }
 
-      array(type?: 'expression' | 'pattern') { }
+      array(type?: 'expression' | 'pattern') {
+
+        if (!type) {
+
+          this.traverse('[', ']').then(() => {
+            if (this.token.eq('=')) {
+              type = 'pattern';
+            }
+          });
+
+        }
+
+        const node = this.createNode(ArrayExpression, { type });
+
+        if (this.token.eq('[')) this.next();
+
+
+        return node;
+      }
 
       templateLiteral() {
         const node = this.createNode(TemplateLiteral);

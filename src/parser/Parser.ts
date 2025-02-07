@@ -18,6 +18,7 @@ class Parser {
      */
     public traverse: (startToken: string, endToken: string) => TraverseTokens,
     public skipComment: (skipComment?: boolean) => void,
+    public skipNewline: (skipNewline?: boolean) => void,
     public eat: (token: string, multiple?: boolean) => void,
     public error: Tokenizer['error'],
     public createNode: Program['create_node'],

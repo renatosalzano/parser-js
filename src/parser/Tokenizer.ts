@@ -542,6 +542,9 @@ class Tokenizer {
 
     if (this.err) return;
 
+    this.skip_comment = true;
+    this.skip_newline = true;
+
     log('parser start;y');
     this.Parser.next();
 

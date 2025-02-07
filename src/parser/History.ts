@@ -58,7 +58,7 @@ class History {
     }
   }
 
-  get_token = (index: number) => {
+  get_token = (index: number, debug = false) => {
 
     if (this.token_props[index - 1]) {
       this.del_props('token', this.token_props[index - 1]);
@@ -78,6 +78,13 @@ class History {
 
       this.set_token(this.tokens[index + 1], 'next_token');
       this.set_props('next_token', this.token_props[index + 1]);
+    }
+
+    if (debug) {
+      console.log('debug history')
+      console.log(index, this.tokens[index]);
+      console.log(this.Tokenizer.token);
+      console.log('debug history end')
     }
 
   }

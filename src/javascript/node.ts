@@ -63,10 +63,10 @@ class Expression extends Node {
 class ObjectExpression extends Node {
   tag = 'object'
   type: 'expression' | 'pattern' = 'expression';
-  properties = new Map<string, Node | undefined>();
+  properties = new Map<string, Property>();
 
-  set = (key: string, value?: Node) => {
-    this.properties.set(key, value);
+  set = (key: string, property: Property) => {
+    this.properties.set(key, property);
   }
 
   toString() {
@@ -81,9 +81,9 @@ class ObjectExpression extends Node {
 }
 
 class Property {
-  key = {} as Node;
-  alias?: Node;
-  value: Node | null = null;
+  key: string = '';
+  alias?: string;
+  value?: Node;
   toString() {
     const key = this.key.toString();
     if (this.value) {
