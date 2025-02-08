@@ -169,7 +169,7 @@ export default (config: any) => {
 
       variable(kind: 'const' | 'let' | 'const' | 'var') {
         log('variable;m');
-        const node = this.createNode(Variable, { tag: kind, kind });
+        const node = this.createNode(Variable, { kind });
         const expected_init = kind === 'const';
 
         this.next();

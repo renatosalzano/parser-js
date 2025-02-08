@@ -1,5 +1,4 @@
 import { log } from "utils";
-import Tokenizer from "./Tokenizer";
 import { writeFileSync } from "fs";
 
 interface Ctor<T> {
@@ -7,12 +6,12 @@ interface Ctor<T> {
 }
 
 class Node {
-  tag?: string;
+  type?: string;
   id?: Node | Node[];
   location?: { line: number, start: number, end: number };
 
-  constructor(init: { [key: string]: any }) {
-    Object.assign(this, init);
+  constructor(_: { [key: string]: any }) {
+    Object.assign(this, _);
   }
 
   toString() {
@@ -32,7 +31,7 @@ class Node {
 }
 
 class Block extends Node {
-  tag = 'block';
+  type = 'block';
   functionBody = false;
   body: Node[] = [];
 
@@ -55,13 +54,8 @@ interface Identifier {
 }
 
 class Identifier extends Node {
-  tag = 'identifier';
+  type = 'identifier';
   name = '';
-
-  constructor(init: { [key: string]: any }) {
-    super(init);
-    this.name = init.name;
-  }
 
   toString() {
     return `${this.rest || this.spread ? '...' : ''}${this.name}`;
@@ -105,6 +99,8 @@ class Program {
       };
     }
 
+
+
     if (node instanceof Block) {
 
       this.block.push(node);
@@ -137,6 +133,7 @@ class Program {
   }
 
   toJSON = (path: string) => {
+    log('to json')
     const json = JSON.stringify(this.body.map((n) => n.toJSON()), null, 2);
     writeFileSync(path, json)
   }

@@ -1,7 +1,7 @@
 import { Block, Identifier, Node } from "parser/Progam";
 
 class Variable extends Node {
-  tag = 'variable'
+  type = 'variable'
   kind?: 'var' | 'const' | 'let';
   id = {} as Node;
   init?: Node;
@@ -17,7 +17,7 @@ class Variable extends Node {
 }
 
 class Function extends Node {
-  tag = 'function';
+  type = 'function';
   id?: Identifier;
   expression?: boolean;
   async?: boolean;
@@ -37,6 +37,7 @@ class Function extends Node {
 
 
 class Expression extends Node {
+  type = 'expression';
   group = false;
   expression: (Node | string)[] = [];
 
@@ -58,11 +59,12 @@ class Expression extends Node {
     }
     return expr.join('');
   }
+
 }
 
 class ObjectExpression extends Node {
-  tag = 'object'
-  type: 'expression' | 'pattern' = 'expression';
+  type = 'object'
+  kind: 'expression' | 'pattern' = 'expression';
   properties = new Map<string, Property>();
 
   set = (key: string, property: Property) => {
@@ -78,24 +80,35 @@ class ObjectExpression extends Node {
 
     return `{${properties.join(',\n')}}`;
   }
+
+  toJSON() {
+    const output: any = { properties: [] }
+    output.type = this.type;
+    output.kind = this.kind;
+    this.properties.forEach((value, key) => output.properties.push(value.toJSON()));
+    return output;
+
+  }
 }
 
-class Property {
-  key: string = '';
+class Property extends Node {
+  type = 'property';
+  key?: string;
   alias?: string;
   value?: Node;
+
   toString() {
-    const key = this.key.toString();
+    const key = this.key;
     if (this.value) {
       return `${key}: ${this.value.toString()}`
     }
-    return key
+    return key || '';
   }
 }
 
 class ArrayExpression extends Node {
-  tag = 'array'
-  type: 'expression' | 'pattern' = 'expression';
+  type = 'array'
+  kind: 'expression' | 'pattern' = 'expression';
   items: (Node | undefined)[] = [];
   add(node?: Node) {
     this.items.push(node);
@@ -116,6 +129,7 @@ class ArrayExpression extends Node {
 class Primitive extends Node {
   type?: string;
   value?: boolean | string | number | null;
+
   constructor({ value, type, subtype }: { value: string, type: 'keyword' | 'literal', subtype: string }) {
     super({});
     switch (type) {
@@ -160,7 +174,7 @@ class Primitive extends Node {
 }
 
 class TemplateLiteral extends Node {
-  tag = 'template-literal'
+  type = 'template-literal'
   expression: Node[] = [];
   toString() {
     let expr: string[] = [];
