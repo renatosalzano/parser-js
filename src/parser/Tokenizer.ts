@@ -197,7 +197,7 @@ class Tokenizer {
         this.advance(1);
       }
 
-      this.pos = 1, ++this.line;
+      ++this.line, this.pos = 1;
       if (this.debug.newline) log('Ln:;c', this.line);
     }
   }
@@ -400,7 +400,7 @@ class Tokenizer {
     newline: () => {
       this.token.subtype = 'newline';
       this.token.value = '\n';
-      ++this.index, ++this.pos;
+      ++this.index, this.pos = 1;
       return;
     }
   }
@@ -538,6 +538,7 @@ class Tokenizer {
 
     if (!this.source_end) {
       this.start(source);
+      return;
     }
 
     if (this.err) return;
@@ -550,8 +551,12 @@ class Tokenizer {
 
     try {
 
-      this.Parser.Program();
-      this.Program.toJSON(process.cwd() + '\\dist\\ast.json');
+      while (!this.tokens_end) {
+        this.Parser.Program();
+      }
+
+      log('end parser;c')
+      // this.Program.toJSON(process.cwd() + '\\dist\\ast.json');
 
     } catch (error: any) {
 

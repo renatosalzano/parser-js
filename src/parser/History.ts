@@ -24,7 +24,7 @@ class History {
   token_start = [0, 1, 1];
   set_token_start = () => {
     const { index, line, pos, } = this.Tokenizer;
-    this.token_start = [index, line, pos]
+    this.token_start = [index, line, pos];
   }
 
   set_token = ({

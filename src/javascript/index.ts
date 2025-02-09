@@ -1,8 +1,9 @@
 import Parser from "parser/Parser";
-import { op, tokens } from './tokens';
+import { tokens } from './tokens';
 import { ArrayExpression, Expression, Identifier, ObjectExpression, Primitive, Property, TemplateLiteral, Variable } from "./node";
 import { log } from "utils";
 import errors from "./errors";
+import { Node } from "parser/Progam";
 
 export default (config: any) => {
 
@@ -11,6 +12,8 @@ export default (config: any) => {
     tokens,
     parser: class extends Parser {
       Program() {
+
+        log('program tok:;c', this.token.value);
         switch (this.token.type) {
           case "statement": {
             switch (this.token.value) {
@@ -21,6 +24,7 @@ export default (config: any) => {
                 break;
               case 'import':
               case 'export':
+                this.module(this.token.value);
                 break;
               case 'function':
                 break;
@@ -30,27 +34,40 @@ export default (config: any) => {
           case "literal":
             if (this.token.eq('\n')) {
               this.next();
-              this.Program();
+              return;
             }
             break;
           default: {
             this.expression()
           }
+
         }
       }
+
+      module(type: 'import' | 'export') {
+
+      };
 
       expression(append = false, node = this.createNode(Expression)) {
 
         const self = this;
 
         function end() {
-          log('end expression');
+          log('end expression;m');
 
-          if (append) {
-            self.appendNode(node);
+          let output = node;
+
+          if (node.expression.length == 1) {
+            if (typeof node.expression[0] != 'string') {
+              output = node.expression[0] as any;
+            }
           }
 
-          return node;
+          if (append) {
+            self.appendNode(output);
+          }
+
+          return output;
         }
 
         let parse_expression = true;
@@ -176,7 +193,7 @@ export default (config: any) => {
 
         this.variableID(node); // parse id
 
-        log('Variable;m', 'ID done;g');
+        log('variable;m', 'id done;g');
 
         if (expected_init && !this.token.eq('=')) {
           this.error({ message: errors.variable.expected_init });
@@ -190,7 +207,7 @@ export default (config: any) => {
           }
 
           this.variableInit(node);
-          log('Variable;m', 'init done;y');
+          log('variable;m', 'init done;g');
         }
 
         this.appendNode(node);
@@ -207,7 +224,7 @@ export default (config: any) => {
           }
         }
 
-        log('Variable end;m')
+        log('variable end;g', this.token)
       }
 
       variableID(node: Variable) {
@@ -233,7 +250,6 @@ export default (config: any) => {
       variableInit(node: Variable) {
 
         node.init = this.expression(false);
-        console.log(node.init)
 
       }
 
@@ -288,7 +304,7 @@ export default (config: any) => {
             this.next();
           }
         }
-
+        log('objece end;m');
         return node;
       }
 
@@ -309,6 +325,7 @@ export default (config: any) => {
           case 'bracket-open': {
             // TODO COMPUTED KEY
             if (this.token.eq('[')) {
+              log('computed crap')
               //
             }
           }

@@ -190,6 +190,11 @@ class TemplateLiteral extends Node {
   }
 }
 
+class Spread extends Node {
+  type?: 'spread' | 'rest';
+
+}
+
 class Empty extends Node {
   toString() {
     return '';

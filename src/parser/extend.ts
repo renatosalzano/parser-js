@@ -263,29 +263,35 @@ function extend_ternary(this: Tokenizer, tokens: string[]) {
 
 
 // PARSER API
-
 function next(this: Tokenizer, debug = false) {
 
-  if (this.token_index > this.History.tokens.length - 1) {
-    this.tokens_end = true;
+  try {
+
+    if (this.token_index == this.History.tokens.length - 1) {
+      this.tokens_end = true;
+      throw 'end';
+    }
+
+    if (debug) {
+      console.log('debug', this.token_index)
+      console.log(this.History.tokens[this.token_index]);
+    }
+
+    this.History.get_token(this.token_index);
+    ++this.token_index;
+
+    if (this.skip_comment && this.token.type == 'comment') {
+      if (this.tokens_end) throw 'end'; // WTF
+      next.call(this);
+    }
+
+    if (this.skip_newline && this.token.eq('\n')) {
+      if (this.tokens_end) throw 'end'; // WTF
+      next.call(this);
+    }
+
+  } catch {
     this.History.last_token();
-    return;
-  }
-
-  if (debug) {
-    console.log('debug', this.token_index)
-    console.log(this.History.tokens[this.token_index]);
-  }
-
-  this.History.get_token(this.token_index);
-  ++this.token_index;
-
-  if (this.skip_comment && this.token.type == 'comment') {
-    next.call(this);
-  }
-
-  if (this.skip_newline && this.token.eq('\n')) {
-    next.call(this);
   }
 
 }
@@ -367,6 +373,11 @@ function recursive_next(this: Tokenizer, ts: string, te: string, next: () => voi
       }
     }
 
+    if (this.tokens_end) {
+      this.error({ title: 'Parser error', message: `${te} not found` });
+      break;
+    }
+
   }
 
 }
@@ -391,6 +402,7 @@ function extend_parser(this: Tokenizer, Parser: Ctor<Parser>) {
     this.token,
     this.next_token,
     (debug = false) => next.call(this, debug),
+    // expected wip
     () => true,
     (s: string, e: string) => traverse_tokens.call(this, s, e),
     (skip_comment = true) => this.skip_comment = skip_comment,
