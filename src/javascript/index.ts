@@ -50,10 +50,12 @@ export default (config: any) => {
 
       expression(append = false, node = this.createNode(Expression)) {
 
+        log('expression;m')
+
         const self = this;
 
         function end() {
-          log('end expression;m');
+          log('end expression;g');
 
           let output = node;
 
@@ -75,7 +77,7 @@ export default (config: any) => {
 
         while (parse_expression) {
 
-          log('express tok:;c', this.token.value)
+          log('expr tok:;c', this.token.value)
 
           switch (this.token.type) {
             case "identifier":
@@ -102,7 +104,8 @@ export default (config: any) => {
               switch (this.token.value) {
                 case '{':
                   node.add(this.object());
-                  break;
+                  console.log('after obj', this.token)
+                  continue;
                 case '[':
                   node.add(this.array());
                   break;
@@ -122,26 +125,28 @@ export default (config: any) => {
               }
               break;
             }
-            case "keyword":
+            // case "keyword":
+            case "statement":
             case "separator": {
+
               switch (this.token.value) {
                 case ',':
-
                   this.next();
                   if (node.group) {
                     continue;
                   } else {
-                    return end();
+                    break;
                   }
                 case ';': {
                   this.next();
                   if (node.group) {
                     this.error({ title: 'Unexpected token', message: "expected ')'" });
                   }
-                  return end();
+                  break;
                 }
               }
-              break;
+
+              return end();
             }
             case "special": {
               operand = true;
@@ -150,7 +155,6 @@ export default (config: any) => {
               }
               break;
             }
-            case "statement":
             case "comment":
           }
 

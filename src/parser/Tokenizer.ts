@@ -538,7 +538,6 @@ class Tokenizer {
 
     if (!this.source_end) {
       this.start(source);
-      return;
     }
 
     if (this.err) return;
