@@ -27,17 +27,6 @@ const operator = [
   T(['|=', '&=', '^=', '<<=', '>>=', '>>>='], { bitwise, assignment })
 ]
 
-export const op = {
-
-  unary: {
-    math: new Set(['++', '--'])
-  },
-  binary: {
-    math: new Set(['+', '-', '*', '/', '%', '**']),
-    comparison: new Set(['==', '!=', '>', '>=', '<', '<=', '===', '!==', 'instanceof', 'in'])
-  }
-}
-
 const bracket = [['(', ')'], ['[', ']'], ['{', '}']];
 
 const separator = [',', ':', ';', '\n'];

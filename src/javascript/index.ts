@@ -1,6 +1,6 @@
 import Parser from "parser/Parser";
 import { tokens } from './tokens';
-import { ArrayExpression, Expression, Identifier, ObjectExpression, Primitive, Property, TemplateLiteral, Variable } from "./node";
+import { ArrayExpression, Empty, Expression, Identifier, ObjectExpression, Primitive, Property, TemplateLiteral, Variable } from "./node";
 import { log } from "utils";
 import errors from "./errors";
 import { Node } from "parser/Progam";
@@ -69,6 +69,8 @@ export default (config: any) => {
             self.appendNode(output);
           }
 
+          console.log(output)
+
           return output;
         }
 
@@ -82,7 +84,7 @@ export default (config: any) => {
           switch (this.token.type) {
             case "identifier":
               operand = true;
-              node.add(this.createNode(Identifier, { name: this.token.type }));
+              node.add(this.createNode(Identifier, { name: this.token.value }));
               break;
             case 'literal':
               operand = true;
@@ -104,11 +106,10 @@ export default (config: any) => {
               switch (this.token.value) {
                 case '{':
                   node.add(this.object());
-                  console.log('after obj', this.token)
                   continue;
                 case '[':
                   node.add(this.array());
-                  break;
+                  continue;
                 case '(':
                   this.next();
 
@@ -359,6 +360,7 @@ export default (config: any) => {
       }
 
       array(type?: 'expression' | 'pattern') {
+        log('array;m');
 
         if (!type) {
 
@@ -370,10 +372,39 @@ export default (config: any) => {
 
         }
 
-        const node = this.createNode(ArrayExpression, { type });
-
         if (this.token.eq('[')) this.next();
 
+        const node = this.createNode(ArrayExpression, { type });
+        let parsing = true,
+          comma = 0,
+          item = undefined;
+
+        while (parsing) {
+
+          switch (this.token.value) {
+            case ',': {
+              ++comma;
+              if (!item) {
+                node.add(this.createNode(Empty))
+              } else {
+                node.add(item);
+              }
+              continue;
+            }
+            case ']': {
+              this.next();
+              parsing = false;
+              if (comma == node.items.length) {
+                node.add(item);
+              }
+              log('array end;g');
+              return node;
+            }
+            default: {
+              item = this.expression(false);
+            }
+          }
+        }
 
         return node;
       }

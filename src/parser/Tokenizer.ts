@@ -555,7 +555,7 @@ class Tokenizer {
       }
 
       log('end parser;c')
-      // this.Program.toJSON(process.cwd() + '\\dist\\ast.json');
+      this.Program.toJSON(process.cwd() + '\\dist\\ast.json');
 
     } catch (error: any) {
 

@@ -48,17 +48,16 @@ class Block extends Node {
 }
 
 interface Identifier {
-  name: string;
+  name?: string;
   rest?: boolean;
-  spread?: boolean;
 }
 
 class Identifier extends Node {
   type = 'identifier';
-  name = '';
+  name?: string;
 
   toString() {
-    return `${this.rest || this.spread ? '...' : ''}${this.name}`;
+    return `${this.name}`;
   }
 
   toJSON() {
