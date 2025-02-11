@@ -38,8 +38,10 @@ class Function extends Node {
 
 class Expression extends Node {
   type = 'expression';
-  group = false;
+  kind?: 'member' | 'call' | 'arguments'
+  group?: boolean;
   expression: (Node | string)[] = [];
+  arguments?: (Node)[];
 
   add(node: Node | string) {
     this.expression.push(node);

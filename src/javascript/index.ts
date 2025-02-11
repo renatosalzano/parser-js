@@ -83,21 +83,37 @@ export default (config: any) => {
             case "identifier":
               operand = true;
               node.add(this.createNode(Identifier, { name: this.token.value }));
+
+              if (this.nextToken.eq('(')) {
+                node.kind = 'call';
+                this.next();
+                continue;
+              }
+
               break;
             case 'literal':
               operand = true;
               node.add(this.createNode(Primitive, this.token));
               break;
             case "operator": {
+
               if (this.token.binary) {
                 if (node.expression.length == 0) {
                   console.log(this.token, this.nextToken)
                   this.error({ title: 'Unexpected token', message: 'Expression expected' });
                 }
               }
-              node.add(this.token.value);
-              this.next();
 
+              node.add(this.token.value);
+
+              if (this.token.eq('.')) {
+                node.kind = 'member';
+                this.next();
+                continue;
+              }
+
+              this.next();
+              node.add(this.expression(false));
               continue;
             }
             case "bracket-open": {
@@ -130,7 +146,15 @@ export default (config: any) => {
                   }
 
                   this.next();
+
                   const group = this.createNode(Expression, { group: true });
+
+                  if (node.kind == 'call') {
+                    group.kind = 'arguments';
+                    node.arguments = group.expression;
+                  }
+
+                  console.log('group', group)
                   node.add(this.expression(false, group));
                   break;
                 }
@@ -230,9 +254,9 @@ export default (config: any) => {
         }
 
         if (arrow && !this.token.eq('{')) {
-          log('arrow fn body expression;y')
+          log('arrow fn body expression;y');
+
           node.body = this.expression(false);
-          console.log(node)
           return node;
         }
 
