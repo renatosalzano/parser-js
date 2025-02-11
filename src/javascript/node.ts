@@ -108,11 +108,13 @@ class Property extends Node {
 
 class ArrayExpression extends Node {
   type = 'array'
-  kind: 'expression' | 'pattern' = 'expression';
+  kind?: 'expression' | 'pattern';
   items: (Node | undefined)[] = [];
+
   add(node?: Node) {
     this.items.push(node);
   }
+
   toString(): string {
     const output: string[] = [];
     for (const item of this.items) {

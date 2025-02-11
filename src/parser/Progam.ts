@@ -10,8 +10,8 @@ class Node {
   id?: Node | Node[];
   location?: { line: number, start: number, end: number };
 
-  constructor(_: { [key: string]: any }) {
-    Object.assign(this, _);
+  constructor(init: { [key: string]: any }) {
+    Object.assign(this, init);
   }
 
   toString() {
