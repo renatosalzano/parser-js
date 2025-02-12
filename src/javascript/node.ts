@@ -41,7 +41,7 @@ class Expression extends Node {
   kind?: 'member' | 'call' | 'arguments'
   group?: boolean;
   expression: (Node | string)[] = [];
-  arguments?: (Node)[];
+  arguments?: (Node | string)[];
 
   add(node: Node | string) {
     this.expression.push(node);
@@ -58,6 +58,29 @@ class Expression extends Node {
     }
     if (this.group) {
       return `(${expr.join('')})`;
+    }
+    return expr.join('');
+  }
+
+}
+
+class Arguments extends Node {
+  type = 'arguments';
+
+  arguments: (Node | string)[] = [];
+
+  add(node: Node | string) {
+    this.arguments.push(node);
+  }
+
+  toString() {
+    let expr: string[] = [];
+    for (const item of this.arguments) {
+      if (typeof item === 'string') {
+        expr.push(item);
+      } else {
+        expr.push(item.toString());
+      }
     }
     return expr.join('');
   }
@@ -196,7 +219,24 @@ class TemplateLiteral extends Node {
 
 class Spread extends Node {
   type?: 'spread' | 'rest';
+}
 
+class Import extends Node {
+  type = 'import';
+  specifiers: Importer[] = [];
+  source: Node = {} as Node;
+
+  add(node: Importer) {
+    this.specifiers.push(node);
+  }
+}
+
+class Importer extends Node {
+  type = 'importer';
+  module?: boolean;
+  default?: boolean;
+  imported?: Node;
+  alias?: Node;
 }
 
 class Empty extends Node {
@@ -212,10 +252,13 @@ class Unexpected extends Node {
 export {
   Empty,
   Block,
+  Import,
+  Importer,
   Variable,
   Function,
   Property,
   Primitive,
+  Arguments,
   Identifier,
   Expression,
   Unexpected,

@@ -1,6 +1,6 @@
 import Parser from "parser/Parser";
 import { tokens } from './tokens';
-import { ArrayExpression, Empty, Expression, Function, Identifier, ObjectExpression, Primitive, Property, TemplateLiteral, Variable } from "./node";
+import { Arguments, ArrayExpression, Empty, Expression, Function, Identifier, Import, Importer, ObjectExpression, Primitive, Property, TemplateLiteral, Variable } from "./node";
 import { log } from "utils";
 import errors from "./errors";
 import { Node } from "parser/Progam";
@@ -23,8 +23,10 @@ export default (config: any) => {
                 this.variable(this.token.value);
                 break;
               case 'import':
+                this.import();
+                break;
               case 'export':
-                this.module(this.token.value);
+                this.export();
                 break;
               case 'function':
                 break;
@@ -44,25 +46,164 @@ export default (config: any) => {
         }
       }
 
-      module(type: 'import' | 'export') {
+      import() {
+        log('import;m');
+        const node = this.createNode(Import);
 
+        const end = () => {
+          this.appendNode(node);
+          return node;
+        }
+
+        if (this.token.eq('import')) this.next();
+
+        let parse = true;
+        let alias = false;
+        let pattern = false;
+
+        import_loop: while (parse) {
+          const importer = this.createNode(Importer);
+          log('import tok:;c', this.token.value, this.token.type);
+
+          switch (this.token.type) {
+            case 'literal': {
+              if (this.token.subtype == 'string') {
+                const module_name = this.createNode(Primitive, this.token);
+                this.next();
+
+                switch (this.token.value) {
+                  case 'import':
+                  case ';':
+                    if (this.token.eq(';')) this.next();
+                    parse = false;
+                    node.source = module_name;
+                    return end();
+                }
+
+                importer.imported = module_name;
+                console.log('importer', importer)
+                break;
+              }
+            }
+            case 'identifier': {
+              importer.imported = this.createNode(Identifier, { name: this.token.value });
+              console.log('importer', importer);
+              this.next();
+              break;
+            }
+            case 'operator': {
+              if (this.token.eq('*')) {
+                this.next();
+                importer.module = true;
+                break;
+              }
+            }
+            case 'bracket-open': {
+              if (this.token.eq('{')) {
+                this.next();
+                pattern = true;
+                continue import_loop;
+              }
+            }
+            case 'bracket-close': {
+              if (this.token.eq('}')) {
+                this.next();
+                pattern = false;
+                continue import_loop;
+              }
+            }
+            case 'separator': {
+              if (this.token.eq(',')) {
+                this.next();
+                if (importer.imported) {
+                  node.add(importer);
+                }
+                continue import_loop;
+              }
+            }
+            case 'keyword': {
+              switch (this.token.value) {
+                case 'as':
+                  this.next();
+                  alias = true;
+                  break;
+                case 'default': {
+                  if (pattern) {
+                    this.next();
+                    importer.default = true;
+                    break;
+                  }
+                }
+                case 'from': {
+                  this.next();
+                  parse = false;
+                  continue import_loop;
+                }
+                default: {
+                  this.error({ message: 'unexpected token: ' + this.token.value });
+                }
+              }
+              break;
+            }
+            default: {
+              this.error({ message: 'unexpected token: ' + this.token.value });
+            }
+          }
+
+          if (this.token.eq('as')) {
+            this.next();
+            alias = true;
+          }
+
+          if (alias) {
+            alias = false;
+            if (this.token.eq('identifier')) {
+              importer.alias = this.createNode(Identifier, { name: this.token.value });
+              this.next();
+              log('with alias', importer)
+            } else {
+              this.error({ message: 'unexpected token: ' + this.token.value });
+            }
+          }
+
+          node.add(importer);
+
+        }// end loop
+
+        if (this.token.subtype == 'string') {
+          node.source = this.createNode(Primitive, this.token);
+          this.next();
+          if (this.token.eq(';')) this.next();
+        } else {
+          this.error({ message: 'unexpected token: ' + this.token.value });
+        }
+
+        log('import end;g');
+
+        return end();
       };
 
-      expression(append = false, node = this.createNode(Expression)) {
+      export() { }
 
-        log('expression;m')
+      expression(append = false, node: Expression = this.createNode(Expression)) {
+
+        log('expression;m', this.token.value)
 
         const self = this;
 
         function end() {
-          log('end expression;g');
+          log('end expression;g', self.token.value);
 
           let output = node;
 
-          if (node.expression.length == 1) {
+          if (node.expression.length == 1 && !node.group) {
             if (typeof node.expression[0] != 'string') {
               output = node.expression[0] as any;
             }
+          }
+
+          if (node.kind == 'call') {
+            console.log(node.expression.at(-1))
           }
 
           if (append) {
@@ -74,8 +215,9 @@ export default (config: any) => {
 
         let parse_expression = true;
         let operand, operator;
+        let max = 10
 
-        while (parse_expression) {
+        while (max > 0 && parse_expression) {
 
           log('expr tok:;c', this.token.value)
 
@@ -85,8 +227,8 @@ export default (config: any) => {
               node.add(this.createNode(Identifier, { name: this.token.value }));
 
               if (this.nextToken.eq('(')) {
-                node.kind = 'call';
                 this.next();
+                node.kind = 'call';
                 continue;
               }
 
@@ -103,17 +245,8 @@ export default (config: any) => {
                   this.error({ title: 'Unexpected token', message: 'Expression expected' });
                 }
               }
-
               node.add(this.token.value);
-
-              if (this.token.eq('.')) {
-                node.kind = 'member';
-                this.next();
-                continue;
-              }
-
               this.next();
-              node.add(this.expression(false));
               continue;
             }
             case "bracket-open": {
@@ -147,14 +280,12 @@ export default (config: any) => {
 
                   this.next();
 
-                  const group = this.createNode(Expression, { group: true });
-
                   if (node.kind == 'call') {
-                    group.kind = 'arguments';
-                    node.arguments = group.expression;
+                    node.add(this.arguments());
+                    break;
                   }
 
-                  console.log('group', group)
+                  const group = this.createNode(Expression, { group: true });
                   node.add(this.expression(false, group));
                   break;
                 }
@@ -162,10 +293,12 @@ export default (config: any) => {
               break;
             }
             case "bracket-close": {
+
               switch (this.token.value) {
                 case ')':
                   return end();
               }
+              console.log('porco dio')
               return end();
             }
             // case "keyword":
@@ -194,7 +327,8 @@ export default (config: any) => {
             case "special": {
               operand = true;
               if (this.token.value == '`') {
-                node.add(this.templateLiteral())
+                node.add(this.templateLiteral());
+                continue;
               }
               break;
             }
@@ -205,6 +339,11 @@ export default (config: any) => {
 
           if (operand) {
             operand = false;
+
+            if (node.group && this.token.eq(',')) {
+              this.next();
+              continue;
+            }
 
             if (this.token.postfix) {
               node.add(this.token.value);
@@ -217,12 +356,48 @@ export default (config: any) => {
 
           }
 
+          --max;
+
           return end()
 
         }
 
         return node;
 
+      }
+
+
+      arguments() {
+        log('arguments;m');
+
+        const node = this.createNode(Arguments);
+        let parse = true;
+
+        if (this.token.eq(')')) {
+          this.next();
+          return node;
+        }
+
+        while (parse) {
+
+          node.add(this.expression());
+
+          log('args tok:;c', this.token.value)
+
+          if (this.token.eq(',')) {
+            this.next();
+            continue;
+          }
+
+          if (this.token.eq(')')) {
+            this.next();
+            log('arguments end;g')
+            return node;
+          }
+
+        }
+
+        return node;
       }
 
 
@@ -430,7 +605,7 @@ export default (config: any) => {
 
           --max;
         }
-        log('objece end;m');
+        log('object end;m');
         return node;
       }
 
@@ -530,6 +705,9 @@ export default (config: any) => {
               log('array end;g', this.token.value + ';y');
               return node;
             }
+            case '}': {
+              this.error({ title: 'unexpected token', message: 'porca la madonna' })
+            }
             default: {
               item = this.expression(false);
             }
@@ -540,6 +718,7 @@ export default (config: any) => {
       }
 
       templateLiteral() {
+        log('template literal;m');
         const node = this.createNode(TemplateLiteral);
 
         if (this.token.eq('`')) {
@@ -550,11 +729,14 @@ export default (config: any) => {
 
         while (parse_template) {
 
+          log('templ tok:;c', this.token.value);
+
           if (this.token.eq('`')) {
-            log('Template Literal end;m');
 
             this.next();
             parse_template = false;
+
+            log('template literal end;g', this.token.value);
             return node;
           }
 
@@ -569,7 +751,9 @@ export default (config: any) => {
             // ++loop;
           }
 
-          // if (token.eq('}')) {}
+          // if (this.token.eq('}')) {
+          //   this.next();
+          // }
 
           this.next();
 

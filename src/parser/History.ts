@@ -128,10 +128,10 @@ class History {
 
     const { index, line, pos } = this.Tokenizer;
 
-    if (this.compare([index, line, pos])) {
-      console.log(this.Tokenizer.token)
-      this.Tokenizer.error({ title: "Tokenize Error", message: "terminated for preventing loop" });
-    }
+    // if (this.compare([index, line, pos])) {
+    //   console.log(this.Tokenizer.token)
+    //   this.Tokenizer.error({ title: "Tokenize Error", message: "terminated for preventing loop" });
+    // }
 
     this.history.push([index, line, pos]);
 

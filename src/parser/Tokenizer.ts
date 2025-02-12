@@ -87,7 +87,7 @@ class Tokenizer {
     nl: (char: string) => /[\r\n]/.test(char),
     identifier: (sequence: string) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(sequence),
     alpha: (sequence: string) => /^[a-z]*$/.test(sequence),
-    number: (_: string) => /^\d+$/.test(_)
+    number: (_: string) => /^(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/.test(_)
   }
 
   line = 1
@@ -343,6 +343,10 @@ class Tokenizer {
 
   tokenize: Tokenize = {
     number: () => {
+      if (this.is.space(this.char.curr)) return;
+      if (this.char.curr == '.') {
+        return "next";
+      }
       if (!this.is.space(this.char.curr) && this.is.number(this.token.value + this.char.curr)) {
         return "next";
       } else {
@@ -388,7 +392,9 @@ class Tokenizer {
     },
     comment_ml: () => {
 
-      if (!(this.get_token() != this.end_token)) {
+      const current_token = this.get_token();
+
+      if (!current_token && current_token != this.end_token) {
         return 'next';
       } else {
         this.advance(this.end_token.length);
@@ -525,7 +531,6 @@ class Tokenizer {
       if (error.type && error.message) {
         log(` ${error.title || 'Error'} ;R`, `\n  ${error.message};r`);
       }
-      console.log(error);
     }
 
     this.History.is_parsing = true;

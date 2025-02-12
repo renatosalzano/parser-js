@@ -49,7 +49,6 @@ class Block extends Node {
 
 interface Identifier {
   name?: string;
-  rest?: boolean;
 }
 
 class Identifier extends Node {

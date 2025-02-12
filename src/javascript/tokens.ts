@@ -31,7 +31,7 @@ const bracket = [['(', ')'], ['[', ']'], ['{', '}']];
 
 const separator = [',', ':', ';', '\n'];
 
-const keyword = ['true', 'false', 'null', 'this', 'super', 'yield', 'async'];
+const keyword = ['true', 'false', 'null', 'this', 'super', 'yield', 'async', 'as', 'from', 'default', 'case'];
 
 const statement = [
   'var', 'const', 'let', 'function',
@@ -39,7 +39,7 @@ const statement = [
   'switch', 'for', 'while', 'do',
   'return', 'continue', 'break',
   'try', 'catch', 'throw',
-  'import', 'export', 'default',
+  'import', 'export',
   'with', // deprecated
 ]
 
@@ -93,7 +93,7 @@ class PlusNegation extends Expression {
 
   onBefore(cancel: () => void) {
 
-    if (this.prevToken.type != 'literal' && this.prevToken.type != 'bracket-close' && !this.prevToken.postfix) {
+    if (this.prevToken.type != 'literal' && this.prevToken.type != 'identifier' && this.prevToken.type != 'bracket-close' && !this.prevToken.postfix) {
       this.token.prefix = true;
       delete this.token.binary;
     }
