@@ -16,7 +16,7 @@ class Variable extends Node {
   }
 }
 
-class Function extends Node {
+class Fn extends Node {
   type = 'function';
   id?: Identifier;
   expression?: boolean;
@@ -121,6 +121,7 @@ class Property extends Node {
   key?: string;
   alias?: string;
   value?: Node;
+  method?: boolean;
 
   toString() {
     const key = this.key;
@@ -249,14 +250,33 @@ class Unexpected extends Node {
   tag = 'unexptected';
 }
 
+class Class extends Node {
+  type = 'class';
+  id?: Identifier;
+  extends?: Identifier;
+  expression?: boolean;
+  body: Node[] = [];
+}
+
+class Statement extends Node {
+  type = 'statement';
+  kind?: 'if' | 'else if' | 'else' | 'switch' | 'return';
+  condition?: Node;
+  body?: Node;
+  argument?: Node | string;
+  next?: Statement;
+}
+
 export {
   Empty,
   Block,
+  Class,
   Import,
   Importer,
   Variable,
-  Function,
+  Fn,
   Property,
+  Statement,
   Primitive,
   Arguments,
   Identifier,

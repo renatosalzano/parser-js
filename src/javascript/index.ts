@@ -1,9 +1,9 @@
 import Parser from "parser/Parser";
 import { tokens } from './tokens';
-import { Arguments, ArrayExpression, Empty, Expression, Function, Identifier, Import, Importer, ObjectExpression, Primitive, Property, TemplateLiteral, Variable } from "./node";
+import { Arguments, ArrayExpression, Class, Empty, Expression, Fn, Identifier, Import, Importer, ObjectExpression, Primitive, Property, Statement, TemplateLiteral, Variable } from "./node";
 import { log } from "utils";
 import errors from "./errors";
-import { Node } from "parser/Progam";
+import { Block, Node } from "parser/Progam";
 
 export default (config: any) => {
 
@@ -11,6 +11,9 @@ export default (config: any) => {
     name: 'javascript',
     tokens,
     parser: class extends Parser {
+
+      allowReturn = false;
+
       Program() {
 
         log('program tok:;c', this.token.value);
@@ -29,7 +32,16 @@ export default (config: any) => {
                 this.export();
                 break;
               case 'function':
+                this.function(true);
                 break;
+              case 'class':
+                this.class(true);
+                break;
+              case 'if':
+                this.ifElse();
+                break;
+              case 'return':
+                this.error({ message: 'Illegal return' });
             }
             break;
           }
@@ -39,11 +51,153 @@ export default (config: any) => {
               return;
             }
             break;
+          case "bracket-open": {
+            this.appendNode(this.block());
+            break;
+          }
           default: {
-            this.expression()
+            this.expression(true)
           }
 
         }
+      }
+
+      block(append = false, fnNode?: Fn) {
+
+        log('block;m')
+
+        const node = this.createNode(Block);
+
+        const end = () => {
+          log('block end;g')
+          node.endBlock();
+
+          if (append) {
+            this.appendNode(node);
+          }
+
+          return node;
+        }
+
+        if (this.token.eq('{')) this.next();
+
+        let parse = true;
+
+        while (parse) {
+
+          log('block tok:;c', this.token.value);
+
+          switch (this.token.type) {
+
+            case 'statement': {
+              switch (this.token.value) {
+                case 'var':
+                case 'const':
+                case 'let':
+                  this.variable(this.token.value);
+                  continue;
+                case 'function':
+                  this.function(true);
+                  continue;
+                case 'if':
+                  this.ifElse();
+                  continue;
+                case 'switch':
+                  this.switch();
+                  continue;
+                case 'return':
+                  if (this.allowReturn && fnNode) {
+                    this.return(fnNode);
+                  }
+                  return end();
+              }
+              break;
+            }
+
+            case 'bracket-open': {
+              if (this.token.eq('{')) {
+                this.block(true, fnNode)
+              }
+            }
+
+            case 'bracket-close': {
+              if (this.token.eq('}')) {
+                this.next();
+                parse = false;
+                return end();
+              }
+              break;
+            }
+
+            case 'keyword':
+            default: {
+              switch (this.token.value) {
+                case 'async':
+                  this.function(true, { async: true });
+                  continue;
+              }
+              this.expression(true);
+            }
+
+          }
+        }
+
+        return end();
+      }
+
+      return(fnNode: Fn) {
+        log('block return;m');
+
+        this.skipNewline(false);
+        if (this.token.eq('return')) this.next();
+
+        if (this.token.eq(/[;\n]/)) {
+
+          this.skipNewline(true);
+          this.next();
+
+          if (!this.token.eq('}')) {
+            log('Unreachable code detected.;y');
+            while (!this.token.eq('}')) {
+              this.next();
+              console.log(this.token.value);
+            }
+          }
+
+          this.next();
+
+          return;
+        }
+
+        this.skipNewline(true);
+
+        const node = this.createNode(Statement, { kind: 'return' });
+
+        const expr = this.expression();
+
+        if (expr instanceof Expression) {
+          if (expr.expression.length > 1) {
+            log('Unreachable code detected;y');
+            node.argument = expr.expression[0];
+
+            if (node.argument instanceof Node) {
+              fnNode.returnType = node.argument.type || 'void';
+            } else {
+              fnNode.returnType = node.argument;
+            }
+
+            this.next(); // over '}'
+            this.error({ message: 'swag' })
+            return;
+          }
+        }
+
+        node.argument = expr;
+
+        console.log(node)
+
+        this.error({ message: 'swag' })
+
       }
 
       import() {
@@ -185,14 +339,66 @@ export default (config: any) => {
 
       export() { }
 
+      ifElse(kind: 'if' | 'else' = 'if') {
+
+        log(`statement ${kind};m`);
+
+        const node = this.createNode(Statement, { kind })
+
+        if (this.token.eq(kind)) this.next();
+
+        let expected_condition = kind == 'else'
+          ? this.token.eq('if')
+          : true;
+
+        if (kind == 'else' && expected_condition) {
+          node.kind = 'else if';
+          this.next();
+        }
+
+        if (expected_condition) {
+          log('expected condition;y')
+
+          if (this.token.eq('(')) {
+            this.next();
+
+            node.condition = this.expression();
+
+
+            if (this.token.eq(')')) {
+              this.next();
+            } else {
+              // error
+            }
+
+          } else {
+            // error
+          }
+
+        } // end condition
+
+        if (this.token.eq('{')) {
+          node.body = this.block();
+        }
+
+        if (this.token.eq('else')) {
+          node.next = this.ifElse('else');
+        }
+
+        if (node.kind == 'if') {
+          this.appendNode(node);
+        }
+        return node;
+      }
+
+      switch() { }
+
       expression(append = false, node: Expression = this.createNode(Expression)) {
 
-        log('expression;m', this.token.value)
+        log('expression;m', this.token.value, this.nextToken.value)
 
-        const self = this;
-
-        function end() {
-          log('end expression;g', self.token.value);
+        const end = () => {
+          log('end expression;g', this.token.value);
 
           let output = node;
 
@@ -207,7 +413,7 @@ export default (config: any) => {
           }
 
           if (append) {
-            self.appendNode(output);
+            this.appendNode(output);
           }
 
           return output;
@@ -219,24 +425,27 @@ export default (config: any) => {
 
         while (max > 0 && parse_expression) {
 
-          log('expr tok:;c', this.token.value)
+          --max;
+
+          log('expr tok:;c', this.token.value);
+
+          if (this.token.eq('else')) this.error({ message: 'else' })
 
           switch (this.token.type) {
             case "identifier":
-              operand = true;
               node.add(this.createNode(Identifier, { name: this.token.value }));
+              this.next();
 
-              if (this.nextToken.eq('(')) {
-                this.next();
+              if (this.token.eq('(')) {
                 node.kind = 'call';
                 continue;
               }
 
-              break;
+              continue;
             case 'literal':
-              operand = true;
               node.add(this.createNode(Primitive, this.token));
-              break;
+              this.next();
+              continue;
             case "operator": {
 
               if (this.token.binary) {
@@ -250,7 +459,6 @@ export default (config: any) => {
               continue;
             }
             case "bracket-open": {
-              operand = true;
               switch (this.token.value) {
                 case '{':
                   node.add(this.object());
@@ -274,7 +482,7 @@ export default (config: any) => {
                       return fn_node;
                     } else {
                       node.add(fn_node);
-                      break;
+                      continue;
                     }
                   }
 
@@ -282,26 +490,48 @@ export default (config: any) => {
 
                   if (node.kind == 'call') {
                     node.add(this.arguments());
-                    break;
+                    continue;
                   }
 
                   const group = this.createNode(Expression, { group: true });
                   node.add(this.expression(false, group));
-                  break;
+                  continue;
                 }
               }
               break;
             }
             case "bracket-close": {
-
-              switch (this.token.value) {
-                case ')':
-                  return end();
-              }
-              console.log('porco dio')
               return end();
             }
-            // case "keyword":
+            case "keyword": {
+
+              switch (this.token.value) {
+                case 'true':
+                case 'false':
+                case 'null':
+                  node.add(this.createNode(Primitive, this.token));
+                  this.next()
+                  continue;
+                case 'this':
+                  node.add('this');
+                  this.next()
+                  continue;
+                case 'super':
+                  node.add('super');
+                  this.next()
+
+                  if (this.token.eq('(')) {
+                    this.next();
+                    node.kind = 'call';
+                    continue;
+                  }
+                  break;
+                default:
+                // error
+              }
+
+              break;
+            }
             case "statement":
             case "separator": {
 
@@ -311,7 +541,7 @@ export default (config: any) => {
                     this.next();
                     continue;
                   } else {
-                    return end();
+                    break;
                   }
                 case ';': {
                   this.next();
@@ -334,29 +564,6 @@ export default (config: any) => {
             }
             case "comment":
           }
-
-          this.next();
-
-          if (operand) {
-            operand = false;
-
-            if (node.group && this.token.eq(',')) {
-              this.next();
-              continue;
-            }
-
-            if (this.token.postfix) {
-              node.add(this.token.value);
-              this.next();
-            }
-
-            if (this.token.binary) {
-              continue;
-            }
-
-          }
-
-          --max;
 
           return end()
 
@@ -412,7 +619,17 @@ export default (config: any) => {
           this.next();
         }
 
-        const node = this.createNode(Function, { arrow, async, expression });
+        const node = this.createNode(Fn, { arrow, async, expression });
+
+        const end = () => {
+
+          log('function end;g');
+          if (append) {
+            this.appendNode(node);
+          }
+
+          return node;
+        }
 
         if (this.token.eq('identifier')) {
           node.id = this.createNode(Identifier, { name: this.token.value });
@@ -432,18 +649,20 @@ export default (config: any) => {
           log('arrow fn body expression;y');
 
           node.body = this.expression(false);
-          return node;
+          return end();
         }
 
         if (this.token.eq('{')) {
           // block
-
+          this.allowReturn = true;
+          node.body = this.block(false, node);
+          this.allowReturn = false;
         } else {
           // error
         }
 
 
-        return node;
+        return end();
 
       }
 
@@ -509,7 +728,7 @@ export default (config: any) => {
 
         if (this.token.eq(/[,;]/)) {
 
-          if (this.token.eq(';')) {
+          if (this.token.eq(/[;\n]/)) {
             this.eat(this.token.value, true);
             this.next();
           }
@@ -519,7 +738,7 @@ export default (config: any) => {
           }
         }
 
-        log('variable end;g', this.token)
+        log('variable end;g', this.token.value);
       }
 
       variableID(node: Variable) {
@@ -546,6 +765,60 @@ export default (config: any) => {
 
         node.init = this.expression(false);
 
+      }
+
+      class(append = false, { expression }: { expression?: boolean } = {}) {
+
+        log('class;m');
+
+        const node = this.createNode(Class);
+
+        if (this.token.eq('class')) this.next();
+
+        if (this.token.eq('identifier')) {
+          node.id = this.createNode(Identifier, { name: this.token.value });
+          this.next();
+        } else {
+          node.expression = true;
+        }
+
+        if (this.token.eq('extends')) {
+          this.next();
+          if (this.token.eq('identifiers')) {
+            node.extends = this.createNode(Identifier, { name: this.token.value });
+            this.next();
+          }
+        }
+
+      }
+
+      classBody(node: Class) {
+
+        if (this.token.eq('{')) {
+          this.next();
+        }
+
+        let parse = true;
+
+        while (parse) {
+          const property = this.createNode(Property);
+          const { key } = this.objectKey('expression');
+
+          property.key = key;
+
+          switch (this.token.value) {
+            case '=':
+              this.next();
+              property.value = this.objectValue();
+              break;
+            case '(':
+              property.value = this.function(false, { expression: true })
+
+            case ';':
+              this.next();
+          }
+
+        }
       }
 
       object(type?: 'expression' | 'pattern') {

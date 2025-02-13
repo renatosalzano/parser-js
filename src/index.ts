@@ -35,13 +35,6 @@ async function main() {
 
   try {
 
-    let a = 1
-
-    'string';
-
-    a++
-
-    console.log(1 - +'0');
 
 
 

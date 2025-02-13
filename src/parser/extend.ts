@@ -265,34 +265,28 @@ function extend_ternary(this: Tokenizer, tokens: string[]) {
 // PARSER API
 function next(this: Tokenizer, debug = false) {
 
-  try {
-
-    if (this.token_index == this.History.tokens.length - 1) {
-      this.tokens_end = true;
-      throw 'end';
-    }
+  while (this.token_index < this.History.tokens.length) {
 
     if (debug) {
       console.log('debug', this.token_index)
-      console.log(this.History.tokens[this.token_index]);
     }
 
     this.History.get_token(this.token_index);
     ++this.token_index;
 
     if (this.skip_comment && this.token.type == 'comment') {
-      if (this.tokens_end) throw 'end'; // WTF
-      next.call(this);
+      continue;
     }
 
     if (this.skip_newline && this.token.eq('\n')) {
-      if (this.tokens_end) throw 'end'; // WTF
-      next.call(this);
+      continue;
     }
 
-  } catch {
-    this.History.last_token();
+    return;
+
   }
+
+  log('this is the end;r')
 
 }
 

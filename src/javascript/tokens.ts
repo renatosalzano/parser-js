@@ -31,10 +31,10 @@ const bracket = [['(', ')'], ['[', ']'], ['{', '}']];
 
 const separator = [',', ':', ';', '\n'];
 
-const keyword = ['true', 'false', 'null', 'this', 'super', 'yield', 'async', 'as', 'from', 'default', 'case'];
+const keyword = ['true', 'false', 'null', 'this', 'super', 'yield', 'async', 'as', 'from', 'default', 'case', 'extends'];
 
 const statement = [
-  'var', 'const', 'let', 'function',
+  'var', 'const', 'let', 'function', 'class',
   'if', 'else',
   'switch', 'for', 'while', 'do',
   'return', 'continue', 'break',
@@ -63,7 +63,7 @@ const builtIn = [
   'Iterator', 'AsyncIterator', 'Promise', 'GeneratorFunction', 'AsyncGeneratorFunction', 'Generator', 'AsyncGenerator', 'AsyncFunction',
   'Reflect', 'Proxy',
   'Intl',
-  'window', 'console',
+  'window', 'console', 'log', 'error', 'info'
 ]
 
 

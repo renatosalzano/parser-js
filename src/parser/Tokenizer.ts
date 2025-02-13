@@ -414,7 +414,7 @@ class Tokenizer {
   next = (debug: boolean | 'suppress' = false) => {
 
     if (this.is.nl(this.char.curr)) {
-      ++this.line;
+      ++this.line, this.pos = 1;
     }
 
     this.token.value = '';

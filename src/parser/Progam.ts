@@ -32,7 +32,7 @@ class Node {
 
 class Block extends Node {
   type = 'block';
-  functionBody = false;
+  functionBody?: boolean;
   body: Node[] = [];
 
   appendNode(node: Node) {
@@ -96,8 +96,6 @@ class Program {
         line
       };
     }
-
-
 
     if (node instanceof Block) {
 
