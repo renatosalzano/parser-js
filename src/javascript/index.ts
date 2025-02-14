@@ -13,6 +13,7 @@ export default (config: any) => {
     parser: class extends Parser {
 
       allowReturn = false;
+      checkNewline = false;
 
       Program() {
 
@@ -103,7 +104,7 @@ export default (config: any) => {
                   this.ifElse();
                   continue;
                 case 'switch':
-                  this.switch();
+                  this.switchCase();
                   continue;
                 case 'return':
                   if (this.allowReturn && fnNode) {
@@ -149,54 +150,68 @@ export default (config: any) => {
         log('block return;m');
 
         this.skipNewline(false);
+        this.checkNewline = true;
+
         if (this.token.eq('return')) this.next();
 
-        if (this.token.eq(/[;\n]/)) {
+        let unreachable_code = this.token.eq('\n');
 
-          this.skipNewline(true);
-          this.next();
-
-          if (!this.token.eq('}')) {
-            log('Unreachable code detected.;y');
-            while (!this.token.eq('}')) {
-              this.next();
-              console.log(this.token.value);
-            }
-          }
-
-          this.next();
-
-          return;
+        if (unreachable_code) {
+          this.next(); // over newline
         }
-
-        this.skipNewline(true);
 
         const node = this.createNode(Statement, { kind: 'return' });
 
-        const expr = this.expression();
+        const ret: Node[] = [];
+        const unreachable: Node[] = [];
+        let after_comma = false;
 
-        if (expr instanceof Expression) {
-          if (expr.expression.length > 1) {
-            log('Unreachable code detected;y');
-            node.argument = expr.expression[0];
+        while (!this.token.eq('}')) {
 
-            if (node.argument instanceof Node) {
-              fnNode.returnType = node.argument.type || 'void';
-            } else {
-              fnNode.returnType = node.argument;
-            }
+          const node = this.expression();
 
-            this.next(); // over '}'
-            this.error({ message: 'swag' })
-            return;
+          if (this.token.type == 'bracket-close') {
+            this.next();
           }
+
+          if (unreachable_code) {
+            continue;
+          }
+
+          if (this.token.eq('\n')) {
+            this.next();
+          }
+
+          if (after_comma) {
+            after_comma = false;
+            ret.push(node);
+          }
+
+          if (this.token.eq(',')) {
+            this.next();
+            after_comma = true;
+            ret.push(node);
+          }
+
+          if (this.token.eq('\n')) {
+            this.next();
+          }
+
+          if (this.token.eq(';')) {
+            this.next();
+          }
+
         }
 
-        node.argument = expr;
+        this.skipNewline(true);
+        this.checkNewline = false;
 
-        console.log(node)
+        this.next();
 
-        this.error({ message: 'swag' })
+        node.argument = ret.at(-1);
+        fnNode.returnType = node.argument?.type || 'void';
+
+        this.appendNode(node);
 
       }
 
@@ -391,11 +406,11 @@ export default (config: any) => {
         return node;
       }
 
-      switch() { }
+      switchCase() { }
 
       expression(append = false, node: Expression = this.createNode(Expression)) {
 
-        log('expression;m', this.token.value, this.nextToken.value)
+        log('expression;m', this.token.value, this.nextToken.value);
 
         const end = () => {
           log('end expression;g', this.token.value);
@@ -420,7 +435,6 @@ export default (config: any) => {
         }
 
         let parse_expression = true;
-        let operand, operator;
         let max = 10
 
         while (max > 0 && parse_expression) {
@@ -442,10 +456,21 @@ export default (config: any) => {
               }
 
               continue;
-            case 'literal':
+            case 'literal': {
+
+              if (this.checkNewline && this.token.eq('\n')) {
+                return end();
+              }
+
+              if (this.token.value == "1") {
+                console.log('hey', this.token)
+              }
+
               node.add(this.createNode(Primitive, this.token));
+
               this.next();
               continue;
+            }
             case "operator": {
 
               if (this.token.binary) {
@@ -555,7 +580,6 @@ export default (config: any) => {
               return end();
             }
             case "special": {
-              operand = true;
               if (this.token.value == '`') {
                 node.add(this.templateLiteral());
                 continue;

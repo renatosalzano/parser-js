@@ -286,8 +286,8 @@ function next(this: Tokenizer, debug = false) {
 
   }
 
-  log('this is the end;r')
-
+  log('this is the end;r');
+  this.tokens_end = true;
 }
 
 

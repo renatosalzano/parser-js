@@ -1,7 +1,6 @@
 import Tokenizer, { Error, Token, TokenType } from "parser/Tokenizer";
 import Program from "parser/Progam";
 import { log } from "utils";
-import { ContextObject } from "parser/Context";
 
 type Brackets =
   | 'L'
@@ -30,19 +29,19 @@ type ParserApi<T, A> = {
 }
 
 
-type plugin = {
-  context: { [K in Exclude<string, 'Program'>]: ContextObject } & { Program?: string[] };
-  api: Api;
-  operators: { [key: string]: string };
-  parse: (api: any) => { [key: string]: () => any }
-}
+// type plugin = {
+//   context: { [K in Exclude<string, 'Program'>]: ContextObject } & { Program?: string[] };
+//   api: Api;
+//   operators: { [key: string]: string };
+//   parse: (api: any) => { [key: string]: () => any }
+// }
 
-type Plugin = (config?: { [key: string]: any }) => plugin
+// type Plugin = (config?: { [key: string]: any }) => plugin
 
-export {
-  Plugin,
-  plugin,
-}
+// export {
+//   Plugin,
+//   plugin,
+// }
 
 // export default Plugin;
 

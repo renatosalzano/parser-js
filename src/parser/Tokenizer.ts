@@ -343,15 +343,22 @@ class Tokenizer {
 
   tokenize: Tokenize = {
     number: () => {
-      if (this.is.space(this.char.curr)) return;
+
+      if (this.is.space(this.char.curr)) {
+        this.token.subtype = 'number';
+        return;
+      }
+
       if (this.char.curr == '.') {
         return "next";
       }
+
       if (!this.is.space(this.char.curr) && this.is.number(this.token.value + this.char.curr)) {
         return "next";
       } else {
         // end
         this.token.subtype = 'number';
+        console.log(this.token);
       }
     },
     string: () => {

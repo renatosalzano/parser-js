@@ -263,7 +263,7 @@ class Statement extends Node {
   kind?: 'if' | 'else if' | 'else' | 'switch' | 'return';
   condition?: Node;
   body?: Node;
-  argument?: Node | string;
+  argument?: Node;
   next?: Statement;
 }
 
