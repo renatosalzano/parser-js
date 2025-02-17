@@ -160,10 +160,8 @@ export default (config: any) => {
           this.next(); // over newline
         }
 
-        const node = this.createNode(Statement, { kind: 'return' });
+        const ret_node = this.createNode(Statement, { kind: 'return', argument: [] });
 
-        const ret: Node[] = [];
-        const unreachable: Node[] = [];
         let after_comma = false;
 
         while (!this.token.eq('}')) {
@@ -184,13 +182,18 @@ export default (config: any) => {
 
           if (after_comma) {
             after_comma = false;
-            ret.push(node);
+
+            if (node instanceof Expression && node.empty()) continue;
+            ret_node.add(node);
+            continue
           }
 
           if (this.token.eq(',')) {
             this.next();
             after_comma = true;
-            ret.push(node);
+
+            if (node instanceof Expression && node.empty()) continue;
+            ret_node.add(node);
           }
 
           if (this.token.eq('\n')) {
@@ -208,10 +211,9 @@ export default (config: any) => {
 
         this.next();
 
-        node.argument = ret.at(-1);
-        fnNode.returnType = node.argument?.type || 'void';
+        fnNode.returnType = ret_node?.argument?.at(-1)?.type || 'void';
 
-        this.appendNode(node);
+        this.appendNode(ret_node);
 
       }
 
@@ -408,9 +410,10 @@ export default (config: any) => {
 
       switchCase() { }
 
+
       expression(append = false, node: Expression = this.createNode(Expression)) {
 
-        log('expression;m', this.token.value, this.nextToken.value);
+        log('expression;m', this.token.value);
 
         const end = () => {
           log('end expression;g', this.token.value);
@@ -442,8 +445,6 @@ export default (config: any) => {
           --max;
 
           log('expr tok:;c', this.token.value);
-
-          if (this.token.eq('else')) this.error({ message: 'else' })
 
           switch (this.token.type) {
             case "identifier":
@@ -519,7 +520,13 @@ export default (config: any) => {
                   }
 
                   const group = this.createNode(Expression, { group: true });
-                  node.add(this.expression(false, group));
+
+                  if (node.empty()) {
+                    node = group;
+                  } else {
+                    node.add(this.expression(false, group));
+                  }
+
                   continue;
                 }
               }
@@ -811,8 +818,12 @@ export default (config: any) => {
           if (this.token.eq('identifiers')) {
             node.extends = this.createNode(Identifier, { name: this.token.value });
             this.next();
+          } else {
+            // error
           }
         }
+
+
 
       }
 

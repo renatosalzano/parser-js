@@ -62,6 +62,10 @@ class Expression extends Node {
     return expr.join('');
   }
 
+  empty() {
+    return this.expression.length == 0;
+  }
+
 }
 
 class Arguments extends Node {
@@ -263,8 +267,14 @@ class Statement extends Node {
   kind?: 'if' | 'else if' | 'else' | 'switch' | 'return';
   condition?: Node;
   body?: Node;
-  argument?: Node;
+  argument?: Node[];
   next?: Statement;
+
+  add(node: Node) {
+    if (this.argument) {
+      this.argument.push(node)
+    }
+  }
 }
 
 export {
