@@ -84,7 +84,7 @@ export default (config: any) => {
 
         let parse = true;
 
-        while (parse) {
+        while (!this.token.eq('}')) {
 
           log('block tok:;c', this.token.value);
 
@@ -121,15 +121,6 @@ export default (config: any) => {
               }
             }
 
-            case 'bracket-close': {
-              if (this.token.eq('}')) {
-                this.next();
-                parse = false;
-                return end();
-              }
-              break;
-            }
-
             case 'keyword':
             default: {
               switch (this.token.value) {
@@ -141,7 +132,9 @@ export default (config: any) => {
             }
 
           }
-        }
+        } // end loop
+
+        this.next();
 
         return end();
       }
@@ -824,7 +817,18 @@ export default (config: any) => {
         }
 
 
+        if (this.token.eq('{')) {
+          this.next();
+          this.classBody(node);
+        } else {
+          // error
+        }
 
+        if (append) {
+          this.appendNode(node);
+        }
+
+        return node;
       }
 
       classBody(node: Class) {
@@ -833,28 +837,54 @@ export default (config: any) => {
           this.next();
         }
 
-        let parse = true;
+        while (!this.token.eq('}')) {
 
-        while (parse) {
           const property = this.createNode(Property);
-          const { key } = this.objectKey('expression');
+          let async = false;
 
-          property.key = key;
+          if (this.token.eq('static')) {
+            this.next();
+            property.static = true;
+          }
+
+          if (this.token.eq('async')) {
+            this.next();
+            async = true;
+          }
+
+          if (this.token.eq('identifier')) {
+            property.key = this.token.value;
+            this.next();
+          } else {
+            // error
+          }
 
           switch (this.token.value) {
             case '=':
               this.next();
-              property.value = this.objectValue();
+              property.value = this.expression(false)
+              break;
+            case ';':
+              this.eat(';', true);
+              this.next();
               break;
             case '(':
-              property.value = this.function(false, { expression: true })
+              property.method = true;
+              property.value = this.function(false, { expression: true });
+          }
 
-            case ';':
-              this.next();
+          node.add(property);
+
+          if (this.token.eq(';')) {
+            this.eat(';', true);
+            this.next()
           }
 
         }
+
+        this.next();
       }
+
 
       object(type?: 'expression' | 'pattern') {
 

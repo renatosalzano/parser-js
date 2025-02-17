@@ -124,6 +124,7 @@ class Property extends Node {
   type = 'property';
   key?: string;
   alias?: string;
+  static?: boolean;
   value?: Node;
   method?: boolean;
 
@@ -260,6 +261,10 @@ class Class extends Node {
   extends?: Identifier;
   expression?: boolean;
   body: Node[] = [];
+
+  add(node: Node) {
+    this.body.push(node);
+  }
 }
 
 class Statement extends Node {
@@ -278,13 +283,13 @@ class Statement extends Node {
 }
 
 export {
+  Fn,
   Empty,
   Block,
   Class,
   Import,
   Importer,
   Variable,
-  Fn,
   Property,
   Statement,
   Primitive,
