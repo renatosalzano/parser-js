@@ -729,7 +729,24 @@ export default (config: any) => {
 
         this.next();
 
-        this.variableID(node); // parse id
+        // parse ide
+        switch (this.token.type) {
+          case "identifier":
+            node.id = this.createNode(Identifier, { name: this.token.value });
+            this.next();
+            break;
+          case "bracket-open":
+            switch (this.token.value) {
+              case "{":
+                node.id = this.object('pattern');
+                break;
+              case "[":
+                break;
+            }
+            break;
+          default:
+          // error
+        }
 
         log('variable;m', 'id done;g');
 
@@ -744,7 +761,7 @@ export default (config: any) => {
             this.error({ message: errors.variable.expected_init });
           }
 
-          this.variableInit(node);
+          node.init = this.expression(false);
           log('variable;m', 'init done;g');
         }
 
@@ -763,32 +780,6 @@ export default (config: any) => {
         }
 
         log('variable end;g', this.token.value);
-      }
-
-      variableID(node: Variable) {
-        switch (this.token.type) {
-          case "identifier":
-            node.id = this.createNode(Identifier, { name: this.token.value });
-            this.next();
-            break;
-          case "bracket-open":
-            switch (this.token.value) {
-              case "{":
-                node.id = this.object('pattern');
-                break;
-              case "[":
-                break;
-            }
-            break;
-          default:
-          // todo catch error
-        }
-      }
-
-      variableInit(node: Variable) {
-
-        node.init = this.expression(false);
-
       }
 
       class(append = false, { expression }: { expression?: boolean } = {}) {
@@ -911,6 +902,7 @@ export default (config: any) => {
         while (/* max > 0 &&  */parse_object) {
 
           const { key, alias } = this.objectKey(type);
+
           let value: Expression | Node | undefined = undefined;
 
           log('key:;c', key, 'alias:;c', alias, this.token.value);

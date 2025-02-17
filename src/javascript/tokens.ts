@@ -81,13 +81,7 @@ class Declarator extends TokenContext {
   }
 }
 
-class Expression extends TokenContext {
-  state = {
-    expression: false
-  }
-}
-
-class PlusNegation extends Expression {
+class PlusNegation extends TokenContext {
   name = 'plus-negation'
   start = ['+', '-'];
 
@@ -103,13 +97,11 @@ class PlusNegation extends Expression {
 }
 
 
-class IncDecr extends Expression {
+class IncDecr extends TokenContext {
   name = 'increment/decrement'
   start = ['++', '--'];
 
   onBefore(cancel: () => void) {
-
-    console.log(this.prevToken)
 
     if (this.prevToken.value == '++' || this.prevToken.value == '--') {
       // TODO ERROR BLOCKING
@@ -121,7 +113,7 @@ class IncDecr extends Expression {
 }
 
 
-class ExpressionContainer extends Expression {
+class ExpressionContainer extends TokenContext {
   name = 'expression-container';
   start = ['{', '[', '(', '${'];
   end = ['}', ']', ')'];
@@ -132,7 +124,19 @@ class ExpressionContainer extends Expression {
 
 }
 
-class TempateLiteral extends Expression {
+
+class Return extends TokenContext {
+  name = 'return-statement';
+  start = ['return'];
+
+  state = {
+    expression: true
+  }
+
+}
+
+
+class TempateLiteral extends TokenContext {
   name = 'template-literal';
   start = ['`'];
   end = ['`'];
@@ -167,18 +171,6 @@ class TempateLiteral extends Expression {
   }
 }
 
-class TagStart extends Expression {
-  name = 'tag';
-  start = ['<'];
-
-  is_tag_name(name: string) {
-    /^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$/.test(name);
-  }
-
-  // tokenize() {
-  //   if ()
-  // }
-}
 
 export const tokens = {
   builtIn,
@@ -190,6 +182,7 @@ export const tokens = {
   statement,
   specialToken,
   context: [
+    Return,
     IncDecr,
     Declarator,
     PlusNegation,

@@ -7,16 +7,24 @@ interface Ctor<T> {
 
 type Get = () => string | undefined;
 
-const token_prop_keys = new Set(['arithmetic', 'assignment', 'comparison', 'logical', 'bitwise', 'binary', 'conditional', 'postfix', 'prefix', 'ternary'])
+const token_prop_keys = new Set(['bitwise', 'binary', 'postfix', 'prefix', 'ternary', 'assignment'])
 
 export interface TokenContext {
   name: string;
   start: string[];
   end: string[];
+  expression?: boolean;
   onBefore?(cancel: () => void): any;
   onStart?(): any;
   onEnd?(): any;
   tokenize?(): 'next' | 'skip' | undefined;
+}
+
+
+type ContextState = {
+  expression?: boolean;
+} & {
+  [key: string]: any
 }
 
 export class TokenContext {
@@ -32,14 +40,12 @@ export class TokenContext {
     public prevContext: () => string | null,
     public skipWhitespace: (skip?: boolean) => void,
     public error: Tokenizer['error']
-  ) {
-
-  }
+  ) { }
 
   name: string = '';
   start: string[] = [];
   end: string[] = [];
-  state: { [key: string]: any } = {};
+  state: ContextState = {};
 }
 
 type context = Omit<TokenContext, 'start' | 'end'> & {
